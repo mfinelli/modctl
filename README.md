@@ -19,6 +19,31 @@ writing the documentation). I'm not using an agent, just my the chat interface
 from my browser and when I ask it to write functions I'm reviewing, testing,
 and modifying (when necessary) all of its output.
 
+### Motivation
+
+Gaming on Linux is a real thing now (at least for the kinds of games that I
+play) but modding seems to still be stuck in Windows-only land. In theory one
+can run Vortex or Mod Organizer 2 on Linux using wine but it's clunky (and
+when I tried it I was able to successfully install the tools but the
+performance was abysmal even just starting the game through the mod launcher
+with no mods enabled). There are a few attempts that I'm aware of to make
+real Linux ports of these tools but there hasn't been any real progress that
+I can see. On the other hand for the games that I tried just dumping the files
+into the game directory worked without issue but I missed the nice things
+about a mod manager (e.g., version update check against Nexus, managing the
+load order if there are conflicts, etc).
+
+So I had a flash of inspiration that at the end of the day if all I'm doing
+is dumping the files into the game directory what I really need is just a
+simple package manager to keep track of which archives I've extracted and
+which files they have created so that install/uninstall is easy and if I keep
+track of the Nexus ID I can also make it check for updates (though probably
+not automatically update the mods which is fine) and get most of the
+functionality that matters to me. I thought that I could just keep everything
+in a SQlite database and I'd me most of the way there. A few messages with
+your friendly LLM to flesh out the idea and think about edge cases, etc and
+here we are.
+
 ---
 
 ## Goals
