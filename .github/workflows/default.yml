@@ -1,0 +1,32 @@
+---
+name: Default
+on:
+  push:
+    branches: [master]
+    tags: [v*]
+  pull_request:
+    branches: [master]
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          cache: true
+          go-version-file: go.mod
+      - run: go mod download
+      - run: "[[ -z $(go fmt ./...) ]]"
+      - run: make
+      - run: go test -v ./...
+      - run: go vet ./...
+      - uses: dominikh/staticcheck-action@v1
+        with:
+          install-go: false
+      - uses: actions/upload-artifact@v6
+        with:
+          name: build
+          path: modctl
+          retention-days: 3
