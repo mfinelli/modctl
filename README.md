@@ -40,7 +40,7 @@ which files they have created so that install/uninstall is easy and if I keep
 track of the Nexus ID I can also make it check for updates (though probably
 not automatically update the mods which is fine) and get most of the
 functionality that matters to me. I thought that I could just keep everything
-in a SQlite database and I'd me most of the way there. A few messages with
+in a SQLite database and I'd be most of the way there. A few messages with
 your friendly LLM to flesh out the idea and think about edge cases, etc and
 here we are.
 
