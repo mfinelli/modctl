@@ -14,6 +14,9 @@ Heroic, Lutris, and future GOG clients.
 Metadata is stored in SQLite. Binary artifacts (archives and backups) are
 stored in content-addressed blob stores.
 
+I'm focusing on Linux for this tool, but if they don't raise the overall
+complexity too much I'm willing to accept patches for macOS or Windows support.
+
 **Disclaimer:** I'm using AI to help me plan/build this tool (especially for
 writing the documentation). I'm not using an agent, just my the chat interface
 from my browser and when I ask it to write functions I'm reviewing, testing,
