@@ -30,5 +30,5 @@ DROP INDEX idx_stores_enabled;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
-DROP TABLE stores
+DROP TABLE stores;
 -- +goose StatementEnd
