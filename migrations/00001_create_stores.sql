@@ -24,6 +24,11 @@ CREATE TABLE stores
 CREATE INDEX idx_stores_enabled ON stores(enabled);
 -- +goose StatementEnd
 
+-- +goose StatementBegin
+INSERT INTO stores (id, display_name, implementation, enabled)
+VALUES ('steam', 'Steam', 'steam', TRUE);
+-- +goose StatementEnd
+
 -- +goose Down
 -- +goose StatementBegin
 DROP INDEX idx_stores_enabled;
