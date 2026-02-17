@@ -16,20 +16,37 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package main
+package internal
 
 import (
+	"database/sql"
 	"embed"
+	"fmt"
 
-	"github.com/mfinelli/modctl/cmd"
-	"github.com/mfinelli/modctl/internal"
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/pressly/goose/v3"
 )
 
-//go:embed migrations/*.sql
-var migrations embed.FS
+const DB_PRAGMAS = "?_foreign_keys=ON&_journal_mode=WAL&_synchronous=NORMAL"
 
-func main() {
-	internal.Migrations = migrations
+var Migrations embed.FS
 
-	cmd.Execute()
+func SetupDB() (*sql.DB, error) {
+	// TODO: db name/path is configurable
+	return sql.Open("sqlite3", fmt.Sprintf("file:%s%s",
+		"modctl.db", DB_PRAGMAS))
+}
+
+func MigrateDB(db *sql.DB) error {
+	goose.SetBaseFS(Migrations)
+
+	if err := goose.SetDialect("sqlite3"); err != nil {
+		return fmt.Errorf("error setting goose dialect: %w", err)
+	}
+
+	if err := goose.Up(db, "migrations"); err != nil {
+		return fmt.Errorf("error migrating database: %w", err)
+	}
+
+	return nil
 }
