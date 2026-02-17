@@ -21,7 +21,7 @@ CREATE TABLE game_installs
   install_root TEXT NOT NULL CHECK (LENGTH(install_root) > 0),
 
   -- opaque JSON for store-provided metadata (build id, branch, platform, etc)
-  metadata TEST CHECK (json_valid(metadata)),
+  metadata TExT CHECK (json_valid(metadata)),
 
 
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
