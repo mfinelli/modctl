@@ -3,6 +3,7 @@ module github.com/mfinelli/modctl
 go 1.25.7
 
 require (
+	github.com/adrg/xdg v0.5.3
 	github.com/mattn/go-sqlite3 v1.14.34
 	github.com/pressly/goose/v3 v3.26.0
 	github.com/spf13/cobra v1.10.2

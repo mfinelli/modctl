@@ -19,14 +19,19 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
+	"github.com/adrg/xdg"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-var cfgFile string
+var (
+	cfgFile string
+	verbose bool
+)
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -55,37 +60,68 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
+	rootCmd.PersistentFlags().StringVar(
+		&cfgFile,
+		"config",
+		"",
+		"config file (default is $XDG_CONFIG_HOME/modctl/config.toml",
+	)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.modctl.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.PersistentFlags().BoolVarP(
+		&verbose,
+		"verbose",
+		"v",
+		false,
+		"enable verbose output",
+	)
 }
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Find home directory.
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
+	// if unspecified just search $PATH
+	viper.SetDefault("bsdtar", "bsdtar")
 
-		// Search config in home directory with name ".modctl" (without extension).
-		viper.AddConfigPath(home)
-		viper.SetConfigType("yaml")
-		viper.SetConfigName(".modctl")
+	if cfgFile != "" {
+		// User explicitly provided a config file: it must work.
+		viper.SetConfigFile(cfgFile)
+		viper.SetConfigType("toml")
+
+		if err := viper.ReadInConfig(); err != nil {
+			cobra.CheckErr(err)
+		}
+
+		if verbose {
+			fmt.Fprintln(os.Stderr, "Using config file: ",
+				viper.ConfigFileUsed())
+		}
+
+		return
 	}
 
-	viper.AutomaticEnv() // read in environment variables that match
+	defaultPath, err := xdg.ConfigFile("modctl/config.toml")
+	cobra.CheckErr(err)
 
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+	if _, err := os.Stat(defaultPath); errors.Is(err, os.ErrNotExist) {
+		return // default config file doesn't exist -- use defaults
+	}
+
+	viper.SetConfigFile(defaultPath)
+	viper.SetConfigType("toml")
+
+	if err := viper.ReadInConfig(); err != nil {
+		// missing config file is fine -- use the built-in defaults
+		var notFound viper.ConfigFileNotFoundError
+		if errors.As(err, &notFound) {
+			return
+		}
+
+		// parse/permission errors should fail loudly
+		cobra.CheckErr(err)
+		return
+	}
+
+	if verbose {
+		fmt.Fprintln(os.Stderr, "Using config file: ",
+			viper.ConfigFileUsed())
 	}
 }
