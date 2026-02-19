@@ -25,6 +25,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
+	"github.com/spf13/viper"
 )
 
 const DB_PRAGMAS = "?_foreign_keys=ON&_journal_mode=WAL&_synchronous=NORMAL"
@@ -32,9 +33,8 @@ const DB_PRAGMAS = "?_foreign_keys=ON&_journal_mode=WAL&_synchronous=NORMAL"
 var Migrations embed.FS
 
 func SetupDB() (*sql.DB, error) {
-	// TODO: db name/path is configurable
 	return sql.Open("sqlite3", fmt.Sprintf("file:%s%s",
-		"modctl.db", DB_PRAGMAS))
+		viper.GetString("database"), DB_PRAGMAS))
 }
 
 func MigrateDB(db *sql.DB) error {

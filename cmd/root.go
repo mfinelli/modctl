@@ -81,6 +81,10 @@ func initConfig() {
 	// if unspecified just search $PATH
 	viper.SetDefault("bsdtar", "bsdtar")
 
+	dbPath, err := xdg.DataFile("modctl/modctl.db")
+	cobra.CheckErr(err)
+	viper.SetDefault("database", dbPath)
+
 	if cfgFile != "" {
 		// User explicitly provided a config file: it must work.
 		viper.SetConfigFile(cfgFile)
