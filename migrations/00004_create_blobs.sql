@@ -5,7 +5,7 @@ CREATE TABLE blobs
   -- lowercase hex sha256 digest (64 chars)
   sha256 TEXT PRIMARY KEY CHECK (LENGTH(sha256) = 64 AND sha256 GLOB '[0-9a-f]*'),
   -- where the blob belongs logically (which on-disk store to use)
-  kind TEXT NOT NULL CHECK (kind in ('archive', 'backup')),
+  kind TEXT NOT NULL CHECK (kind in ('archive', 'backup', 'override')),
   -- size in bytes (from filesystem)
   size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0),
   -- what the blob was originally imported as (useful for orphaned blobs)

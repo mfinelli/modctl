@@ -18,8 +18,10 @@ CREATE TABLE installed_files
   -- file content identity (lowercase hex sha256)
   content_sha256 TEXT NOT NULL CHECK (LENGTH(content_sha256) = 64 AND content_sha256 GLOB '[0-9a-f]*'),
   size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0),
+  -- owner: exactly one of these is set
   -- who "owns" this file in the plan (the winner that supplied it)
-  owner_mod_file_version_id INTEGER NOT NULL REFERENCES mod_file_versions(id) ON UPDATE CASCADE ON DELETE RESTRICT,
+  owner_mod_file_version_id INTEGER REFERENCES mod_file_versions(id) ON UPDATE CASCADE ON DELETE RESTRICT,
+  owner_override_id INTEGER REFERENCES overrides(id) ON UPDATE CASCADE ON DELETE RESTRICT,
   -- the profile that last applied this file
   owner_profile_id INTEGER REFERENCES profiles(id) ON UPDATE CASCADE ON DELETE SET NULL,
   -- operation that last wrote this path
@@ -28,7 +30,13 @@ CREATE TABLE installed_files
   verified_at TEXT,
 
   -- one canonical row per path
-  UNIQUE(game_install_id, target_id, relpath)
+  UNIQUE(game_install_id, target_id, relpath),
+
+  CHECK (
+    (owner_mod_file_version_id IS NOT NULL AND owner_override_id IS NULL)
+    OR
+    (owner_mod_file_version_id IS NULL AND owner_override_id IS NOT NULL)
+  )
 ) STRICT;
 -- +goose StatementEnd
 
@@ -42,6 +50,10 @@ CREATE INDEX idx_installed_files_target ON installed_files(target_id);
 
 -- +goose StatementBegin
 CREATE INDEX idx_installed_files_owner ON installed_files(owner_mod_file_version_id);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE INDEX idx_installed_files_owner_override ON installed_files(owner_override_id);
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -63,6 +75,10 @@ DROP INDEX idx_installed_files_target;
 
 -- +goose StatementBegin
 DROP INDEX idx_installed_files_owner;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+DROP INDEX idx_installed_files_owner_override;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
