@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/adrg/xdg"
 	"github.com/spf13/cobra"
@@ -84,6 +85,15 @@ func initConfig() {
 	dbPath, err := xdg.DataFile("modctl/modctl.db")
 	cobra.CheckErr(err)
 	viper.SetDefault("database", dbPath)
+
+	viper.SetDefault("archives_dir",
+		filepath.Join(xdg.DataHome, "modctl", "archives"))
+	viper.SetDefault("backups_dir",
+		filepath.Join(xdg.DataHome, "modctl", "backups"))
+	viper.SetDefault("overrides_dir",
+		filepath.Join(xdg.DataHome, "modctl", "overrides"))
+	viper.SetDefault("tmp_dir",
+		filepath.Join(xdg.DataHome, "modctl", "tmp"))
 
 	if cfgFile != "" {
 		// User explicitly provided a config file: it must work.
