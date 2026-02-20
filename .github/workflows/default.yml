@@ -20,6 +20,7 @@ jobs:
       - run: go mod download
       - run: "[[ -z $(go fmt ./...) ]]"
       - run: make
+      - run: ./modctl init
       - run: go test -v ./...
       - run: go vet ./...
       - uses: dominikh/staticcheck-action@v1
