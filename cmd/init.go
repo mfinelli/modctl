@@ -24,18 +24,19 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/mfinelli/modctl/internal"
 )
 
 // initCmd represents the init command
 var initCmd = &cobra.Command{
 	Use:   "init",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "initializes the modctl database and filesystem",
+	Long: `Initialize modctl's local state.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+Creates the required data directories (archives, backups, overrides, tmp) and
+initializes or upgrades the internal database. This command is safe to run
+multiple times and will not overwrite existing data.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := os.MkdirAll(viper.GetString("archives_dir"), 0o0755)
 		if err != nil {
@@ -57,20 +58,21 @@ to quickly create a Cobra application.`,
 			return fmt.Errorf("error creating tmp directory: %w", err)
 		}
 
+		db, err := internal.SetupDB()
+		if err != nil {
+			return fmt.Errorf("error opening database: %w", err)
+		}
+		defer db.Close()
+
+		err = internal.MigrateDB(db)
+		if err != nil {
+			return fmt.Errorf("error migrating database: %w", err)
+		}
+
 		return nil
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(initCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// initCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// initCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
