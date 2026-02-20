@@ -82,7 +82,7 @@ func initConfig() {
 	// if unspecified just search $PATH
 	viper.SetDefault("bsdtar", "bsdtar")
 
-	dbPath, err := xdg.DataFile("modctl/modctl.db")
+	dbPath, err := xdg.DataFile(filepath.Join("modctl", "modctl.db"))
 	cobra.CheckErr(err)
 	viper.SetDefault("database", dbPath)
 
@@ -112,7 +112,7 @@ func initConfig() {
 		return
 	}
 
-	defaultPath, err := xdg.ConfigFile("modctl/config.toml")
+	defaultPath, err := xdg.ConfigFile(filepath.Join("modctl", "config.toml"))
 	cobra.CheckErr(err)
 
 	if _, err := os.Stat(defaultPath); errors.Is(err, os.ErrNotExist) {
