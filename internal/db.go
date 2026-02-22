@@ -19,9 +19,11 @@
 package internal
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"fmt"
+	"io/fs"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
@@ -37,14 +39,24 @@ func SetupDB() (*sql.DB, error) {
 		viper.GetString("database"), DB_PRAGMAS))
 }
 
-func MigrateDB(db *sql.DB) error {
-	goose.SetBaseFS(Migrations)
-
-	if err := goose.SetDialect("sqlite3"); err != nil {
-		return fmt.Errorf("error setting goose dialect: %w", err)
+func GooseProvider(db *sql.DB) (*goose.Provider, error) {
+	// Make the provider FS point at the "migrations" directory within the embed.FS.
+	fsys, err := fs.Sub(Migrations, "migrations")
+	if err != nil {
+		return nil, fmt.Errorf("error preparing migrations fs: %w", err)
 	}
 
-	if err := goose.Up(db, "migrations"); err != nil {
+	return goose.NewProvider(goose.DialectSQLite3, db, fsys)
+}
+
+func MigrateDB(ctx context.Context, db *sql.DB) error {
+	p, err := GooseProvider(db)
+	if err != nil {
+		return fmt.Errorf("error setting up goose provider: %w", err)
+	}
+
+	_, err = p.Up(ctx)
+	if err != nil {
 		return fmt.Errorf("error migrating database: %w", err)
 	}
 

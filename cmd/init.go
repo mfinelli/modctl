@@ -19,6 +19,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -38,6 +39,8 @@ Creates the required data directories (archives, backups, overrides, tmp) and
 initializes or upgrades the internal database. This command is safe to run
 multiple times and will not overwrite existing data.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
+
 		err := os.MkdirAll(viper.GetString("archives_dir"), 0o0755)
 		if err != nil {
 			return fmt.Errorf("error creating archives directory: %w", err)
@@ -64,7 +67,7 @@ multiple times and will not overwrite existing data.`,
 		}
 		defer db.Close()
 
-		err = internal.MigrateDB(db)
+		err = internal.MigrateDB(ctx, db)
 		if err != nil {
 			return fmt.Errorf("error migrating database: %w", err)
 		}
