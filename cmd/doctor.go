@@ -33,6 +33,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+var deepCheck bool
+
 // doctorCmd represents the doctor command
 var doctorCmd = &cobra.Command{
 	Use:   "doctor",
@@ -63,6 +65,8 @@ to quickly create a Cobra application.`,
 
 func init() {
 	rootCmd.AddCommand(doctorCmd)
+
+	doctorCmd.Flags().BoolVar(&deepCheck, "full", false, "Runs a more complete database check")
 }
 
 // CheckDatabase verifies the DB exists and is usable, and warns if migrations
@@ -107,7 +111,7 @@ func checkDb(ctx context.Context) error {
 	fmt.Println(okStyle.Render("  ✓ database file exists"))
 
 	// Keep doctor snappy.
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
+	ctxT, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 
 	// 2) Open DB + trivial query
@@ -121,7 +125,7 @@ func checkDb(ctx context.Context) error {
 	defer db.Close()
 
 	var one int
-	if err := db.QueryRowContext(ctx, "SELECT 1").Scan(&one); err != nil || one != 1 {
+	if err := db.QueryRowContext(ctxT, "SELECT 1").Scan(&one); err != nil || one != 1 {
 		fmt.Println(errStyle.Render("  ✗ basic query failed (SELECT 1)"))
 		if err != nil {
 			fmt.Println(subtleStyle.Render("    " + err.Error()))
@@ -131,6 +135,7 @@ func checkDb(ctx context.Context) error {
 	}
 	fmt.Println(okStyle.Render("  ✓ basic query OK (SELECT 1)"))
 
+	// 3) migrations status
 	p, err := internal.GooseProvider(db)
 	if err != nil {
 		// if we can't determine migration state treat it as fatal
@@ -161,6 +166,82 @@ func checkDb(ctx context.Context) error {
 		}
 	} else {
 		fmt.Println(okStyle.Render("  ✓ migrations up to date"))
+	}
+
+	// 4) quick_check or integrity_check and foreign_key_check
+	pragma := "PRAGMA quick_check;"
+	label := "quick_check"
+	if deepCheck {
+		pragma = "PRAGMA integrity_check;"
+		label = "integrity_check"
+	}
+
+	rows, err := db.QueryContext(ctx, pragma)
+	if err != nil {
+		fmt.Println(errStyle.Render(fmt.Sprintf("  ✗ %s failed", label)))
+		fmt.Println(subtleStyle.Render("    " + err.Error()))
+		return fmt.Errorf("%s failed: %w", label, err)
+	}
+	defer rows.Close()
+
+	var problems []string
+	for rows.Next() {
+		var result string
+		if err := rows.Scan(&result); err != nil {
+			return err
+		}
+		if result != "ok" {
+			problems = append(problems, result)
+		}
+	}
+
+	if len(problems) == 0 {
+		fmt.Println(okStyle.Render(fmt.Sprintf("  ✓ %s OK", label)))
+	} else {
+		fmt.Println(errStyle.Render(fmt.Sprintf("  ✗ %s reported corruption", label)))
+		for _, p := range problems {
+			fmt.Println(subtleStyle.Render("    " + p))
+		}
+		return fmt.Errorf("database integrity check failed")
+	}
+
+	if deepCheck {
+		rows, err := db.QueryContext(ctx, "PRAGMA foreign_key_check;")
+		if err != nil {
+			fmt.Println(errStyle.Render("  ✗ foreign_key_check failed"))
+			fmt.Println(subtleStyle.Render("    " + err.Error()))
+			return fmt.Errorf("foreign_key_check failed: %w", err)
+		}
+		defer rows.Close()
+
+		var violations []string
+
+		for rows.Next() {
+			var table string
+			var rowid int64
+			var parent string
+			var fkid int64
+
+			if err := rows.Scan(&table, &rowid, &parent, &fkid); err != nil {
+				return err
+			}
+
+			violations = append(violations,
+				fmt.Sprintf("table=%s rowid=%d parent=%s fkid=%d",
+					table, rowid, parent, fkid,
+				),
+			)
+		}
+
+		if len(violations) == 0 {
+			fmt.Println(okStyle.Render("  ✓ foreign_key_check OK"))
+		} else {
+			fmt.Println(errStyle.Render("  ✗ foreign_key_check reported violations"))
+			for _, v := range violations {
+				fmt.Println(subtleStyle.Render("    " + v))
+			}
+			return fmt.Errorf("foreign key violations detected")
+		}
 	}
 
 	fmt.Println()
