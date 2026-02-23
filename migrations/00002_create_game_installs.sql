@@ -8,6 +8,9 @@ CREATE TABLE game_installs
   -- store-specific game identifier (e.g., steam appid "1091500", heroic slug, etc.)
   store_game_id TEXT NOT NULL CHECK (LENGTH(store_game_id) > 0),
 
+  -- Human-facing game name as reported by the store (may change over time)
+  display_name TEXT NOT NULL CHECK (LENGTH(display_name) > 0),
+
   -- allows multiple installs per store_game_id if needed
   -- examples: 'default', 'library_2', 'sdcard', etc
   instance_id TEXT NOT NULL DEFAULT "default" CHECK (LENGTH(instance_id) > 0),
@@ -21,8 +24,13 @@ CREATE TABLE game_installs
   install_root TEXT NOT NULL CHECK (LENGTH(install_root) > 0),
 
   -- opaque JSON for store-provided metadata (build id, branch, platform, etc)
-  metadata TExT CHECK (json_valid(metadata)),
+  metadata TEXT CHECK (json_valid(metadata)),
 
+  -- Discovery state: when we last observed this install during refresh
+  last_seen_at TEXT,
+  -- Whether the install was present during the most recent refresh that
+  -- scanned its store
+  is_present INTEGER NOT NULL DEFAULT TRUE CHECK (is_present IN (TRUE, FALSE)),
 
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
@@ -36,9 +44,17 @@ CREATE TABLE game_installs
 CREATE INDEX idx_game_installs_store_lookup ON game_installs(store_id, store_game_id);
 -- +goose StatementEnd
 
+-- +goose StatementBegin
+CREATE INDEX idx_game_installs_is_present ON game_installs(is_present);
+-- +goose StatementEnd
+
 -- +goose Down
 -- +goose StatementBegin
-DROP INDEX ids_game_installs_store_lookup;
+DROP INDEX idx_game_installs_is_present;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+DROP INDEX idx_game_installs_store_lookup;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
