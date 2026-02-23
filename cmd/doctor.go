@@ -23,7 +23,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/adrg/xdg"
@@ -34,6 +36,8 @@ import (
 )
 
 var deepCheck bool
+
+var SampleTarGz []byte
 
 // doctorCmd represents the doctor command
 var doctorCmd = &cobra.Command{
@@ -49,13 +53,15 @@ to quickly create a Cobra application.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-		err := checkDb(ctx)
-		if err != nil {
+		if err := checkDb(ctx); err != nil {
 			return err
 		}
 
-		err = checkPaths()
-		if err != nil {
+		if err := checkPaths(); err != nil {
+			return err
+		}
+
+		if err := checkBsdtar(ctx); err != nil {
 			return err
 		}
 
@@ -69,7 +75,7 @@ func init() {
 	doctorCmd.Flags().BoolVar(&deepCheck, "full", false, "Runs a more complete database check")
 }
 
-// CheckDatabase verifies the DB exists and is usable, and warns if migrations
+// checkDb verifies the DB exists and is usable, and warns if migrations
 // are pending. Returns error only for non-recoverable failures.
 func checkDb(ctx context.Context) error {
 	// TODO: extract these somewhere else
@@ -303,4 +309,89 @@ func checkPaths() error {
 	fmt.Println()
 
 	return fatalErr
+}
+
+func checkBsdtar(ctx context.Context) error {
+	// TODO: extract these somewhere else
+	headerStyle := lipgloss.NewStyle().Bold(true).
+		Foreground(lipgloss.Color("63"))
+	subtleStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("245"))
+	errStyle := lipgloss.NewStyle().Bold(true).
+		Foreground(lipgloss.Color("1"))
+	okStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("2"))
+
+	bsdtar := viper.GetString("bsdtar")
+	fmt.Println(headerStyle.Render("bsdtar Checks"))
+	fmt.Println(subtleStyle.Render("  search: " + bsdtar))
+	fmt.Println()
+
+	resolvedPath, err := exec.LookPath(bsdtar)
+	if err != nil {
+		fmt.Println(errStyle.Render("  ✗ bsdtar not found in PATH"))
+		fmt.Println(subtleStyle.Render("    " + err.Error()))
+		return fmt.Errorf("bsdtar not found: %w", err)
+	}
+
+	fmt.Println(okStyle.Render("  ✓ bsdtar found: " + resolvedPath))
+
+	// Use short timeout for all subprocess calls
+	cmdCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	versionCmd := exec.CommandContext(cmdCtx, resolvedPath, "--version")
+	versionOutput, err := versionCmd.CombinedOutput()
+	if err != nil {
+		fmt.Println(errStyle.Render("  ✗ bsdtar --version failed"))
+		fmt.Println(subtleStyle.Render("    " + err.Error()))
+		return fmt.Errorf("bsdtar --version failed: %w", err)
+	}
+
+	fmt.Println(okStyle.Render("  ✓ bsdtar --version OK"))
+	fmt.Println(subtleStyle.Render("      " + strings.TrimSpace(string(versionOutput))))
+
+	tmpFile, err := os.CreateTemp("", "modctl-bsdtar-*.tar.gz")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+	defer tmpFile.Close()
+
+	if _, err := tmpFile.Write(SampleTarGz); err != nil {
+		return fmt.Errorf("failed to write sample archive: %w", err)
+	}
+
+	listCmd := exec.CommandContext(cmdCtx, resolvedPath, "-t", "-f", tmpPath)
+	listOutput, err := listCmd.CombinedOutput()
+	if err != nil {
+		fmt.Println(errStyle.Render("  ✗ bsdtar failed to list sample archive"))
+		fmt.Println(subtleStyle.Render("    " + err.Error()))
+		return fmt.Errorf("bsdtar test archive failed: %w", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(listOutput)), "\n")
+
+	if len(lines) != 1 {
+		fmt.Println(errStyle.Render("  ✗ unexpected archive contents"))
+		fmt.Println(subtleStyle.Render(fmt.Sprintf("    expected 1 entry, got %d", len(lines))))
+		for _, e := range lines {
+			fmt.Println(subtleStyle.Render("    " + e))
+		}
+		return fmt.Errorf("invalid sample archive contents")
+	}
+
+	if lines[0] != "hello.txt" {
+		fmt.Println(errStyle.Render("  ✗ archive entry mismatch"))
+		fmt.Println(subtleStyle.Render("    expected: hello.txt"))
+		fmt.Println(subtleStyle.Render("    got:      " + lines[0]))
+		return fmt.Errorf("archive contents incorrect")
+	}
+
+	fmt.Println(okStyle.Render("  ✓ bsdtar archive test OK"))
+
+	fmt.Println()
+
+	return nil
 }

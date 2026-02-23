@@ -28,7 +28,11 @@ import (
 //go:embed migrations/*.sql
 var migrations embed.FS
 
+//go:embed sample.tar.gz
+var sampleTarGz []byte
+
 func main() {
+	cmd.SampleTarGz = sampleTarGz
 	internal.Migrations = migrations
 
 	cmd.Execute()
