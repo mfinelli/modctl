@@ -1,0 +1,12 @@
+---
+version: "2"
+sql:
+  - engine: sqlite
+    queries: queries.sql
+    schema: migrations
+    gen:
+      go:
+        emit_empty_slices: true
+        emit_prepared_queries: true
+        out: dbq
+        package: dbq

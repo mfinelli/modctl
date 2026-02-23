@@ -1,14 +1,15 @@
 GO := go
+SQLC := sqlc
 
 SOURCES := $(wildcard *.go cmd/*.go internal/*.go migrations/*.sql)
 
 all: modctl
 
 clean:
-	rm -rf modctl sample.tar.gz
+	rm -rf modctl dbq sample.tar.gz
 
 modctl: export CGO_ENABLED = 1
-modctl: $(SOURCES) go.mod go.sum sample.tar.gz
+modctl: $(SOURCES) go.mod go.sum dbq/db.go sample.tar.gz
 	$(GO) build -o $@ \
 		-buildmode=pie \
 		-trimpath \
@@ -29,5 +30,8 @@ sample.tar.gz:
 		-czf $@ \
 		hello.txt
 	rm hello.txt
+
+dbq/db.go: sqlc.yaml queries.sql $(wildcard migrations/*.sql)
+	$(SQLC) generate
 
 .PHONY: all clean

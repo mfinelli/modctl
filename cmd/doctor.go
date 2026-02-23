@@ -65,6 +65,11 @@ to quickly create a Cobra application.`,
 			return err
 		}
 
+		// TODO loop through game installs and ensure that we can
+		//      write into them
+
+		// TODO verify blobs on disk haven't changed and aren't missing
+
 		return nil
 	},
 }
