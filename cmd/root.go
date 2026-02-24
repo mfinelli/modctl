@@ -65,7 +65,7 @@ func init() {
 		&cfgFile,
 		"config",
 		"",
-		"config file (default is $XDG_CONFIG_HOME/modctl/config.toml",
+		"config file (default is $XDG_CONFIG_HOME/modctl/config.toml)",
 	)
 
 	rootCmd.PersistentFlags().BoolVarP(

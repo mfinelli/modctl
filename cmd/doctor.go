@@ -42,13 +42,23 @@ var SampleTarGz []byte
 // doctorCmd represents the doctor command
 var doctorCmd = &cobra.Command{
 	Use:   "doctor",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "Run health checks on the modctl state, database, and dependencies",
+	Long: `Run a read-only health check to confirm modctl can operate safely.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+Doctor verifies:
+  - State directory layout and writability (archives/, backups/, overrides/,
+    tmp/)
+  - Database is present and usable (SELECT 1), and reports pending migrations
+  - SQLite integrity checks (quick_check by default; integrity_check +
+    foreign_key_check with --deep)
+  - External dependencies (bsdtar present, --version works, and can list a
+    built-in test archive)
+  - (TODO) Steam readiness when the Steam store is enabled (locates Steam root
+    and parses libraryfolders.vdf)
+  - (TODO) Integrity of blobs stored on disk (presence, size, hash)
+
+Doctor does not modify Steam or your game installs. It may read files to
+validate integrity.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
