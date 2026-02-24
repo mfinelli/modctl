@@ -77,3 +77,23 @@ ON CONFLICT (game_install_id, name) DO UPDATE SET
   metadata  = excluded.metadata,
   updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 RETURNING id;
+
+-- name: EnsureDefaultProfile :exec
+INSERT INTO profiles (
+  game_install_id,
+  name,
+  description,
+  is_active,
+  created_at,
+  updated_at
+)
+SELECT
+  ?,
+  'default',
+  NULL,
+  TRUE,
+  strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+  strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE NOT EXISTS (
+  SELECT 1 FROM profiles WHERE game_install_id = ?
+);
