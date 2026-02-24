@@ -504,7 +504,7 @@ func parseAppManifest(manifestPath string) (appid, name, installdir, warning str
 	appStateAny, ok := parsed["AppState"]
 	if !ok {
 		// Some parsers/libraries might lower-case keys; be tolerant
-		appStateAny, ok = parsed["appstate"]
+		appStateAny = parsed["appstate"]
 	}
 	appState, ok := appStateAny.(map[string]any)
 	if !ok {
