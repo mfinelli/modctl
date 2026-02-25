@@ -44,14 +44,16 @@ to quickly create a Cobra application.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
+		err := internal.EnsureDBExists()
+		if err != nil {
+			return err
+		}
+
 		db, err := internal.SetupDB()
 		if err != nil {
 			return fmt.Errorf("error setting up database: %w", err)
 		}
 		defer db.Close()
-
-		// TODO: check if db file _exists_, if it does NOT error and
-		//       prompt the user to run modctl init
 
 		err = internal.MigrateDB(ctx, db)
 		if err != nil {

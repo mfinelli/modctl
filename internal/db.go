@@ -24,6 +24,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"os"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
@@ -58,6 +59,32 @@ func MigrateDB(ctx context.Context, db *sql.DB) error {
 	_, err = p.Up(ctx)
 	if err != nil {
 		return fmt.Errorf("error migrating database: %w", err)
+	}
+
+	return nil
+}
+
+// EnsureDBExists verifies that the configured database file exists
+// and is a regular file. If not, it returns a user-friendly error.
+func EnsureDBExists() error {
+	path := viper.GetString("database")
+	if path == "" {
+		return fmt.Errorf("database path is not configured")
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf(
+				"database not found at %s\n\nRun `modctl init` to initialize the state directory",
+				path,
+			)
+		}
+		return fmt.Errorf("cannot access database %s: %w", path, err)
+	}
+
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("database path %s exists but is not a regular file", path)
 	}
 
 	return nil
