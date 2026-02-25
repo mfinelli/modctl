@@ -13,7 +13,7 @@ CREATE TABLE game_installs
 
   -- allows multiple installs per store_game_id if needed
   -- examples: 'default', 'library_2', 'sdcard', etc
-  instance_id TEXT NOT NULL DEFAULT "default" CHECK (LENGTH(instance_id) > 0),
+  instance_id TEXT NOT NULL DEFAULT 'default' CHECK (LENGTH(instance_id) > 0),
 
   -- canonical identifiers (for future): steam may populate appid into store_game_id
   -- but other stores might provide multiple identifiers
