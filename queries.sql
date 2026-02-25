@@ -4,6 +4,17 @@ SELECT * FROM stores WHERE id = ? LIMIT 1;
 -- name: ListEnabledStores :many
 SELECT * FROM stores WHERE enabled = TRUE ORDER BY id;
 
+-- name: ListAllStores :many
+SELECT * FROM stores ORDER BY id;
+
+-- name: ListAllGameInstalls :many
+SELECT * FROM game_installs
+ORDER BY store_id, display_name, store_game_id, instance_id;
+
+-- name: ListGameInstallsByStore :many
+SELECT * FROM game_installs WHERE store_id = ?
+ORDER BY display_name, store_game_id, instance_id;
+
 -- name: MarkStoreInstallsNotPresent :exec
 UPDATE game_installs
 SET

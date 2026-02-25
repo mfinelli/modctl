@@ -10,6 +10,7 @@ require (
 	github.com/pressly/goose/v3 v3.27.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
+	go.finelli.dev/util v0.0.0-20260225184140-820f3748656b
 )
 
 require (
