@@ -24,6 +24,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -37,7 +38,12 @@ var Migrations embed.FS
 
 func SetupDB() (*sql.DB, error) {
 	return sql.Open("sqlite3", fmt.Sprintf("file:%s%s",
-		viper.GetString("database"), DB_PRAGMAS))
+		url.PathEscape(viper.GetString("database")), DB_PRAGMAS))
+}
+
+func SetupDBReadOnly() (*sql.DB, error) {
+	return sql.Open("sqlite3", fmt.Sprintf("file:%s%s&mode=ro",
+		url.PathEscape(viper.GetString("database")), DB_PRAGMAS))
 }
 
 func GooseProvider(db *sql.DB) (*goose.Provider, error) {

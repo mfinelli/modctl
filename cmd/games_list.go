@@ -25,6 +25,7 @@ import (
 	"github.com/charmbracelet/lipgloss/table"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
 )
@@ -115,8 +116,13 @@ func init() {
 
 	gamesListCmd.Flags().BoolVarP(&gamesListAll, "all", "A", false,
 		"List games from all stores")
+
 	gamesListCmd.Flags().StringVarP(&gamesListStore, "store", "s", "",
 		"List games from the given store")
+	gamesListCmd.RegisterFlagCompletionFunc("store",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return completion.StoreIDs(cmd, toComplete)
+		})
 
 	gamesListCmd.MarkFlagsMutuallyExclusive("all", "store")
 }

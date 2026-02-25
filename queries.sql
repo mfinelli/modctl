@@ -1,11 +1,17 @@
 -- name: GetStoreById :one
 SELECT * FROM stores WHERE id = ? LIMIT 1;
 
+-- name: GetEnabledStoreById :one
+SELECT * FROM stores WHERE id = ? AND enabled = TRUE LIMIT 1;
+
 -- name: ListEnabledStores :many
 SELECT * FROM stores WHERE enabled = TRUE ORDER BY id;
 
 -- name: ListAllStores :many
 SELECT * FROM stores ORDER BY id;
+
+-- name: ListEnabledStoresForCompletion :many
+SELECT id, display_name FROM stores WHERE enabled = TRUE ORDER BY id;
 
 -- name: ListAllGameInstalls :many
 SELECT * FROM game_installs
