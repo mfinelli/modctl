@@ -43,6 +43,14 @@ var storesListCmd = &cobra.Command{
 		}
 		defer db.Close()
 
+		// TODO: check if db file _exists_, if it does NOT error and
+		//       prompt the user to run modctl init
+
+		err = internal.MigrateDB(ctx, db)
+		if err != nil {
+			return fmt.Errorf("error migrating database: %w", err)
+		}
+
 		q := dbq.New(db)
 		var stores []dbq.Store
 		if storesListNoDisabled {
