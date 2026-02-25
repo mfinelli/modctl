@@ -78,9 +78,6 @@ to quickly create a Cobra application.`,
 
 		rows := [][]string{}
 		for _, game := range games {
-			// TODO factor this out into function
-			selector := fmt.Sprintf("%s:%s#%s", game.StoreID, game.StoreGameID, game.InstanceID)
-
 			present := "✗"
 			if util.SqliteIntToBool(game.IsPresent) {
 				present = "✓"
@@ -93,7 +90,7 @@ to quickly create a Cobra application.`,
 
 			rows = append(rows, []string{
 				fmt.Sprintf(" %d ", game.ID),
-				fmt.Sprintf(" %s ", selector),
+				fmt.Sprintf(" %s ", internal.FullSelector(game.StoreID, game.StoreGameID, game.InstanceID)),
 				fmt.Sprintf(" %s ", game.DisplayName),
 				fmt.Sprintf(" %s ", game.InstallRoot),
 				fmt.Sprintf(" %s ", present),
