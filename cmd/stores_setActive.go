@@ -33,7 +33,7 @@ import (
 	"go.finelli.dev/util"
 )
 
-var setActiveCmd = &cobra.Command{
+var storesSetActiveCmd = &cobra.Command{
 	Use:   "set-active",
 	Short: "Set the active store",
 	Long: `A longer description that spans multiple lines and likely contains examples
@@ -100,7 +100,7 @@ to quickly create a Cobra application.`,
 }
 
 func init() {
-	storesCmd.AddCommand(setActiveCmd)
+	storesCmd.AddCommand(storesSetActiveCmd)
 }
 
 func normalizeStoreID(s string) string {

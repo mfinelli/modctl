@@ -29,8 +29,10 @@ import (
 )
 
 type Active struct {
-	ActiveStoreID string `json:"active_store_id,omitempty"`
-	UpdatedAt     string `json:"updated_at,omitempty"`
+	ActiveStoreID             string `json:"active_store_id,omitempty"`
+	ActiveGameInstallID       int64  `json:"active_game_install_id,omitempty"`
+	ActiveGameInstallSelector string `json:"active_game_install_selector,omitempty"`
+	UpdatedAt                 string `json:"updated_at,omitempty"`
 }
 
 func LoadActive() (Active, error) {

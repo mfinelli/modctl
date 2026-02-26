@@ -114,3 +114,15 @@ SELECT
 WHERE NOT EXISTS (
   SELECT 1 FROM profiles WHERE game_install_id = ?
 );
+
+-- name: GetGameInstallByID :one
+SELECT * FROM game_installs WHERE id = ? LIMIT 1;
+
+-- name: GetGameInstallBySelector :one
+SELECT * FROM game_installs
+WHERE store_id = ? AND store_game_id = ? AND instance_id = ? LIMIT 1;
+
+-- name: ListGameInstallsByStoreGameID :many
+SELECT * FROM game_installs
+WHERE store_id = ? AND store_game_id = ?
+ORDER BY instance_id;
