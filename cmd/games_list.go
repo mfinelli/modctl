@@ -26,6 +26,7 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
 )
@@ -69,11 +70,18 @@ to quickly create a Cobra application.`,
 		} else if gamesListStore != "" {
 			games, err = q.ListGameInstallsByStore(ctx, gamesListStore)
 		} else {
-			// TODO read active-store if it exists and is set
+			a, err := state.LoadActive()
+			if err != nil {
+				return fmt.Errorf("error getting active store: %w", err)
+			}
 
-			// we default to steam for now since it's the only
-			// store that we support (TODO when we add more stores)
-			games, err = q.ListGameInstallsByStore(ctx, "steam")
+			if a.ActiveStoreID != "" {
+				games, err = q.ListGameInstallsByStore(ctx, a.ActiveStoreID)
+			} else {
+				// we default to steam for now since it's the only
+				// store that we support (TODO when we add more stores)
+				games, err = q.ListGameInstallsByStore(ctx, "steam")
+			}
 		}
 		if err != nil {
 			return fmt.Errorf("error listing games: %w", err)
