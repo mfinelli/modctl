@@ -126,3 +126,23 @@ WHERE store_id = ? AND store_game_id = ? AND instance_id = ? LIMIT 1;
 SELECT * FROM game_installs
 WHERE store_id = ? AND store_game_id = ?
 ORDER BY instance_id;
+
+-- name: CompleteGameInstallsByPrefix :many
+SELECT
+  id,
+  store_id,
+  store_game_id,
+  instance_id,
+  display_name,
+  is_present
+FROM game_installs
+WHERE
+  (lower(store_id || ':' || store_game_id || '#' || instance_id) LIKE lower(sqlc.arg(prefix)) ESCAPE '\')
+  OR (lower(display_name) LIKE lower(sqlc.arg(prefix)) ESCAPE '\')
+ORDER BY
+  is_present DESC,
+  display_name,
+  store_id,
+  store_game_id,
+  instance_id
+LIMIT 10;
