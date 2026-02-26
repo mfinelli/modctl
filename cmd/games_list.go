@@ -70,8 +70,8 @@ to quickly create a Cobra application.`,
 		} else if gamesListStore != "" {
 			games, err = q.ListGameInstallsByStore(ctx, gamesListStore)
 		} else {
-			a, err := state.LoadActive()
-			if err != nil {
+			a, aerr := state.LoadActive()
+			if aerr != nil {
 				return fmt.Errorf("error getting active store: %w", err)
 			}
 
