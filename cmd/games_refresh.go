@@ -29,13 +29,13 @@ import (
 // gamesRefreshCmd represents the gamesRefresh command
 var gamesRefreshCmd = &cobra.Command{
 	Use:   "refresh",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "Discover installed games from enabled stores",
+	Long: `Scan all enabled stores and update the list of discovered game installs.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+This command detects installed games, updates their install paths, and marks
+missing installs as not present.
+
+It is safe to run multiple times.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 

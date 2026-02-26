@@ -35,13 +35,13 @@ import (
 
 var storesSetActiveCmd = &cobra.Command{
 	Use:   "set-active",
-	Short: "Set the active store",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "Set the active store for future commands",
+	Long: `Set the active store used by modctl commands.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+When an active store is set, commands that accept a store can omit
+the --store flag.
+
+The store must already be configured.`,
 	Args: cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) != 0 {

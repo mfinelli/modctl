@@ -34,13 +34,16 @@ import (
 
 var gamesInfoCmd = &cobra.Command{
 	Use:   "info",
-	Short: "Show detailed info about a discovered game install",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "Show detailed information about a game install",
+	Long: `Show detailed information about a discovered game install.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+You may specify either the numeric install ID or a selector such as:
+
+  steam:1091500
+  steam:1091500#default
+
+If multiple installs exist for the same game, an explicit instance must be
+provided.`,
 	Args: cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) != 0 {

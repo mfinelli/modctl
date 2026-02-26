@@ -36,13 +36,13 @@ var gamesListStore string
 
 var gamesListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "List discovered game installs",
+	Long: `Display all discovered game installs.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+By default, only the active store is included. Use --store to filter by a
+specific store. Or use --all to include games from all stores.
+
+(TODO) The active game install (if any) is highlighted.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 

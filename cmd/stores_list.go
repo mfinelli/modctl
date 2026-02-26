@@ -34,6 +34,9 @@ var storesListNoDisabled bool
 var storesListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "Lists all stores that we know about",
+	Long: `Display all configured stores and whether they are enabled.
+
+Only enabled stores are scanned during discovery.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
