@@ -152,3 +152,15 @@ SELECT * FROM targets WHERE game_install_id = ? ORDER BY name;
 
 -- name: GetProfilesForGameInstall :many
 SELECT * FROM profiles WHERE game_install_id = ? ORDER BY name;
+
+-- name: GetBlob :one
+SELECT * FROM blobs WHERE sha256 = ? LIMIT 1;
+
+-- name: InsertBlob :exec
+INSERT INTO blobs (sha256, kind, size_bytes, original_name, verified_at)
+VALUES (?, ?, ?, ?, ?);
+
+-- name: TouchBlobVerifiedAt :exec
+UPDATE blobs
+SET verified_at = ?
+WHERE sha256 = ?;
