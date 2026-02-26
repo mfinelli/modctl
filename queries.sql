@@ -146,3 +146,9 @@ ORDER BY
   store_game_id,
   instance_id
 LIMIT 10;
+
+-- name: ListTargetsForGameInstall :many
+SELECT * FROM targets WHERE game_install_id = ? ORDER BY name;
+
+-- name: GetProfilesForGameInstall :many
+SELECT * FROM profiles WHERE game_install_id = ? ORDER BY name;

@@ -25,13 +25,13 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
+	"go.finelli.dev/util"
 )
 
-var gamesSetActiveCmd = &cobra.Command{
-	Use:   "set-active",
-	Short: "Set the active game",
+var gamesInfoCmd = &cobra.Command{
+	Use:   "info",
+	Short: "Show detailed info about a discovered game install",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 
@@ -70,30 +70,76 @@ to quickly create a Cobra application.`,
 			return err
 		}
 
-		return persistActiveGameInstall(gi)
+		targets, err := q.ListTargetsForGameInstall(ctx, gi.ID)
+		if err != nil {
+			return fmt.Errorf("list targets: %w", err)
+		}
+
+		profiles, err := q.GetProfilesForGameInstall(ctx, gi.ID)
+		if err != nil {
+			return fmt.Errorf("list profiles: %w", err)
+		}
+
+		fullSel := internal.FullSelector(gi.StoreID, gi.StoreGameID, gi.InstanceID)
+		shortSel := internal.ShortSelector(gi.StoreID, gi.StoreGameID, gi.InstanceID)
+
+		// Print
+		fmt.Printf("%s\n", gi.DisplayName)
+		fmt.Printf("  ID:        %d\n", gi.ID)
+		fmt.Printf("  Selector:  %s\n", fullSel)
+		if shortSel != fullSel {
+			fmt.Printf("  Short:     %s\n", shortSel)
+		}
+		fmt.Printf("  Store:     %s\n", gi.StoreID)
+		fmt.Printf("  Store ID:  %s\n", gi.StoreGameID)
+		fmt.Printf("  Instance:  %s\n", gi.InstanceID)
+		fmt.Printf("  Path:      %s\n", gi.InstallRoot)
+
+		present := "yes"
+		if gi.IsPresent == 0 {
+			present = "no"
+		}
+		fmt.Printf("  Present:   %s\n", present)
+
+		if gi.LastSeenAt.Valid {
+			fmt.Printf("  Last seen: %s\n", gi.LastSeenAt.String)
+		}
+
+		// Targets
+		fmt.Println()
+		fmt.Println("Targets:")
+		if len(targets) == 0 {
+			fmt.Println("  (none)")
+		} else {
+			for _, t := range targets {
+				fmt.Printf("  - %s\n", t.Name)
+				fmt.Printf("      path:   %s\n", t.RootPath)
+				fmt.Printf("      origin: %s\n", t.Origin)
+			}
+		}
+
+		// Profiles
+		fmt.Println()
+		fmt.Println("Profiles:")
+		if len(profiles) == 0 {
+			fmt.Println("  (none)")
+		} else {
+			for _, p := range profiles {
+				active := "\n"
+				if util.SqliteIntToBool(p.IsActive) {
+					active = " (active)\n"
+				}
+				fmt.Printf("  - %s%s", p.Name, active)
+				if p.Description.Valid {
+					fmt.Printf("      desc:    %s\n", p.Description.String)
+				}
+			}
+		}
+
+		return nil
 	},
 }
 
 func init() {
-	gamesCmd.AddCommand(gamesSetActiveCmd)
-}
-
-func persistActiveGameInstall(gi dbq.GameInstall) error {
-	a, err := state.LoadActive()
-	if err != nil {
-		return err
-	}
-
-	fullSel := internal.FullSelector(gi.StoreID, gi.StoreGameID, gi.InstanceID)
-
-	a.ActiveStoreID = gi.StoreID // keeps store context in sync
-	a.ActiveGameInstallID = gi.ID
-	a.ActiveGameInstallSelector = fullSel
-
-	if err := state.SaveActive(a); err != nil {
-		return err
-	}
-
-	fmt.Printf("Active game set to %s (%s)\n", fullSel, gi.DisplayName)
-	return nil
+	gamesCmd.AddCommand(gamesInfoCmd)
 }

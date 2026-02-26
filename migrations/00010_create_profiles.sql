@@ -8,7 +8,7 @@ CREATE TABLE profiles
   name TEXT NOT NULL CHECK (LENGTH(name) > 0),
   description TEXT,
   -- only one profile per game_install should be active at a time
-  is_active INTEGER DEFAULT FALSE CHECK (is_active IN (TRUE, FALSE)),
+  is_active INTEGER NOT NULL DEFAULT FALSE CHECK (is_active IN (TRUE, FALSE)),
 
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
