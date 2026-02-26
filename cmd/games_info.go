@@ -21,10 +21,13 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
 )
@@ -80,66 +83,173 @@ to quickly create a Cobra application.`,
 			return fmt.Errorf("list profiles: %w", err)
 		}
 
-		fullSel := internal.FullSelector(gi.StoreID, gi.StoreGameID, gi.InstanceID)
-		shortSel := internal.ShortSelector(gi.StoreID, gi.StoreGameID, gi.InstanceID)
-
-		// Print
-		fmt.Printf("%s\n", gi.DisplayName)
-		fmt.Printf("  ID:        %d\n", gi.ID)
-		fmt.Printf("  Selector:  %s\n", fullSel)
-		if shortSel != fullSel {
-			fmt.Printf("  Short:     %s\n", shortSel)
+		a, err := state.LoadActive()
+		if err != nil {
+			return err
 		}
-		fmt.Printf("  Store:     %s\n", gi.StoreID)
-		fmt.Printf("  Store ID:  %s\n", gi.StoreGameID)
-		fmt.Printf("  Instance:  %s\n", gi.InstanceID)
-		fmt.Printf("  Path:      %s\n", gi.InstallRoot)
+		isCurrent := a.ActiveGameInstallID == gi.ID
 
-		present := "yes"
-		if gi.IsPresent == 0 {
-			present = "no"
-		}
-		fmt.Printf("  Present:   %s\n", present)
-
-		if gi.LastSeenAt.Valid {
-			fmt.Printf("  Last seen: %s\n", gi.LastSeenAt.String)
-		}
-
-		// Targets
-		fmt.Println()
-		fmt.Println("Targets:")
-		if len(targets) == 0 {
-			fmt.Println("  (none)")
-		} else {
-			for _, t := range targets {
-				fmt.Printf("  - %s\n", t.Name)
-				fmt.Printf("      path:   %s\n", t.RootPath)
-				fmt.Printf("      origin: %s\n", t.Origin)
-			}
-		}
-
-		// Profiles
-		fmt.Println()
-		fmt.Println("Profiles:")
-		if len(profiles) == 0 {
-			fmt.Println("  (none)")
-		} else {
-			for _, p := range profiles {
-				active := "\n"
-				if util.SqliteIntToBool(p.IsActive) {
-					active = " (active)\n"
-				}
-				fmt.Printf("  - %s%s", p.Name, active)
-				if p.Description.Valid {
-					fmt.Printf("      desc:    %s\n", p.Description.String)
-				}
-			}
-		}
-
+		fmt.Println(renderGameInfo(gi, targets, profiles, isCurrent))
 		return nil
 	},
 }
 
 func init() {
 	gamesCmd.AddCommand(gamesInfoCmd)
+}
+
+func renderGameInfo(gi dbq.GameInstall, targets []dbq.Target, profiles []dbq.Profile, isCurrentContext bool) string {
+	// styles
+	cardBorder := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		Padding(0, 1)
+
+	titleStyle := lipgloss.NewStyle().
+		Bold(true)
+
+	selectorStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("8")) // gray
+
+	sectionTitleStyle := lipgloss.NewStyle().
+		Bold(true).
+		MarginTop(1)
+
+	activeTagStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("10"))
+
+	warningBanner := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("11")).
+		Border(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("11")).
+		Padding(0, 1)
+
+	contextBadge := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("0")).
+		Background(lipgloss.Color("10")).
+		Padding(0, 1).
+		Bold(true)
+
+	inactiveProfileStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("8"))
+
+	activeDot := lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render("●")
+	inactiveDot := lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render("○")
+
+	// Header card
+	fullSel := internal.FullSelector(gi.StoreID, gi.StoreGameID, gi.InstanceID)
+	shortSel := internal.ShortSelector(gi.StoreID, gi.StoreGameID, gi.InstanceID)
+	selText := fullSel
+	if shortSel != fullSel {
+		selText = fmt.Sprintf("%s (short: %s)", fullSel, shortSel)
+	}
+
+	headerContent := titleStyle.Render(gi.DisplayName) + "\n" +
+		selectorStyle.Render(selText)
+
+	if isCurrentContext {
+		headerContent += "\n\n" + contextBadge.Render("CURRENT ACTIVE CONTEXT")
+	}
+
+	header := cardBorder.Render(headerContent)
+
+	var b strings.Builder
+	b.WriteString(header)
+	b.WriteString("\n")
+
+	// Not present warning
+	if gi.IsPresent == 0 {
+		b.WriteString("\n")
+		b.WriteString(warningBanner.Render("⚠  This install is not currently present on disk"))
+		b.WriteString("\n")
+	}
+
+	// Install section
+	b.WriteString(sectionTitleStyle.Render("Install") + "\n")
+	writeKV(&b, "ID:", fmt.Sprintf("%d", gi.ID))
+	writeKV(&b, "Store:", gi.StoreID)
+	writeKV(&b, "Store ID:", gi.StoreGameID)
+	writeKV(&b, "Instance:", gi.InstanceID)
+	writeKV(&b, "Path:", gi.InstallRoot)
+
+	present := "yes"
+	if gi.IsPresent == 0 {
+		present = "no"
+	}
+	writeKV(&b, "Present:", present)
+
+	if gi.LastSeenAt.Valid {
+		writeKV(&b, "Last seen:", gi.LastSeenAt.String)
+	}
+
+	// Targets
+	b.WriteString("\n" + sectionTitleStyle.Render("Targets") + "\n")
+	if len(targets) == 0 {
+		b.WriteString("  (none)\n")
+	} else {
+		for _, t := range targets {
+			b.WriteString("  • " + t.Name + "\n")
+			writeKVIndented(&b, "path:", t.RootPath)
+			writeKVIndented(&b, "origin:", t.Origin)
+		}
+	}
+
+	// Profiles
+	b.WriteString("\n" + sectionTitleStyle.Render("Profiles") + "\n")
+	if len(profiles) == 0 {
+		b.WriteString("  (none)\n")
+	} else {
+		for _, p := range profiles {
+			dot := inactiveDot
+			line := "  "
+
+			if p.IsActive != 0 {
+				dot = activeDot
+			}
+
+			line += dot + " " + p.Name
+
+			if util.SqliteIntToBool(p.IsActive) {
+				line += "   " + activeTagStyle.Render("(active)")
+			}
+
+			b.WriteString(inactiveProfileStyle.Render(line) + "\n")
+
+			if p.Description.Valid && strings.TrimSpace(p.Description.String) != "" {
+				writeKVIndentedInactive(&b, "description:", p.Description.String)
+			}
+
+			b.WriteString("\n")
+		}
+	}
+
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func writeKV(b *strings.Builder, label, value string) {
+	labelStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("7")).
+		Width(12)
+
+	b.WriteString("  " + labelStyle.Render(label) + " " + value + "\n")
+}
+
+func writeKVIndented(b *strings.Builder, label, value string) {
+	labelStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("7")).
+		Width(12)
+
+	b.WriteString("      " + labelStyle.Render(label) + " " + value + "\n")
+}
+
+func writeKVIndentedInactive(b *strings.Builder, label, value string) {
+	labelStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("7")).
+		Width(12)
+
+	inactiveProfileStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("8"))
+
+	line := "      " + labelStyle.Render(label) + " " + value + "\n"
+	b.WriteString(inactiveProfileStyle.Render(line))
 }
