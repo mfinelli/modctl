@@ -113,7 +113,7 @@ func (s Store) IngestFile(ctx context.Context, kind Kind, srcPath string) (Inges
 	w := io.MultiWriter(tmp, h)
 
 	buf := make([]byte, 1024*1024) // 1MiB buffer; fine for big archives
-	n, err := copyWithContext(ctx, w, src, buf)
+	n, err := CopyWithContext(ctx, w, src, buf)
 	if err != nil {
 		return res, fmt.Errorf("copy: %w", err)
 	}
@@ -175,7 +175,7 @@ func (s Store) IngestFile(ctx context.Context, kind Kind, srcPath string) (Inges
 	return IngestResult{SHA256Hex: shaHex, SizeBytes: n, Existed: false}, nil
 }
 
-// copyWithContext copies bytes from src to dst using the provided buffer,
+// CopyWithContext copies bytes from src to dst using the provided buffer,
 // periodically checking ctx for cancellation.
 //
 // It behaves similarly to io.CopyBuffer, but allows the caller to cancel
@@ -190,7 +190,7 @@ func (s Store) IngestFile(ctx context.Context, kind Kind, srcPath string) (Inges
 // This is useful when ingesting large blobs where we want the CLI to remain
 // interruptible (Ctrl+C, timeouts, etc.) without relying on OS-level signals
 // to interrupt a blocking read.
-func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader, buf []byte) (int64, error) {
+func CopyWithContext(ctx context.Context, dst io.Writer, src io.Reader, buf []byte) (int64, error) {
 	var total int64
 
 	for {

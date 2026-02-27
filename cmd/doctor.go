@@ -20,10 +20,14 @@ package cmd
 
 import (
 	"context"
+	"crypto/sha256"
+	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"time"
@@ -64,24 +68,32 @@ Doctor does not modify Steam or your game installs. It may read files to
 validate integrity.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := context.Background()
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer stop()
 
-		if err := checkDb(ctx); err != nil {
-			return err
+		run := func() error {
+			if err := checkDb(ctx); err != nil {
+				return err
+			}
+			if err := checkPaths(); err != nil {
+				return err
+			}
+			if err := checkBsdtar(ctx); err != nil {
+				return err
+			}
+			if err := checkSteamStatus(); err != nil {
+				return err
+			}
+			if err := checkBlobs(ctx); err != nil {
+				return err
+			}
+			return nil
 		}
 
-		if err := checkPaths(); err != nil {
-			return err
-		}
-
-		if err := checkBsdtar(ctx); err != nil {
-			return err
-		}
-
-		// TODO loop through game installs and ensure that we can
-		//      write into them
-
-		if err := checkBlobs(ctx); err != nil {
+		if err := run(); err != nil {
+			if errors.Is(err, context.Canceled) {
+				return fmt.Errorf("cancelled")
+			}
 			return err
 		}
 
@@ -417,6 +429,11 @@ func checkBsdtar(ctx context.Context) error {
 	return nil
 }
 
+func checkSteamStatus() error {
+	// TODO loop through game installs and ensure that we can write into them
+	return nil
+}
+
 // checkBlobsPresence scans blob records and ensures each expected blob file
 // exists on disk at the derived content-addressed path.
 //
@@ -513,10 +530,123 @@ func checkBlobs(ctx context.Context) error {
 
 	if doctorRehash {
 		fmt.Println()
-		fmt.Println(subtleStyle.Render("  (rehash pass not implemented yet)"))
+		for _, kind := range kinds {
+			if err := rehashBlobs(ctx, q, bs, kind, subtleStyle); err != nil {
+				return err
+			}
+		}
 	}
 
 	fmt.Println()
+
+	return nil
+}
+
+func rehashBlobs(
+	ctx context.Context,
+	q *dbq.Queries,
+	bs blobstore.Store,
+	kind blobstore.Kind,
+	subtleStyle lipgloss.Style,
+) error {
+	blobs, err := q.ListBlobsByKind(ctx, string(kind))
+	if err != nil {
+		return fmt.Errorf("list blobs kind=%s: %w", kind, err)
+	}
+
+	total := len(blobs)
+	if total == 0 {
+		fmt.Println(subtleStyle.Render(fmt.Sprintf("  %s: (no blobs)", kind)))
+		return nil
+	}
+
+	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	buf := make([]byte, 1024*1024) // 1MiB
+
+	var hashed int
+	var skippedMissing int
+
+	label := fmt.Sprintf("  %s: rehash", kind)
+	// Print an initial line so \r updates have something to overwrite
+	fmt.Printf("%s (0/%d)", label, total)
+
+	for i, b := range blobs {
+		select {
+		case <-ctx.Done():
+			fmt.Print("\n")
+			return ctx.Err()
+		default:
+		}
+
+		// Progress update (overwrite same line).
+		fmt.Printf("\r%s (%d/%d)", label, i+1, total)
+
+		path, perr := bs.PathFor(kind, b.Sha256)
+		if perr != nil {
+			fmt.Print("\n")
+			return fmt.Errorf("derive blob path kind=%s sha=%s: %w", kind, b.Sha256, perr)
+		}
+
+		st, serr := os.Stat(path)
+		if serr != nil {
+			if errors.Is(serr, os.ErrNotExist) {
+				skippedMissing++
+				continue
+			}
+			fmt.Print("\n")
+			return fmt.Errorf("stat blob kind=%s sha=%s path=%s: %w", kind, b.Sha256, path, serr)
+		}
+		if st.Size() != b.SizeBytes {
+			fmt.Print("\n")
+			return fmt.Errorf(
+				"blob size mismatch kind=%s sha=%s path=%s db=%d disk=%d",
+				kind, b.Sha256, path, b.SizeBytes, st.Size(),
+			)
+		}
+
+		f, err := os.Open(path)
+		if err != nil {
+			fmt.Print("\n")
+			return fmt.Errorf("open blob kind=%s sha=%s path=%s: %w", kind, b.Sha256, path, err)
+		}
+
+		h := sha256.New()
+		_, cerr := blobstore.CopyWithContext(ctx, h, f, buf)
+		_ = f.Close()
+		if cerr != nil {
+			fmt.Print("\n")
+			return fmt.Errorf("hash blob kind=%s sha=%s path=%s: %w", kind, b.Sha256, path, cerr)
+		}
+
+		sumHex := hex.EncodeToString(h.Sum(nil))
+		if sumHex != b.Sha256 {
+			fmt.Print("\n")
+			return fmt.Errorf(
+				"blob hash mismatch kind=%s expected=%s got=%s path=%s",
+				kind, b.Sha256, sumHex, path,
+			)
+		}
+
+		// only after a successful rehash do we update verified_at
+		if err := q.TouchBlobVerifiedAt(ctx, dbq.TouchBlobVerifiedAtParams{
+			VerifiedAt: sql.NullString{String: now, Valid: true},
+			Sha256:     b.Sha256,
+		}); err != nil {
+			fmt.Print("\n")
+			return fmt.Errorf("update verified_at sha=%s: %w", b.Sha256, err)
+		}
+
+		hashed++
+	}
+
+	// Finish the progress line and print a summary
+	fmt.Print("\r") // return to start of line
+	fmt.Printf("%s (%d/%d)", label, total, total)
+	fmt.Print("\n")
+	if skippedMissing > 0 {
+		fmt.Println(subtleStyle.Render(fmt.Sprintf("    skipped %d missing blobs", skippedMissing)))
+	}
+	fmt.Println(subtleStyle.Render(fmt.Sprintf("    verified %d blobs", hashed)))
 
 	return nil
 }
