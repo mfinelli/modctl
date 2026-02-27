@@ -160,6 +160,9 @@ SELECT * FROM blobs WHERE sha256 = ? LIMIT 1;
 INSERT INTO blobs (sha256, kind, size_bytes, original_name, verified_at)
 VALUES (?, ?, ?, ?, ?);
 
+-- name: ListBlobsByKind :many
+SELECT * FROM blobs WHERE kind = ? ORDER BY created_at;
+
 -- name: TouchBlobVerifiedAt :exec
 UPDATE blobs
 SET verified_at = ?

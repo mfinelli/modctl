@@ -30,12 +30,15 @@ import (
 
 	"github.com/adrg/xdg"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var deepCheck bool
+var doctorRehash bool
 
 var SampleTarGz []byte
 
@@ -55,7 +58,7 @@ Doctor verifies:
     built-in test archive)
   - (TODO) Steam readiness when the Steam store is enabled (locates Steam root
     and parses libraryfolders.vdf)
-  - (TODO) Integrity of blobs stored on disk (presence, size, hash)
+  - Integrity of blobs stored on disk (presence, size, hash)
 
 Doctor does not modify Steam or your game installs. It may read files to
 validate integrity.`,
@@ -78,7 +81,9 @@ validate integrity.`,
 		// TODO loop through game installs and ensure that we can
 		//      write into them
 
-		// TODO verify blobs on disk haven't changed and aren't missing
+		if err := checkBlobs(ctx); err != nil {
+			return err
+		}
 
 		return nil
 	},
@@ -88,6 +93,7 @@ func init() {
 	rootCmd.AddCommand(doctorCmd)
 
 	doctorCmd.Flags().BoolVar(&deepCheck, "full", false, "Runs a more complete database check")
+	doctorCmd.Flags().BoolVar(&doctorRehash, "recheck", false, "Rehashes all blobs in the blob store to ensure integrity")
 }
 
 // checkDb verifies the DB exists and is usable, and warns if migrations
@@ -405,6 +411,110 @@ func checkBsdtar(ctx context.Context) error {
 	}
 
 	fmt.Println(okStyle.Render("  ✓ bsdtar archive test OK"))
+
+	fmt.Println()
+
+	return nil
+}
+
+// checkBlobsPresence scans blob records and ensures each expected blob file
+// exists on disk at the derived content-addressed path.
+//
+// For now this is "presence + size sanity". If rehashCheck is enabled we’ll
+// add a second pass later to stream-hash and update verified_at.
+func checkBlobs(ctx context.Context) error {
+	// TODO: extract these somewhere else
+	headerStyle := lipgloss.NewStyle().Bold(true).
+		Foreground(lipgloss.Color("63"))
+	subtleStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("245"))
+	errStyle := lipgloss.NewStyle().Bold(true).
+		Foreground(lipgloss.Color("1"))
+	okStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("2"))
+	warnStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("3"))
+
+	fmt.Println(headerStyle.Render("Blob Store Checks"))
+	fmt.Println(subtleStyle.Render("  archives:  " + viper.GetString("archives_dir")))
+	fmt.Println(subtleStyle.Render("  backups:   " + viper.GetString("backups_dir")))
+	fmt.Println(subtleStyle.Render("  overrides: " + viper.GetString("overrides_dir")))
+	fmt.Println()
+
+	db, err := internal.SetupDB()
+	if err != nil {
+		fmt.Println(errStyle.Render("  ✗ could not open database"))
+		fmt.Println(subtleStyle.Render("    " + err.Error()))
+		fmt.Println()
+		return fmt.Errorf("cannot open database: %w", err)
+	}
+	defer db.Close()
+
+	q := dbq.New(db)
+
+	bs := blobstore.Store{
+		ArchivesDir:  viper.GetString("archives_dir"),
+		BackupsDir:   viper.GetString("backups_dir"),
+		OverridesDir: viper.GetString("overrides_dir"),
+	}
+
+	kinds := []blobstore.Kind{
+		blobstore.KindArchive,
+		blobstore.KindBackup,
+		blobstore.KindOverride,
+	}
+
+	for _, kind := range kinds {
+		rows, err := q.ListBlobsByKind(ctx, string(kind))
+		if err != nil {
+			fmt.Println(errStyle.Render(fmt.Sprintf("  ✗ %s: failed to list blobs", kind)))
+			fmt.Println(subtleStyle.Render("    " + err.Error()))
+			fmt.Println()
+			return fmt.Errorf("list blobs kind=%s: %w", kind, err)
+		}
+
+		var missing int
+		for _, b := range rows {
+			path, perr := bs.PathFor(kind, b.Sha256)
+			if perr != nil {
+				return fmt.Errorf("derive blob path kind=%s sha=%s: %w", kind, b.Sha256, perr)
+			}
+
+			st, serr := os.Stat(path)
+			if serr != nil {
+				if errors.Is(serr, os.ErrNotExist) {
+					// TODO: there should be a way to surface to the user
+					//       _which_ blobs are missing (eg original filename or
+					//       which games a blob is associated with)
+					missing++
+					continue
+				}
+				return fmt.Errorf("stat blob kind=%s sha=%s path=%s: %w", kind, b.Sha256, path, serr)
+			}
+
+			// size sanity: if it exists but size differs, something is wrong
+			if st.Size() != b.SizeBytes {
+				return fmt.Errorf(
+					"blob size mismatch kind=%s sha=%s path=%s db=%d disk=%d",
+					kind, b.Sha256, path, b.SizeBytes, st.Size(),
+				)
+			}
+		}
+
+		switch {
+		case len(rows) == 0:
+			fmt.Println(okStyle.Render(fmt.Sprintf("  ✓ %s: no blobs recorded", kind)))
+		case missing == 0:
+			fmt.Println(okStyle.Render(fmt.Sprintf("  ✓ %s: %d/%d present", kind, len(rows), len(rows))))
+		default:
+			fmt.Println(warnStyle.Render(fmt.Sprintf("  ⚠ %s: %d/%d present (%d missing)", kind, len(rows)-missing, len(rows), missing)))
+		}
+	}
+
+	if doctorRehash {
+		fmt.Println()
+		fmt.Println(subtleStyle.Render("  (rehash pass not implemented yet)"))
+	}
 
 	fmt.Println()
 
