@@ -167,3 +167,33 @@ SELECT * FROM blobs WHERE kind = ? ORDER BY created_at;
 UPDATE blobs
 SET verified_at = ?
 WHERE sha256 = ?;
+
+-- name: CreateModPage :one
+INSERT INTO mod_pages (
+  game_install_id, name, source_kind, source_url, source_ref,
+  nexus_game_domain, nexus_mod_id,
+  notes, metadata
+) VALUES (
+  ?, ?, ?, ?, ?,
+  ?, ?,
+  ?, ?
+)
+RETURNING id;
+
+-- name: CreateModFile :one
+INSERT INTO mod_files (
+  mod_page_id, label, is_primary, nexus_file_id, source_url, metadata
+) VALUES (
+  ?, ?, ?, ?, ?, ?
+)
+RETURNING id;
+
+-- name: CreateModFileVersion :one
+INSERT INTO mod_file_versions (
+  mod_file_id, archive_sha256, original_name, version_string,
+  uploaded_at, upstream_notes, notes, metadata
+) VALUES (
+  ?, ?, ?, ?,
+  ?, ?, ?, ?
+)
+RETURNING id;
