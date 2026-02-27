@@ -21,6 +21,7 @@ package importer
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 
@@ -38,6 +39,13 @@ type ImportOptions struct {
 
 	ModName   *string // optional override for mod_pages.name
 	FileLabel *string // optional override for mod_files.label
+
+	Wrapped     bool
+	WrappedFrom string
+	MemberName  string
+
+	// what to store into blobs.original_name / mod_file_versions.original_name
+	OriginalBasename string
 }
 
 func ImportArchive(
@@ -129,16 +137,30 @@ func ImportArchive(
 		return 0, 0, 0, "", 0, fmt.Errorf("create mod_file: %w", err)
 	}
 
+	var m sql.NullString
+	if opts.Wrapped {
+		meta := map[string]any{
+			"wrapped":             true,
+			"wrapped_from":        opts.WrappedFrom,
+			"wrapped_member_name": opts.MemberName,
+		}
+		b, jerr := json.Marshal(meta)
+		m = sql.NullString{String: string(b), Valid: true}
+		if jerr != nil {
+			return 0, 0, 0, "", 0, fmt.Errorf("creating wrapped json: %w", err)
+		}
+	}
+
 	// 7) Create mod_file_version
 	versionID, err = qtx.CreateModFileVersion(ctx, dbq.CreateModFileVersionParams{
 		ModFileID:     fileID,
 		ArchiveSha256: sha,
-		OriginalName:  nullString(&base),
+		OriginalName:  nullString(&opts.OriginalBasename),
 		VersionString: sql.NullString{Valid: false},
 		UploadedAt:    sql.NullString{Valid: false},
 		UpstreamNotes: sql.NullString{Valid: false},
 		Notes:         sql.NullString{Valid: false},
-		Metadata:      sql.NullString{Valid: false},
+		Metadata:      m,
 	})
 	if err != nil {
 		return 0, 0, 0, "", 0, fmt.Errorf("create mod_file_version: %w", err)
