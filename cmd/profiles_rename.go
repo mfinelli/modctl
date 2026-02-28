@@ -26,8 +26,8 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 
+	"github.com/mattn/go-sqlite3"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/completion"
@@ -113,7 +113,8 @@ Profile names must be unique per game.`,
 			Name: newName,
 			ID:   p.ID,
 		}); err != nil {
-			if strings.Contains(strings.ToLower(err.Error()), "unique") {
+			var se sqlite3.Error
+			if errors.As(err, &se) && se.Code == sqlite3.ErrConstraint && se.ExtendedCode == sqlite3.ErrConstraintUnique {
 				return fmt.Errorf("profile %q already exists for this game", newName)
 			}
 			return fmt.Errorf("rename profile: %w", err)

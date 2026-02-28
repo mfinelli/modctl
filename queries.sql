@@ -293,9 +293,7 @@ VALUES (?, ?, ?, FALSE)
 RETURNING id;
 
 -- name: GetProfileByName :one
-SELECT id, game_install_id, name, description, is_active
-FROM profiles
-WHERE game_install_id = ? AND name = ? LIMIT 1;
+SELECT * FROM profiles WHERE game_install_id = ? AND name = ? LIMIT 1;
 
 -- name: ListProfilesByGameInstall :many
 SELECT id, name, description, is_active, created_at, updated_at
@@ -325,3 +323,33 @@ SELECT name, is_active
 FROM profiles
 WHERE game_install_id = ?
 ORDER BY is_active DESC, name COLLATE NOCASE;
+
+-- name: IsPriorityTaken :one
+SELECT TRUE
+FROM profile_items
+WHERE profile_id = ? AND priority = ?;
+
+-- name: GetActiveProfileForGame :one
+SELECT * FROM profiles WHERE game_install_id = ? AND is_active = TRUE LIMIT 1;
+
+-- name: GetMaxPriorityForProfile :one
+SELECT CAST(COALESCE(MAX(priority), 0) AS INTEGER) AS max_priority
+FROM profile_items
+WHERE profile_id = ?;
+
+-- name: CreateProfileItem :one
+INSERT INTO profile_items (
+  profile_id,
+  policy,
+  mod_file_version_id,
+  enabled,
+  priority,
+  remap_config_id,
+  notes
+) VALUES (?, 'pinned', ?, ?, ?, NULL, NULL)
+RETURNING id;
+
+-- name: ExistsModFileVersion :one
+SELECT 1
+FROM mod_file_versions
+WHERE id = ? LIMIT 1;

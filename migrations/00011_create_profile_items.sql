@@ -53,7 +53,16 @@ CREATE INDEX idx_profile_items_profile_priority ON profile_items(profile_id, ena
 CREATE INDEX idx_profile_items_mfv ON profile_items(mod_file_version_id);
 -- +goose StatementEnd
 
+-- +goose StatementBegin
+CREATE UNIQUE INDEX uq_profile_items_priority_per_profile
+ON profile_items(profile_id, priority);
+-- +goose StatementEnd
+
 -- +goose Down
+-- +goose StatementBegin
+DROP INDEX uq_profile_items_priority_per_profile;
+-- +goose StatementEnd
+
 -- +goose StatementBegin
 DROP INDEX idx_profile_items_mfv;
 -- +goose StatementEnd
