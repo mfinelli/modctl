@@ -353,3 +353,14 @@ RETURNING id;
 SELECT 1
 FROM mod_file_versions
 WHERE id = ? LIMIT 1;
+
+-- name: GetProfileItemByVersion :one
+SELECT id, enabled
+FROM profile_items
+WHERE profile_id = ? AND mod_file_version_id = ? LIMIT 1;
+
+-- name: SetProfileItemEnabled :exec
+UPDATE profile_items
+SET enabled = ?,
+    updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+WHERE id = ?;
