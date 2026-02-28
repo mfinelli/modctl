@@ -364,3 +364,12 @@ UPDATE profile_items
 SET enabled = ?,
     updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 WHERE id = ?;
+
+-- name: GetAppliedProfileIDForGame :one
+SELECT applied_profile_id
+FROM game_installs
+WHERE id = ? LIMIT 1;
+
+-- name: DeleteProfileByID :exec
+DELETE FROM profiles
+WHERE id = ?;
