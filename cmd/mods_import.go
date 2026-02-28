@@ -52,6 +52,7 @@ var (
 	modsImportNexusUrl    string
 	modsImportRm          bool
 	modsImportListTimeout int64
+	modsImportPageID      int64
 )
 
 type prepareArchiveResult struct {
@@ -184,6 +185,7 @@ has been safely stored and the database has been updated successfully.`,
 			GameInstallID:    gi.ID,
 			ArchivePath:      prep.PathToImport,
 			OriginalBasename: filepath.Base(inputPath),
+			PageID:           &modsImportPageID,
 			NexusURL:         ptrIfNonEmpty(modsImportNexusUrl),
 			NexusGameDomain:  gameDomain,
 			NexusModID:       modID,
@@ -239,10 +241,15 @@ func init() {
 		"Label for the mod file (defaults to 'Main File')")
 	modsImportCmd.Flags().StringVar(&modsImportNexusUrl, "nexus-url", "",
 		"Nexus mod page URL (sets source_kind=nexus)")
+	modsImportCmd.Flags().Int64Var(&modsImportPageID, "page-id", 0,
+		"Attach the mod to an existing page")
 	modsImportCmd.Flags().BoolVar(&modsImportRm, "rm", false,
 		"Remove original archive after import")
 	modsImportCmd.Flags().Int64VarP(&modsImportListTimeout, "list-timeout",
 		"t", 60, "Set timeout in seconds to list the contents of the passed archive")
+
+	// name only makes sense when creating a new page
+	modsImportCmd.MarkFlagsMutuallyExclusive("name", "page-id")
 }
 
 func ptrIfNonEmpty(s string) *string {

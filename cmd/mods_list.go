@@ -20,9 +20,12 @@ package cmd
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
+	"sort"
 	"strconv"
 
 	"github.com/charmbracelet/lipgloss"
@@ -33,18 +36,25 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var modsListGame string
+var (
+	modsListGame    string
+	modsListDetails bool
+)
 
 var modsListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List imported mods for the current game",
 	Long: `List imported mods (mod pages) for a game install.
 
-For each mod page, this shows the latest imported version and how many versions
-have been imported in total.
+By default, this shows one line per mod page with counts and the latest imported
+archive across all files under that page.
+
+With --details, the output expands each mod page to show its mod files and their
+versions.
 
 TODO:
-  - Show latest version information from the Nexus API for Nexus-linked mods.`,
+- Show latest version information from the Nexus API for Nexus-linked mods and
+  compare it with imported versions.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// TODO: extract these somewhere else
 		headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
@@ -102,56 +112,187 @@ TODO:
 		fmt.Println(headerStyle.Render("Mods"))
 		fmt.Println()
 
+		// Summary query is already "one row per page" (rn=1). We'll build a stable list of page IDs.
+		type pageSummary struct {
+			ModPageID   int64
+			ModName     string
+			SourceKind  string
+			NexusDomain sql.NullString
+			NexusModID  sql.NullInt64
+
+			FilesCount    int64
+			VersionsCount int64
+
+			LatestFileLabel  sql.NullString
+			LatestVersionID  sql.NullInt64
+			LatestVersionStr sql.NullString
+			LatestArchiveSHA sql.NullString
+			LatestImportedAt sql.NullString
+		}
+
+		pages := make([]pageSummary, 0, len(rows))
 		for _, r := range rows {
+			pages = append(pages, pageSummary{
+				ModPageID:   r.ModPageID,
+				ModName:     r.ModName,
+				SourceKind:  r.SourceKind,
+				NexusDomain: r.NexusGameDomain,
+				NexusModID:  r.NexusModID,
+
+				FilesCount:    r.FilesCount,
+				VersionsCount: r.VersionsCount,
+
+				LatestFileLabel:  r.ModFileLabel,
+				LatestVersionID:  r.ModFileVersionID,
+				LatestVersionStr: r.VersionString,
+				LatestArchiveSHA: r.ArchiveSha256,
+				LatestImportedAt: r.ImportedAt,
+			})
+		}
+
+		// keep deterministic order even if SQL already sorted.
+		sort.Slice(pages, func(i, j int) bool {
+			if pages[i].ModName == pages[j].ModName {
+				return pages[i].ModPageID < pages[j].ModPageID
+			}
+			return pages[i].ModName < pages[j].ModName
+		})
+
+		// Helper formatters
+		shortSHA := func(ns sql.NullString) string {
+			if !ns.Valid || ns.String == "" {
+				return "—"
+			}
+			s := ns.String
+			if len(s) > 12 {
+				s = s[:12]
+			}
+			return s
+		}
+		strOrDash := func(ns sql.NullString) string {
+			if !ns.Valid || ns.String == "" {
+				return "—"
+			}
+			return ns.String
+		}
+		intOrDash := func(ni sql.NullInt64) string {
+			if !ni.Valid {
+				return "—"
+			}
+			return fmt.Sprintf("%d", ni.Int64)
+		}
+
+		if !modsListDetails {
+			for _, p := range pages {
+				// Header line
+				fmt.Printf("%d  %s\n", p.ModPageID, p.ModName)
+
+				// Optional nexus ref
+				nexusRef := ""
+				if p.NexusDomain.Valid && p.NexusModID.Valid {
+					nexusRef = fmt.Sprintf("%s:%d", p.NexusDomain.String, p.NexusModID.Int64)
+				}
+
+				line := fmt.Sprintf(
+					"  source=%s  files=%d  versions=%d",
+					p.SourceKind, p.FilesCount, p.VersionsCount,
+				)
+
+				if p.LatestVersionID.Valid {
+					line += fmt.Sprintf(
+						"  latest_file=%q  latest_version_id=%s  imported_at=%s  sha=%s",
+						strOrDash(p.LatestFileLabel),
+						intOrDash(p.LatestVersionID),
+						strOrDash(p.LatestImportedAt),
+						shortSHA(p.LatestArchiveSHA),
+					)
+					if p.LatestVersionStr.Valid && p.LatestVersionStr.String != "" {
+						line += fmt.Sprintf("  version=%q", p.LatestVersionStr.String)
+					}
+				} else {
+					line += "  (no imported archives yet)"
+				}
+
+				if nexusRef != "" {
+					line += fmt.Sprintf("  nexus=%s", nexusRef)
+					// TODO: add "nexus_latest=..." once Nexus API integration exists
+				}
+
+				fmt.Println(subtleStyle.Render(line))
+				fmt.Println()
+			}
+
+			return nil
+		}
+
+		for _, p := range pages {
+			fmt.Printf("%d  %s\n", p.ModPageID, p.ModName)
+
 			nexusRef := ""
-			if r.NexusGameDomain.Valid && r.NexusModID.Valid {
-				nexusRef = fmt.Sprintf("%s:%d", r.NexusGameDomain.String, r.NexusModID.Int64)
+			if p.NexusDomain.Valid && p.NexusModID.Valid {
+				nexusRef = fmt.Sprintf("%s:%d", p.NexusDomain.String, p.NexusModID.Int64)
 			}
 
-			latestID := "-"
-			if r.ModFileVersionID.Valid {
-				latestID = fmt.Sprintf("%d", r.ModFileVersionID.Int64)
+			line := fmt.Sprintf(
+				"  source=%s  files=%d  versions=%d",
+				p.SourceKind, p.FilesCount, p.VersionsCount,
+			)
+			if nexusRef != "" {
+				line += fmt.Sprintf("  nexus=%s", nexusRef)
+				// TODO: add "nexus_latest=..." once Nexus API integration exists
+			}
+			fmt.Println(subtleStyle.Render(line))
+
+			files, err := q.ListModFilesByPage(ctx, p.ModPageID)
+			if err != nil {
+				return fmt.Errorf("list mod files (page_id=%d): %w", p.ModPageID, err)
 			}
 
-			importedAt := "-"
-			if r.ImportedAt.Valid && r.ImportedAt.String != "" {
-				importedAt = r.ImportedAt.String
+			if len(files) == 0 {
+				fmt.Println(subtleStyle.Render("  (no files)"))
+				fmt.Println()
+				continue
 			}
 
-			shaShort := "-"
-			if r.ArchiveSha256.Valid && r.ArchiveSha256.String != "" {
-				shaShort = r.ArchiveSha256.String
-				if len(shaShort) > 12 {
-					shaShort = shaShort[:12]
+			for _, f := range files {
+				primaryTag := ""
+				if f.IsPrimary != 0 {
+					primaryTag = " (primary)"
+				}
+				fmt.Println(subtleStyle.Render(fmt.Sprintf("  File: %s%s", f.Label, primaryTag)))
+
+				vers, err := q.ListModFileVersionsByFile(ctx, f.ID)
+				if err != nil && !errors.Is(err, sql.ErrNoRows) {
+					return fmt.Errorf("list versions (file_id=%d): %w", f.ID, err)
+				}
+				if len(vers) == 0 {
+					fmt.Println(subtleStyle.Render("    (no versions)"))
+					continue
+				}
+
+				for _, v := range vers {
+					vline := fmt.Sprintf(
+						"    v%d  imported_at=%s  sha=%s",
+						v.ID,
+						v.CreatedAt,
+						func() string {
+							s := v.ArchiveSha256
+							if len(s) > 12 {
+								s = s[:12]
+							}
+							return s
+						}(),
+					)
+
+					if v.VersionString.Valid && v.VersionString.String != "" {
+						vline += fmt.Sprintf("  version=%q", v.VersionString.String)
+					}
+
+					// TODO: think about also showing v.OriginalName later (only if not-null)
+					fmt.Println(subtleStyle.Render(vline))
 				}
 			}
 
-			verStr := ""
-			if r.VersionString.Valid && r.VersionString.String != "" {
-				verStr = r.VersionString.String
-			}
-
-			// TODO: nexus latest placeholder
-			nexusLatest := "-"
-			_ = nexusLatest
-
-			// Primary line
-			fmt.Printf("%d  %s\n", r.ModPageID, r.ModName)
-
-			// Details line
-			details := fmt.Sprintf(
-				"  source=%s  versions=%d  latest_version_id=%s  imported_at=%s  sha=%s",
-				r.SourceKind, r.VersionsCount, latestID, importedAt, shaShort,
-			)
-			if verStr != "" {
-				details += fmt.Sprintf("  version=%q", verStr)
-			}
-			if nexusRef != "" {
-				details += fmt.Sprintf("  nexus=%s", nexusRef)
-				// TODO: details += fmt.Sprintf("  nexus_latest=%s", nexusLatest)
-			}
-
-			fmt.Println(subtleStyle.Render(details))
 			fmt.Println()
 		}
 
@@ -162,6 +303,8 @@ TODO:
 func init() {
 	modsCmd.AddCommand(modsListCmd)
 
+	modsListCmd.Flags().BoolVarP(&modsListDetails, "details", "d", false,
+		"Show per-file and per-version details")
 	modsListCmd.Flags().StringVarP(&modsListGame, "game", "g", "",
 		"Override the currently active game")
 	modsListCmd.RegisterFlagCompletionFunc("game",

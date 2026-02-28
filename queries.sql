@@ -207,11 +207,15 @@ WITH joined AS (
     mp.nexus_game_domain,
     mp.nexus_mod_id,
 
+    mf.id AS mod_file_id,
+    mf.label AS mod_file_label,
+
     mfv.id AS mod_file_version_id,
     mfv.version_string,
     mfv.archive_sha256,
     mfv.created_at AS imported_at,
 
+    COUNT(DISTINCT mf.id) OVER (PARTITION BY mp.id) AS files_count,
     COUNT(mfv.id) OVER (PARTITION BY mp.id) AS versions_count,
 
     ROW_NUMBER() OVER (
@@ -234,11 +238,51 @@ SELECT
   source_kind,
   nexus_game_domain,
   nexus_mod_id,
+
+  files_count,
+  versions_count,
+
+  mod_file_id,
+  mod_file_label,
   mod_file_version_id,
   version_string,
   archive_sha256,
-  imported_at,
-  versions_count
+  imported_at
 FROM joined
 WHERE rn = 1
 ORDER BY mod_name COLLATE NOCASE, mod_page_id;
+
+-- name: ListModFilesByPage :many
+SELECT id, mod_page_id, label, is_primary, nexus_file_id, source_url, created_at, updated_at
+FROM mod_files
+WHERE mod_page_id = ?
+ORDER BY is_primary DESC, label COLLATE NOCASE, id;
+
+-- name: ListModFileVersionsByFile :many
+SELECT id, mod_file_id, archive_sha256, original_name, version_string, created_at
+FROM mod_file_versions
+WHERE mod_file_id = ?
+ORDER BY created_at DESC, id DESC;
+
+-- name: GetModPageForGame :one
+SELECT id, game_install_id, name, source_kind, nexus_game_domain, nexus_mod_id
+FROM mod_pages
+WHERE id = ? AND game_install_id = ?;
+
+-- name: GetModPageByNexus :one
+SELECT id, game_install_id, name, source_kind, nexus_game_domain, nexus_mod_id
+FROM mod_pages
+WHERE game_install_id = ?
+  AND source_kind = 'nexus'
+  AND nexus_game_domain = ?
+  AND nexus_mod_id = ?;
+
+-- name: GetModFileByLabel :one
+SELECT id, mod_page_id, label, is_primary, nexus_file_id
+FROM mod_files
+WHERE mod_page_id = ? AND label = ?;
+
+-- name: CountModFilesForPage :one
+SELECT COUNT(1)
+FROM mod_files
+WHERE mod_page_id = ?;

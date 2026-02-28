@@ -37,6 +37,7 @@ type ImportOptions struct {
 	NexusGameDomain *string
 	NexusModID      *int64
 
+	PageID    *int64  // optional attach to existing mod_page
 	ModName   *string // optional override for mod_pages.name
 	FileLabel *string // optional override for mod_files.label
 
@@ -103,20 +104,54 @@ func ImportArchive(
 		sourceKind = "nexus"
 	}
 
-	// 5) Create mod_page
-	pageID, err = qtx.CreateModPage(ctx, dbq.CreateModPageParams{
-		GameInstallID:   opts.GameInstallID,
-		Name:            pageName,
-		SourceKind:      sourceKind,
-		SourceUrl:       nullString(opts.NexusURL),
-		SourceRef:       sql.NullString{Valid: false}, // can add later
-		NexusGameDomain: nullString(opts.NexusGameDomain),
-		NexusModID:      nullInt64(opts.NexusModID),
-		Notes:           sql.NullString{Valid: false},
-		Metadata:        sql.NullString{Valid: false},
-	})
-	if err != nil {
-		return 0, 0, 0, "", 0, fmt.Errorf("create mod_page: %w", err)
+	// 5) Decide mod_page_id (create mod_page if necessary)
+	switch {
+	case opts.PageID != nil && *opts.PageID != 0:
+		// Validate the page belongs to the game install
+		p, err := qtx.GetModPageForGame(ctx, dbq.GetModPageForGameParams{
+			ID:            *opts.PageID,
+			GameInstallID: opts.GameInstallID,
+		})
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return 0, 0, 0, "", 0, fmt.Errorf("mod page %d not found for this game", *opts.PageID)
+			}
+			return 0, 0, 0, "", 0, fmt.Errorf("get mod page: %w", err)
+		}
+		pageID = p.ID
+
+	default:
+		// If nexus-url provided (and parsed), attempt to reuse the existing nexus page
+		if opts.NexusGameDomain != nil && opts.NexusModID != nil {
+			p, err := qtx.GetModPageByNexus(ctx, dbq.GetModPageByNexusParams{
+				GameInstallID:   opts.GameInstallID,
+				NexusGameDomain: nullString(opts.NexusGameDomain),
+				NexusModID:      nullInt64(opts.NexusModID),
+			})
+			if err == nil {
+				pageID = p.ID
+			} else if err != sql.ErrNoRows {
+				return 0, 0, 0, "", 0, fmt.Errorf("lookup nexus mod page: %w", err)
+			}
+		}
+
+		// If not found, create a new page
+		if pageID == 0 {
+			pageID, err = qtx.CreateModPage(ctx, dbq.CreateModPageParams{
+				GameInstallID:   opts.GameInstallID,
+				Name:            pageName,
+				SourceKind:      sourceKind, // "nexus" if nexus fields set, else "local"
+				SourceUrl:       nullString(opts.NexusURL),
+				SourceRef:       sql.NullString{Valid: false},
+				NexusGameDomain: nullString(opts.NexusGameDomain),
+				NexusModID:      nullInt64(opts.NexusModID),
+				Notes:           sql.NullString{Valid: false},
+				Metadata:        sql.NullString{Valid: false},
+			})
+			if err != nil {
+				return 0, 0, 0, "", 0, fmt.Errorf("create mod_page: %w", err)
+			}
+		}
 	}
 
 	// 6) Create mod_file
@@ -125,16 +160,37 @@ func ImportArchive(
 		label = *opts.FileLabel
 	}
 
-	fileID, err = qtx.CreateModFile(ctx, dbq.CreateModFileParams{
-		ModPageID:   pageID,
-		Label:       label,
-		IsPrimary:   1,
-		NexusFileID: sql.NullInt64{Valid: false},
-		SourceUrl:   nullString(opts.NexusURL),
-		Metadata:    sql.NullString{Valid: false},
+	// Decide mod_file_id by label (find-or-create)
+	mf, err := qtx.GetModFileByLabel(ctx, dbq.GetModFileByLabelParams{
+		ModPageID: pageID,
+		Label:     label,
 	})
-	if err != nil {
-		return 0, 0, 0, "", 0, fmt.Errorf("create mod_file: %w", err)
+	if err == nil {
+		fileID = mf.ID
+	} else if err != sql.ErrNoRows {
+		return 0, 0, 0, "", 0, fmt.Errorf("lookup mod_file: %w", err)
+	} else {
+		// is_primary=true only for the first file created under this page
+		cnt, err := qtx.CountModFilesForPage(ctx, pageID)
+		if err != nil {
+			return 0, 0, 0, "", 0, fmt.Errorf("count mod_files: %w", err)
+		}
+		isPrimary := int64(0)
+		if cnt == 0 {
+			isPrimary = 1
+		}
+
+		fileID, err = qtx.CreateModFile(ctx, dbq.CreateModFileParams{
+			ModPageID:   pageID,
+			Label:       label,
+			IsPrimary:   isPrimary,
+			NexusFileID: sql.NullInt64{Valid: false}, // we don't have file_id from nexus-url
+			SourceUrl:   nullString(opts.NexusURL),
+			Metadata:    sql.NullString{Valid: false},
+		})
+		if err != nil {
+			return 0, 0, 0, "", 0, fmt.Errorf("create mod_file: %w", err)
+		}
 	}
 
 	var m sql.NullString

@@ -51,7 +51,17 @@ CREATE UNIQUE INDEX uq_mod_files_nexus_file
   WHERE nexus_file_id IS NOT NULL;
 -- +goose StatementEnd
 
+-- +goose StatementBegin
+-- ensure uniqueness for local mod_files by label
+CREATE UNIQUE INDEX uq_mod_files_label_per_page
+  ON mod_files(mod_page_id, label);
+-- +goose StatementEnd
+
 -- +goose Down
+-- +goose StatementBegin
+DROP INDEX uq_mod_files_label_per_page;
+-- +goose StatementEnd
+
 -- +goose StatementBegin
 DROP INDEX uq_mod_files_nexus_file;
 -- +goose StatementEnd
