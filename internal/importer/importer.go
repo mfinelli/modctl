@@ -55,7 +55,7 @@ func ImportArchive(
 	bs blobstore.Store,
 	opts ImportOptions,
 ) (pageID, fileID, versionID int64, sha string, size int64, err error) {
-	// 1) Ingest archive into blob store (outside TX — filesystem first)
+	// 1) Ingest archive into blob store (outside TX - filesystem first)
 	// Why ingest happens before the transaction:
 	//   - Filesystem is authoritative for blob content
 	//   - We don't want a DB row if ingest fails

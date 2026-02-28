@@ -201,7 +201,7 @@ func checkDb(ctx context.Context) error {
 				current, target,
 			)))
 		} else {
-			fmt.Println(warnStyle.Render("  ⚠ pending migrations — other commands will auto-migrate"))
+			fmt.Println(warnStyle.Render("  ⚠ pending migrations - other commands will auto-migrate"))
 		}
 	} else {
 		fmt.Println(okStyle.Render("  ✓ migrations up to date"))

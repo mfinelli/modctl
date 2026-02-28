@@ -197,3 +197,48 @@ INSERT INTO mod_file_versions (
   ?, ?, ?, ?
 )
 RETURNING id;
+
+-- name: ListModsByGameInstall :many
+WITH joined AS (
+  SELECT
+    mp.id AS mod_page_id,
+    mp.name AS mod_name,
+    mp.source_kind,
+    mp.nexus_game_domain,
+    mp.nexus_mod_id,
+
+    mfv.id AS mod_file_version_id,
+    mfv.version_string,
+    mfv.archive_sha256,
+    mfv.created_at AS imported_at,
+
+    COUNT(mfv.id) OVER (PARTITION BY mp.id) AS versions_count,
+
+    ROW_NUMBER() OVER (
+      PARTITION BY mp.id
+      ORDER BY
+        (mfv.created_at IS NULL) ASC,  -- prefer non-NULL versions
+        mfv.created_at DESC,
+        mfv.id DESC
+    ) AS rn
+  FROM mod_pages mp
+  LEFT JOIN mod_files mf
+    ON mf.mod_page_id = mp.id
+  LEFT JOIN mod_file_versions mfv
+    ON mfv.mod_file_id = mf.id
+  WHERE mp.game_install_id = ?
+)
+SELECT
+  mod_page_id,
+  mod_name,
+  source_kind,
+  nexus_game_domain,
+  nexus_mod_id,
+  mod_file_version_id,
+  version_string,
+  archive_sha256,
+  imported_at,
+  versions_count
+FROM joined
+WHERE rn = 1
+ORDER BY mod_name COLLATE NOCASE, mod_page_id;
