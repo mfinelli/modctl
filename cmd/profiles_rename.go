@@ -47,6 +47,13 @@ profile name; it does not change which mods are in the profile.
 
 Profile names must be unique per game.`,
 	Args: cobra.ExactArgs(2),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		// Complete only the first positional arg (old profile name).
+		if len(args) == 0 {
+			return completion.ProfileNames(cmd, toComplete)
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer stop()

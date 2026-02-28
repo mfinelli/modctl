@@ -46,6 +46,13 @@ profile contents default to the active profile unless --profile is provided.
 
 The current active game is used unless --game is provided.`,
 	Args: cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		// Only complete the first positional arg.
+		if len(args) > 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return completion.ProfileNames(cmd, toComplete)
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer stop()

@@ -319,3 +319,9 @@ UPDATE profiles
 SET is_active = TRUE,
     updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 WHERE game_install_id = ? AND name = ?;
+
+-- name: ListProfilesForCompletion :many
+SELECT name, is_active
+FROM profiles
+WHERE game_install_id = ?
+ORDER BY is_active DESC, name COLLATE NOCASE;
