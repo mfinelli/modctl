@@ -307,3 +307,15 @@ ORDER BY is_active DESC, name COLLATE NOCASE, id;
 UPDATE profiles
 SET name = ?, updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 WHERE id = ?;
+
+-- name: DeactivateProfilesForGame :exec
+UPDATE profiles
+SET is_active = FALSE,
+    updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+WHERE game_install_id = ? AND is_active = TRUE;
+
+-- name: ActivateProfileByName :exec
+UPDATE profiles
+SET is_active = TRUE,
+    updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+WHERE game_install_id = ? AND name = ?;
