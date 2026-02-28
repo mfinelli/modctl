@@ -20,13 +20,12 @@ package cmd
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/completion"
@@ -34,26 +33,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	profilesCreateGame        string
-	profilesCreateDescription string
-)
+var profilesListGame string
 
-var profilesCreateCmd = &cobra.Command{
-	Use:   "create",
-	Short: "Create a profile for the current game",
-	Long: `Create a new profile for the current game install.
-
-Profiles are named mod sets. Exactly one profile can be active per game install.
-New profiles start inactive; use ` + "`modctl profiles set-active`" + ` to activate one.
-
-Note: modctl automatically creates a "default" profile during game refresh.`,
-	Args: cobra.ExactArgs(1),
+var profilesListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List profiles for the current game",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// TODO: extract these somewhere else
+		headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
+		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer stop()
-
-		name := args[0]
 
 		err := internal.EnsureDBExists()
 		if err != nil {
@@ -74,7 +67,7 @@ Note: modctl automatically creates a "default" profile during game refresh.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		if profilesCreateGame == "" {
+		if profilesListGame == "" {
 			active, err := state.LoadActive()
 			if err != nil {
 				return fmt.Errorf("load active selection: %w", err)
@@ -82,48 +75,50 @@ Note: modctl automatically creates a "default" profile during game refresh.`,
 			if active.ActiveGameInstallID == 0 {
 				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
 			}
-			profilesCreateGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
+			profilesListGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, profilesCreateGame)
+		gi, err := internal.ResolveGameInstallArg(ctx, q, profilesListGame)
 		if err != nil {
 			return err
 		}
 
-		var desc sql.NullString
-		if profilesCreateDescription != "" {
-			desc = sql.NullString{String: profilesCreateDescription, Valid: true}
-		}
-
-		id, err := q.CreateProfile(ctx, dbq.CreateProfileParams{
-			GameInstallID: gi.ID,
-			Name:          name,
-			Description:   desc,
-		})
+		rows, err := q.ListProfilesByGameInstall(ctx, gi.ID)
 		if err != nil {
-			// SQLite uniqueness violation will bubble up as an error string; keep it user-friendly.
-			if strings.Contains(strings.ToLower(err.Error()), "unique") {
-				return fmt.Errorf("profile %q already exists for this game", name)
-			}
-			return fmt.Errorf("create profile: %w", err)
+			return fmt.Errorf("list profiles: %w", err)
 		}
 
-		fmt.Printf("Created profile %q (id=%d)\n", name, id)
+		if len(rows) == 0 {
+			fmt.Println(subtleStyle.Render("No profiles found"))
+			return nil
+		}
+
+		fmt.Println(headerStyle.Render("Profiles"))
+		fmt.Println()
+
+		for _, p := range rows {
+			prefix := "  "
+			if p.IsActive != 0 {
+				prefix = okStyle.Render("  * ")
+			}
+			fmt.Printf("%s%s\n", prefix, p.Name)
+
+			if p.Description.Valid && p.Description.String != "" {
+				fmt.Println(subtleStyle.Render("    " + p.Description.String))
+			}
+		}
 
 		return nil
 	},
 }
 
 func init() {
-	profilesCmd.AddCommand(profilesCreateCmd)
+	profilesCmd.AddCommand(profilesListCmd)
 
-	profilesCreateCmd.Flags().StringVarP(&profilesCreateGame, "game", "g", "",
+	profilesListCmd.Flags().StringVarP(&profilesListGame, "game", "g", "",
 		"Override the currently active game")
-	profilesCreateCmd.RegisterFlagCompletionFunc("game",
+	profilesListCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return completion.GameInstallSelectors(cmd, toComplete)
 		})
-
-	profilesCreateCmd.Flags().StringVarP(&profilesCreateDescription, "description", "d", "",
-		"Optional profile description")
 }
