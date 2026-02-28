@@ -286,3 +286,19 @@ WHERE mod_page_id = ? AND label = ?;
 SELECT COUNT(1)
 FROM mod_files
 WHERE mod_page_id = ?;
+
+-- name: CreateProfile :one
+INSERT INTO profiles (game_install_id, name, description, is_active)
+VALUES (?, ?, ?, FALSE)
+RETURNING id;
+
+-- name: GetProfileByName :one
+SELECT id, game_install_id, name, description, is_active
+FROM profiles
+WHERE game_install_id = ? AND name = ?;
+
+-- name: ListProfilesByGameInstall :many
+SELECT id, name, description, is_active, created_at, updated_at
+FROM profiles
+WHERE game_install_id = ?
+ORDER BY is_active DESC, name COLLATE NOCASE, id;
