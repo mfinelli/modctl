@@ -121,9 +121,9 @@ Profile names must be unique per game.`,
 func init() {
 	profilesCmd.AddCommand(profilesRenameCmd)
 
-	profilesListCmd.Flags().StringVarP(&profilesListGame, "game", "g", "",
+	profilesRenameCmd.Flags().StringVarP(&profilesListGame, "game", "g", "",
 		"Override the currently active game")
-	profilesListCmd.RegisterFlagCompletionFunc("game",
+	profilesRenameCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return completion.GameInstallSelectors(cmd, toComplete)
 		})
