@@ -135,9 +135,9 @@ The current active game is used unless --game is provided.`,
 func init() {
 	profilesCmd.AddCommand(profilesSetActiveCmd)
 
-	profilesListCmd.Flags().StringVarP(&profilesListGame, "game", "g", "",
+	profilesSetActiveCmd.Flags().StringVarP(&profilesListGame, "game", "g", "",
 		"Override the currently active game")
-	profilesListCmd.RegisterFlagCompletionFunc("game",
+	profilesSetActiveCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return completion.GameInstallSelectors(cmd, toComplete)
 		})
