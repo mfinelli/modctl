@@ -37,6 +37,7 @@ var storesListCmd = &cobra.Command{
 	Long: `Display all configured stores and whether they are enabled.
 
 Only enabled stores are scanned during discovery.`,
+	Args: cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 

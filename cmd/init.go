@@ -38,6 +38,7 @@ var initCmd = &cobra.Command{
 Creates the required data directories (archives, backups, overrides, tmp) and
 initializes or upgrades the internal database. This command is safe to run
 multiple times and will not overwrite existing data.`,
+	Args: cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 

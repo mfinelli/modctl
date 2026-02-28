@@ -55,6 +55,7 @@ versions.
 TODO:
 - Show latest version information from the Nexus API for Nexus-linked mods and
   compare it with imported versions.`,
+	Args: cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// TODO: extract these somewhere else
 		headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))

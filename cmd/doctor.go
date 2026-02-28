@@ -66,6 +66,7 @@ Doctor verifies:
 
 Doctor does not modify Steam or your game installs. It may read files to
 validate integrity.`,
+	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)

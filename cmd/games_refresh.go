@@ -36,6 +36,7 @@ This command detects installed games, updates their install paths, and marks
 missing installs as not present.
 
 It is safe to run multiple times.`,
+	Args: cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 

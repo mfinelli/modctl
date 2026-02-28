@@ -43,6 +43,7 @@ By default, only the active store is included. Use --store to filter by a
 specific store. Or use --all to include games from all stores.
 
 (TODO) The active game install (if any) is highlighted.`,
+	Args: cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
