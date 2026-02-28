@@ -20,12 +20,14 @@ package cmd
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/completion"
@@ -33,26 +35,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var profilesListGame string
+var profilesRenameGame string
 
-var profilesListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List profiles for the current game",
-	Long: `List all profiles defined for the current game install.
+var profilesRenameCmd = &cobra.Command{
+	Use:   "rename",
+	Short: "Rename a profile for the current game",
+	Long: `Rename an existing profile for the current game install.
 
-The active profile is marked with an asterisk (*).
+Profiles are named mod sets scoped to a single game. This command updates the
+profile name; it does not change which mods are in the profile.
 
-Profiles are independent mod configurations for a single game.
-Use: ` + "`modctl profiles set-active <name>`" + ` to switch the active profile.
-
-The current active game is used unless --game is provided.`,
-	Args: cobra.ExactArgs(0),
+Profile names must be unique per game.`,
+	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: extract these somewhere else
-		headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer stop()
 
@@ -75,7 +70,7 @@ The current active game is used unless --game is provided.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		if profilesListGame == "" {
+		if profilesRenameGame == "" {
 			active, err := state.LoadActive()
 			if err != nil {
 				return fmt.Errorf("load active selection: %w", err)
@@ -83,45 +78,48 @@ The current active game is used unless --game is provided.`,
 			if active.ActiveGameInstallID == 0 {
 				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
 			}
-			profilesListGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
+			profilesRenameGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, profilesListGame)
+		gi, err := internal.ResolveGameInstallArg(ctx, q, profilesRenameGame)
 		if err != nil {
 			return err
 		}
 
-		rows, err := q.ListProfilesByGameInstall(ctx, gi.ID)
+		oldName := args[0]
+		newName := args[1]
+
+		// Friendly "not found" error
+		p, err := q.GetProfileByName(ctx, dbq.GetProfileByNameParams{
+			GameInstallID: gi.ID,
+			Name:          oldName,
+		})
 		if err != nil {
-			return fmt.Errorf("list profiles: %w", err)
-		}
-
-		if len(rows) == 0 {
-			fmt.Println(subtleStyle.Render("No profiles found"))
-			return nil
-		}
-
-		fmt.Println(headerStyle.Render("Profiles"))
-		fmt.Println()
-
-		for _, p := range rows {
-			prefix := "  "
-			if p.IsActive != 0 {
-				prefix = okStyle.Render("  * ")
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("profile %q not found for this game", oldName)
 			}
-			fmt.Printf("%s%s\n", prefix, p.Name)
-
-			if p.Description.Valid && p.Description.String != "" {
-				fmt.Println(subtleStyle.Render("    " + p.Description.String))
-			}
+			return fmt.Errorf("lookup profile: %w", err)
 		}
+
+		// Attempt rename
+		if err := q.RenameProfile(ctx, dbq.RenameProfileParams{
+			Name: newName,
+			ID:   p.ID,
+		}); err != nil {
+			if strings.Contains(strings.ToLower(err.Error()), "unique") {
+				return fmt.Errorf("profile %q already exists for this game", newName)
+			}
+			return fmt.Errorf("rename profile: %w", err)
+		}
+
+		fmt.Printf("Renamed profile %q -> %q\n", oldName, newName)
 
 		return nil
 	},
 }
 
 func init() {
-	profilesCmd.AddCommand(profilesListCmd)
+	profilesCmd.AddCommand(profilesRenameCmd)
 
 	profilesListCmd.Flags().StringVarP(&profilesListGame, "game", "g", "",
 		"Override the currently active game")

@@ -295,10 +295,15 @@ RETURNING id;
 -- name: GetProfileByName :one
 SELECT id, game_install_id, name, description, is_active
 FROM profiles
-WHERE game_install_id = ? AND name = ?;
+WHERE game_install_id = ? AND name = ? LIMIT 1;
 
 -- name: ListProfilesByGameInstall :many
 SELECT id, name, description, is_active, created_at, updated_at
 FROM profiles
 WHERE game_install_id = ?
 ORDER BY is_active DESC, name COLLATE NOCASE, id;
+
+-- name: RenameProfile :exec
+UPDATE profiles
+SET name = ?, updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+WHERE id = ?;
