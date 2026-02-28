@@ -67,6 +67,7 @@ func init() {
 		"",
 		"config file (default is $XDG_CONFIG_HOME/modctl/config.toml)",
 	)
+	rootCmd.MarkFlagFilename("config", "toml")
 
 	rootCmd.PersistentFlags().BoolVarP(
 		&verbose,
