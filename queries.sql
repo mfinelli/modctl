@@ -373,3 +373,12 @@ WHERE id = ? LIMIT 1;
 -- name: DeleteProfileByID :exec
 DELETE FROM profiles
 WHERE id = ?;
+
+-- name: GetProfileItemIDByVersion :one
+SELECT id
+FROM profile_items
+WHERE profile_id = ? AND mod_file_version_id = ?;
+
+-- name: DeleteProfileItemByID :exec
+DELETE FROM profile_items
+WHERE id = ?;
