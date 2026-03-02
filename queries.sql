@@ -405,3 +405,31 @@ UPDATE profile_items
 SET priority = priority + sqlc.arg(offset),
     updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 WHERE profile_id = ?;
+
+-- name: ListUnscannedArchives :many
+SELECT DISTINCT
+    b.sha256,
+    b.original_name,
+    b.size_bytes
+FROM blobs b
+JOIN mod_file_versions mfv ON mfv.archive_sha256 = b.sha256
+WHERE b.kind = 'archive'
+  AND mfv.inventory_scanned_at IS NULL;
+
+-- name: InsertArchiveInventoryEntry :exec
+INSERT INTO archive_inventory_entries (
+    archive_sha256,
+    raw_path,
+    entry_type,
+    size_bytes,
+    link_target,
+    content_sha256,
+    position,
+    parse_error
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: MarkArchiveInventoryScanned :exec
+UPDATE mod_file_versions
+SET inventory_scanned_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE archive_sha256 = @archive_sha256
+  AND inventory_scanned_at IS NULL;

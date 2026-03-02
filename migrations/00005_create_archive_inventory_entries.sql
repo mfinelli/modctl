@@ -5,7 +5,7 @@ CREATE TABLE archive_inventory_entries (
   archive_sha256 TEXT NOT NULL REFERENCES blobs(sha256) ON UPDATE CASCADE ON DELETE CASCADE,
 
   -- path as it appears inside the archive (no normalization)
-  raw_path TEXT NOT NULL CHECK (LENGTH(raw_path) > 0),
+  raw_path TEXT CHECK (parse_error IS NOT NULL OR (raw_path IS NOT NULL AND LENGTH(raw_path) > 0)),
 
   -- entry type
   entry_type TEXT NOT NULL DEFAULT 'file' CHECK (entry_type IN ('file', 'dir', 'symlink', 'other')),
@@ -27,6 +27,9 @@ CREATE TABLE archive_inventory_entries (
   -- position in the archive (useful for preserving bsdtar -t order and
   -- for debugging "which entry won" in duplicate-entry archives)
   position INTEGER NOT NULL CHECK (position >= 0),
+
+  -- nullable, only set when the line could not be fully parsed
+  parse_error TEXT,
 
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 
