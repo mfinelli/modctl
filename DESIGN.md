@@ -111,6 +111,19 @@ A named set of enabled mod versions for a `GameInstall`, with:
 
 Exactly one profile can be active/applied at a time per `GameInstall`.
 
+### Applied State
+
+`GameInstall` tracks the currently-applied profile as denormalized state:
+- `applied_profile_id` - the profile whose file set is currently on disk
+- `applied_at` - timestamp of the last successful apply
+- `applied_operrtion_id` - the operation that produced the current on-disk
+  state
+
+This is intentionally denormalized for fast status queries ("what is deployed
+right now?") without joining through operations. It is updated atomically at
+the end of a successful `apply` or `unapply`. On unapply, all three fields are
+set to NULL.
+
 ### Plan
 
 A computed desired state: the union of enabled mods in a profile with conflicts
@@ -256,6 +269,19 @@ path", where the "content source" can eventually be:
 Even if v1 only supports "file from mod", designing the plan structure this way
 keeps it extensible.
 
+### Priority Uniqueness
+
+Priority values within a profile are unique (enforced by a unique index on
+`(profile_id, priority)`). This avoids ambiguous tie-breaking in the conflict
+engine but requires care during reorder operations:
+
+- Swapping two items or inserting at an occupied priority cannot be done with
+  naive sequential updates - a second update would temporarily collide.
+- Recommended approach: perform all priority changes in a single transaction
+  using a gap strategy or a full bulk rewrite of the profile's priority
+  sequence.
+- The `profiles order` command must account for this.
+
 ## 7. Remap rules
 
 v1 remap capabilities (stored as structured data):
@@ -291,6 +317,16 @@ Recommendation for readiness:
 - Schema supports both, but you can implement full-file override first.
 - Later add structured patch types.
 
+### Storage
+
+Overrides are stored in the `overrides` table:
+- Scoped to a `(profile_id, target_id, relpath)` triple - one override per path per profile
+- References a blob of `kind='override'` in the content-addressed store
+- `override_type` is always `full_file` in v1; reserved for future structured
+  patch types (ini patches, yaml merges, etc.)
+- Only the latest override is stored per path; updating an override replaces
+  the row (and the old blob becomes eligible for garbage collection)
+
 ### Override ownership and drift
 
 When a file has an override:
@@ -306,6 +342,17 @@ During apply:
 1. deploy base mod files (priority winner)
 2. apply overrides (write final file content)
 3. hash and record final file hashes in installed_files
+
+`installed_files` tracks ownership via mutually exclusive columns:
+- `owner_mod_file_version_id` - set when a mod version owns the file
+- `owner_override_id` - set when an override owns the file
+Exactly one must be non-NULL (enforced by CHECK constraint).
+
+### Drift Detection
+
+When a file has an active override, drift detection distinguishes:
+- Base file differs from expected mod content (mod was changed externally)
+- Override result differs from expected hash (override was changed externally)
 
 ## 9. Backups strategy
 
