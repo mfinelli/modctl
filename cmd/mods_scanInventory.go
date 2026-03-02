@@ -93,17 +93,13 @@ previous scan was interrupted.`,
 			return fmt.Errorf("scan-inventory: %w", err)
 		}
 
-		if result.Scanned == 0 && result.Failed == 0 && result.Skipped == 0 {
+		if result.Scanned == 0 && result.Failed == 0 {
 			fmt.Println(subtleStyle.Render("  all archives already inventoried, nothing to do"))
 			return nil
 		}
 
 		fmt.Println(boldStyle.Render("Inventory scan complete:"))
 		fmt.Printf("  scanned: %d\n", result.Scanned)
-
-		if result.Skipped > 0 {
-			fmt.Println(warnStyle.Render(fmt.Sprintf("  skipped: %d (blob path could not be resolved)", result.Skipped)))
-		}
 
 		if result.Failed > 0 {
 			fmt.Println(warnStyle.Render(fmt.Sprintf("  failed:  %d (see logs for details)", result.Failed)))

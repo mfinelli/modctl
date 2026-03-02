@@ -431,5 +431,13 @@ INSERT INTO archive_inventory_entries (
 -- name: MarkArchiveInventoryScanned :exec
 UPDATE mod_file_versions
 SET inventory_scanned_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-WHERE archive_sha256 = @archive_sha256
+WHERE archive_sha256 = ?
   AND inventory_scanned_at IS NULL;
+
+-- name: IsArchiveInventoried :one
+SELECT EXISTS (
+    SELECT TRUE
+    FROM mod_file_versions
+    WHERE archive_sha256 = ?
+      AND inventory_scanned_at IS NOT NULL
+) AS inventoried;

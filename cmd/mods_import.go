@@ -25,6 +25,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -36,6 +37,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/archivescanner"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/importer"
@@ -46,13 +48,14 @@ import (
 )
 
 var (
-	modsImportGame        string
-	modsImportName        string
-	modsImportLabel       string
-	modsImportNexusUrl    string
-	modsImportRm          bool
-	modsImportListTimeout int64
-	modsImportPageID      int64
+	modsImportGame          string
+	modsImportName          string
+	modsImportLabel         string
+	modsImportNexusUrl      string
+	modsImportRm            bool
+	modsImportListTimeout   int64
+	modsImportPageID        int64
+	modsImportSkipInventory bool
 )
 
 type prepareArchiveResult struct {
@@ -205,6 +208,24 @@ has been safely stored and the database has been updated successfully.`,
 			return err
 		}
 
+		// Do an inventory scan for the imported archive
+		if !modsImportSkipInventory {
+			err := archivescanner.ScanOne(
+				ctx,
+				db,
+				q,
+				bs,
+				archivescanner.Scanner{},
+				sha,
+				slog.Default(),
+			)
+			if err != nil {
+				fmt.Println(warnStyle.Render("  ⚠ inventory scan failed - run 'mods scan-inventory' to retry"))
+			} else {
+				fmt.Println(subtleStyle.Render(fmt.Sprintf("  inventoried archive entries")))
+			}
+		}
+
 		// Delete original only after successful import + DB commit
 		if modsImportRm {
 			if err := os.Remove(inputPath); err != nil {
@@ -247,6 +268,9 @@ func init() {
 		"Remove original archive after import")
 	modsImportCmd.Flags().Int64VarP(&modsImportListTimeout, "list-timeout",
 		"t", 60, "Set timeout in seconds to list the contents of the passed archive")
+
+	modsImportCmd.Flags().BoolVar(&modsImportSkipInventory, "skip-inventory", false,
+		"Skip scanning archive contents after import")
 
 	// name only makes sense when creating a new page
 	modsImportCmd.MarkFlagsMutuallyExclusive("name", "page-id")

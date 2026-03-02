@@ -26,13 +26,59 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"go.finelli.dev/util"
 )
 
 // ScanAllResult summarizes the outcome of a ScanAll run
 type ScanAllResult struct {
 	Scanned int
-	Skipped int
 	Failed  int
+}
+
+// ScanOne scans a single archive by sha256 and commits its inventory in a
+// single transaction. If the archive has already been inventoried it is a
+// no-op. Returns an error only if the scan or commit fails - the caller is
+// responsible for deciding how loudly to surface that.
+func ScanOne(
+	ctx context.Context,
+	sqldb *sql.DB,
+	queries *dbq.Queries,
+	store blobstore.Store,
+	scanner Scanner,
+	archiveSha256 string,
+	logger *slog.Logger,
+) error {
+	log := logger.With("sha256", archiveSha256)
+
+	already, err := queries.IsArchiveInventoried(ctx, archiveSha256)
+	if err != nil {
+		return fmt.Errorf("checking inventory status: %w", err)
+	}
+	if util.SqliteIntToBool(already) {
+		log.Info("archive already inventoried, skipping")
+		return nil
+	}
+
+	archivePath, err := store.PathFor(blobstore.KindArchive, archiveSha256)
+	if err != nil {
+		return fmt.Errorf("resolving blob path: %w", err)
+	}
+
+	scanResult, err := scanner.Scan(ctx, archivePath)
+	if err != nil {
+		return fmt.Errorf("bsdtar scan failed: %w", err)
+	}
+
+	if scanResult.Warnings != "" {
+		log.Warn("bsdtar warnings during scan", "warnings", scanResult.Warnings)
+	}
+
+	if err := commitArchiveInventory(ctx, sqldb, archiveSha256, scanResult.Entries, log); err != nil {
+		return fmt.Errorf("committing inventory: %w", err)
+	}
+
+	log.Info("scanned archive", "entries", len(scanResult.Entries))
+	return nil
 }
 
 // ScanAll scans all archives that have not yet had their inventory populated
@@ -55,33 +101,24 @@ func ScanAll(
 	var result ScanAllResult
 
 	for _, archive := range archives {
-		log := logger.With("sha256", archive.Sha256, "original_name", archive.OriginalName)
-
-		archivePath, err := store.PathFor(blobstore.KindArchive, archive.Sha256)
+		err := ScanOne(
+			ctx,
+			sqldb,
+			queries,
+			store,
+			scanner,
+			archive.Sha256,
+			logger,
+		)
 		if err != nil {
-			log.Warn("could not resolve blob path, skipping", "err", err)
-			result.Skipped++
-			continue
-		}
-
-		scanResult, err := scanner.Scan(ctx, archivePath)
-		if err != nil {
-			log.Warn("bsdtar scan failed, skipping", "err", err)
+			logger.Warn("failed to scan archive, skipping",
+				"sha256", archive.Sha256,
+				"original_name", archive.OriginalName,
+				"err", err,
+			)
 			result.Failed++
 			continue
 		}
-
-		if scanResult.Warnings != "" {
-			log.Warn("bsdtar warnings during scan", "warnings", scanResult.Warnings)
-		}
-
-		if err := commitArchiveInventory(ctx, sqldb, archive.Sha256, scanResult.Entries, log); err != nil {
-			log.Warn("failed to commit inventory, skipping", "err", err)
-			result.Failed++
-			continue
-		}
-
-		log.Info("scanned archive", "entries", len(scanResult.Entries))
 		result.Scanned++
 	}
 
