@@ -222,7 +222,7 @@ has been safely stored and the database has been updated successfully.`,
 			if err != nil {
 				fmt.Println(warnStyle.Render("  ⚠ inventory scan failed - run 'mods scan-inventory' to retry"))
 			} else {
-				fmt.Println(subtleStyle.Render(fmt.Sprintf("  inventoried archive entries")))
+				fmt.Println(subtleStyle.Render("  inventoried archive entries"))
 			}
 		}
 
