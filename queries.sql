@@ -382,3 +382,14 @@ WHERE profile_id = ? AND mod_file_version_id = ?;
 -- name: DeleteProfileItemByID :exec
 DELETE FROM profile_items
 WHERE id = ?;
+
+-- name: GetProfileItemByVersionForOrder :one
+SELECT id, priority
+FROM profile_items
+WHERE profile_id = ? AND mod_file_version_id = ?;
+
+-- name: SetProfileItemPriorityByID :exec
+UPDATE profile_items
+SET priority = ?,
+    updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+WHERE id = ?;
