@@ -441,3 +441,65 @@ SELECT EXISTS (
     WHERE archive_sha256 = ?
       AND inventory_scanned_at IS NOT NULL
 ) AS inventoried;
+
+-- name: GetProfileStatusItems :many
+SELECT
+    pi.id                       AS item_id,
+    pi.priority,
+    pi.enabled,
+    pi.notes                    AS item_notes,
+    mp.id                       AS mod_page_id,
+    mp.name                     AS mod_page_name,
+    mp.nexus_mod_id,
+    mp.source_kind,
+    mf.id                       AS mod_file_id,
+    mf.label                    AS file_label,
+    mfv.id                      AS mod_file_version_id,
+    mfv.version_string,
+    mfv.archive_sha256,
+    mfv.inventory_scanned_at,
+    b.size_bytes
+FROM profile_items pi
+JOIN mod_file_versions mfv ON mfv.id = pi.mod_file_version_id
+JOIN mod_files mf           ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp            ON mp.id = mf.mod_page_id
+JOIN blobs b                 ON b.sha256 = mfv.archive_sha256
+WHERE pi.profile_id = ?
+ORDER BY pi.priority ASC;
+
+-- name: GetGameInstallAppliedState :one
+SELECT
+    applied_profile_id,
+    applied_at,
+    applied_operation_id
+FROM game_installs
+WHERE id = ?;
+
+-- name: GetIncompatibleModPairsForProfile :many
+SELECT
+    mi.id,
+    mi.reason,
+    mpa.name AS mod_page_name_a,
+    mpb.name AS mod_page_name_b
+FROM mod_incompatibilities mi
+JOIN mod_pages mpa ON mpa.id = mi.mod_page_id_a
+JOIN mod_pages mpb ON mpb.id = mi.mod_page_id_b
+WHERE mpa.game_install_id = (SELECT game_install_id FROM profiles p WHERE p.id = sqlc.arg(profile_id))
+  AND mi.mod_page_id_a IN (
+      SELECT mp.id
+      FROM profile_items pi
+      JOIN mod_file_versions mfv ON mfv.id = pi.mod_file_version_id
+      JOIN mod_files mf ON mf.id = mfv.mod_file_id
+      JOIN mod_pages mp ON mp.id = mf.mod_page_id
+      WHERE pi.profile_id = sqlc.arg(profile_id)
+        AND pi.enabled = TRUE
+  )
+  AND mi.mod_page_id_b IN (
+      SELECT mp.id
+      FROM profile_items pi
+      JOIN mod_file_versions mfv ON mfv.id = pi.mod_file_version_id
+      JOIN mod_files mf ON mf.id = mfv.mod_file_id
+      JOIN mod_pages mp ON mp.id = mf.mod_page_id
+      WHERE pi.profile_id = sqlc.arg(profile_id)
+        AND pi.enabled = TRUE
+  );

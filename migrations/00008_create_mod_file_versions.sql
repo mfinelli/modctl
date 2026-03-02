@@ -23,6 +23,8 @@ CREATE TABLE mod_file_versions
   -- optional upstream timestamps (best-effort)
   uploaded_at TEXT,
 
+  inventory_scanned_at TEXT, -- NULL means not yet scanned
+
   -- optional upstream notes or changelog
   upstream_notes TEXT,
 

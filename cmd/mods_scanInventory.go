@@ -46,6 +46,7 @@ without re-reading archives from disk.
 Scanning is performed automatically during 'mods import'. Use this command
 to populate inventory for archives that were skipped during import, or if a
 previous scan was interrupted.`,
+	Args: cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// TODO extract these somewhere else
 		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
