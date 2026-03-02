@@ -52,24 +52,24 @@ func IsUnderDir(path, dir string) (bool, error) {
 		return false, err
 	}
 
-	// Compute relative path from dir -> path.
+	// Compute relative path from dir -> path
 	rel, err := filepath.Rel(ad, ap)
 	if err != nil {
 		return false, err
 	}
 
 	if rel == "." {
-		// path and dir are the same directory.
+		// path and dir are the same directory
 		return true, nil
 	}
 
-	// If rel begins with "..", then path escapes dir.
+	// If rel begins with "..", then path escapes dir
 	if strings.HasPrefix(rel, ".."+string(filepath.Separator)) || rel == ".." {
 		return false, nil
 	}
 
-	// Defensive: if Rel somehow returned an absolute path (shouldn't happen),
-	// treat it as outside.
+	// Defensive: if Rel somehow returned an absolute path (shouldn't
+	// happen), treat it as outside
 	if filepath.IsAbs(rel) {
 		return false, nil
 	}
