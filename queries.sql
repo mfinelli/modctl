@@ -393,3 +393,15 @@ UPDATE profile_items
 SET priority = ?,
     updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 WHERE id = ?;
+
+-- name: ListProfileItemsForOrder :many
+SELECT id, mod_file_version_id, priority
+FROM profile_items
+WHERE profile_id = ?
+ORDER BY priority ASC;
+
+-- name: BumpPrioritiesForProfile :exec
+UPDATE profile_items
+SET priority = priority + sqlc.arg(offset),
+    updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+WHERE profile_id = ?;
