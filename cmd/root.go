@@ -20,7 +20,7 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -32,6 +32,7 @@ import (
 var (
 	cfgFile string
 	verbose bool
+	logger  *slog.Logger
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -47,6 +48,23 @@ software, and you are welcome to redistribute it under certain conditions;
 You should have received a copy of the GNU General Public License (version
 3) along with this program. If not, see https://www.gnu.org/licenses/.`,
 	Version: "1.0.0",
+
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		level := slog.LevelWarn
+		if verbose {
+			level = slog.LevelDebug
+		}
+		logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+			Level: level,
+		}))
+		slog.SetDefault(logger)
+
+		if viper.ConfigFileUsed() != "" {
+			logger.Debug("using config file", "path", viper.ConfigFileUsed())
+		}
+
+		return nil
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -105,11 +123,6 @@ func initConfig() {
 			cobra.CheckErr(err)
 		}
 
-		if verbose {
-			fmt.Fprintln(os.Stderr, "Using config file: ",
-				viper.ConfigFileUsed())
-		}
-
 		return
 	}
 
@@ -133,10 +146,5 @@ func initConfig() {
 		// parse/permission errors should fail loudly
 		cobra.CheckErr(err)
 		return
-	}
-
-	if verbose {
-		fmt.Fprintln(os.Stderr, "Using config file: ",
-			viper.ConfigFileUsed())
 	}
 }
