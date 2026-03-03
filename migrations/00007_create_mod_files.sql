@@ -9,7 +9,6 @@ CREATE TABLE mod_files
 -- - "Patch"
 --
 -- Notes:
--- - For Nexus, nexus_file_id identifies the file on the mod page.
 -- - For non-Nexus, keep it as a logical grouping so versions can still exist.
 (
   id INTEGER PRIMARY KEY,
@@ -20,9 +19,6 @@ CREATE TABLE mod_files
 
   -- whether this file is intended at the "primary" one
   is_primary INTEGER NOT NULL DEFAULT FALSE CHECK (is_primary in (TRUE, FALSE)),
-
-  -- nexus file id (optional)
-  nexus_file_id INTEGER,
 
   -- generic source URL for this file entry (optional)
   source_url TEXT,

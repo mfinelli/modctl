@@ -182,19 +182,19 @@ RETURNING id;
 
 -- name: CreateModFile :one
 INSERT INTO mod_files (
-  mod_page_id, label, is_primary, nexus_file_id, source_url, metadata
+  mod_page_id, label, is_primary, source_url, metadata
 ) VALUES (
-  ?, ?, ?, ?, ?, ?
+  ?, ?, ?, ?, ?
 )
 RETURNING id;
 
 -- name: CreateModFileVersion :one
 INSERT INTO mod_file_versions (
   mod_file_id, archive_sha256, original_name, version_string,
-  uploaded_at, upstream_notes, notes, metadata
+  nexus_file_id, uploaded_at, upstream_notes, notes, metadata
 ) VALUES (
   ?, ?, ?, ?,
-  ?, ?, ?, ?
+  ?, ?, ?, ?, ?
 )
 RETURNING id;
 
@@ -212,6 +212,7 @@ WITH joined AS (
 
     mfv.id AS mod_file_version_id,
     mfv.version_string,
+    mfv.nexus_file_id,
     mfv.archive_sha256,
     mfv.created_at AS imported_at,
 
@@ -253,13 +254,13 @@ WHERE rn = 1
 ORDER BY mod_name COLLATE NOCASE, mod_page_id;
 
 -- name: ListModFilesByPage :many
-SELECT id, mod_page_id, label, is_primary, nexus_file_id, source_url, created_at, updated_at
+SELECT id, mod_page_id, label, is_primary, source_url, created_at, updated_at
 FROM mod_files
 WHERE mod_page_id = ?
 ORDER BY is_primary DESC, label COLLATE NOCASE, id;
 
 -- name: ListModFileVersionsByFile :many
-SELECT id, mod_file_id, archive_sha256, original_name, version_string, created_at
+SELECT id, mod_file_id, archive_sha256, original_name, version_string, nexus_file_id, created_at
 FROM mod_file_versions
 WHERE mod_file_id = ?
 ORDER BY created_at DESC, id DESC;
@@ -278,7 +279,7 @@ WHERE game_install_id = ?
   AND nexus_mod_id = ?;
 
 -- name: GetModFileByLabel :one
-SELECT id, mod_page_id, label, is_primary, nexus_file_id
+SELECT id, mod_page_id, label, is_primary
 FROM mod_files
 WHERE mod_page_id = ? AND label = ?;
 
@@ -450,12 +451,12 @@ SELECT
     pi.notes                    AS item_notes,
     mp.id                       AS mod_page_id,
     mp.name                     AS mod_page_name,
-    mp.nexus_mod_id,
     mp.source_kind,
     mf.id                       AS mod_file_id,
     mf.label                    AS file_label,
     mfv.id                      AS mod_file_version_id,
     mfv.version_string,
+    mfv.nexus_file_id,
     mfv.archive_sha256,
     mfv.inventory_scanned_at,
     b.size_bytes
@@ -503,3 +504,18 @@ WHERE mpa.game_install_id = (SELECT game_install_id FROM profiles p WHERE p.id =
       WHERE pi.profile_id = sqlc.arg(profile_id)
         AND pi.enabled = TRUE
   );
+
+-- name: UpdateModPageName :exec
+UPDATE mod_pages
+SET name = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE id = ?;
+
+-- name: UpdateModFileLabel :exec
+UPDATE mod_files
+SET label = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE id = ?;
+
+-- name: UpdateModFileVersionNexusFileID :exec
+UPDATE mod_file_versions
+SET nexus_file_id = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE id = ?;

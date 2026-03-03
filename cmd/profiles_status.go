@@ -238,8 +238,8 @@ func renderProfileStatus(
 				writeKVIndented16(&b, "version:", subtleStyle.Render("(none)"))
 			}
 
-			// nexus version placeholder — shown only when mod has a nexus_mod_id
-			if item.NexusModID.Valid {
+			// nexus version placeholder - shown only when mod has a nexus_mod_id
+			if item.NexusFileID.Valid {
 				writeKVIndented16(&b, "nexus version:", nexusUpdateStyle.Render("(run 'modctl nexus check' to fetch)"))
 			}
 
@@ -265,7 +265,7 @@ func renderProfileStatus(
 	}
 	if uninventoried > 0 {
 		warnings = append(warnings, fmt.Sprintf(
-			"⚠  %d mod(s) have no inventory scan — run 'mods scan-inventory' to populate",
+			"⚠  %d mod(s) have no inventory scan - run 'mods scan-inventory' to populate",
 			uninventoried,
 		))
 	}

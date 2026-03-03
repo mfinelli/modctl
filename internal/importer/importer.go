@@ -181,12 +181,11 @@ func ImportArchive(
 		}
 
 		fileID, err = qtx.CreateModFile(ctx, dbq.CreateModFileParams{
-			ModPageID:   pageID,
-			Label:       label,
-			IsPrimary:   isPrimary,
-			NexusFileID: sql.NullInt64{Valid: false}, // we don't have file_id from nexus-url
-			SourceUrl:   nullString(opts.NexusURL),
-			Metadata:    sql.NullString{Valid: false},
+			ModPageID: pageID,
+			Label:     label,
+			IsPrimary: isPrimary,
+			SourceUrl: nullString(opts.NexusURL),
+			Metadata:  sql.NullString{Valid: false},
 		})
 		if err != nil {
 			return 0, 0, 0, "", 0, fmt.Errorf("create mod_file: %w", err)
@@ -213,6 +212,7 @@ func ImportArchive(
 		ArchiveSha256: sha,
 		OriginalName:  nullString(&opts.OriginalBasename),
 		VersionString: sql.NullString{Valid: false},
+		NexusFileID:   sql.NullInt64{Valid: false}, // we don't have file_id from nexus-url
 		UploadedAt:    sql.NullString{Valid: false},
 		UpstreamNotes: sql.NullString{Valid: false},
 		Notes:         sql.NullString{Valid: false},

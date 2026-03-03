@@ -23,6 +23,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"database/sql"
 	"fmt"
 	"io"
 	"log/slog"
@@ -42,6 +43,7 @@ import (
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/importer"
 	"github.com/mfinelli/modctl/internal/nexus"
+	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -56,6 +58,7 @@ var (
 	modsImportListTimeout   int64
 	modsImportPageID        int64
 	modsImportSkipInventory bool
+	modsImportSkipNexusLink bool
 )
 
 type prepareArchiveResult struct {
@@ -226,6 +229,36 @@ has been safely stored and the database has been updated successfully.`,
 			}
 		}
 
+		// Attempt Nexus linking if we have a URL, an API key, and --skip-nexus-link was not set
+		if modsImportNexusUrl != "" && !modsImportSkipNexusLink {
+			apiKey := viper.GetString("nexus.apikey")
+			if apiKey == "" {
+				fmt.Println(subtleStyle.Render("  nexus api key not configured, skipping link"))
+			} else {
+				client, err := nexusclient.New(ctx, apiKey, slog.Default(), rootCmd.Version)
+				if err != nil {
+					// Non-fatal, warn and continue
+					fmt.Println(warnStyle.Render(fmt.Sprintf("  ⚠ failed to initialize nexus client: %s", err)))
+				} else {
+					defer client.Close()
+					if err := attemptNexusLink(ctx, q, client, nexusLinkParams{
+						pageID:           pageID,
+						fileID:           fileID,
+						versionID:        versionID,
+						gameDomain:       *gameDomain,
+						modID:            *modID,
+						originalBasename: filepath.Base(inputPath),
+						archiveSize:      size,
+						nameProvided:     modsImportName != "",
+						labelProvided:    modsImportLabel != "",
+						label:            modsImportLabel,
+					}); err != nil {
+						fmt.Println(warnStyle.Render(fmt.Sprintf("  ⚠ nexus link failed: %s", err)))
+					}
+				}
+			}
+		}
+
 		// Delete original only after successful import + DB commit
 		if modsImportRm {
 			if err := os.Remove(inputPath); err != nil {
@@ -271,6 +304,8 @@ func init() {
 
 	modsImportCmd.Flags().BoolVar(&modsImportSkipInventory, "skip-inventory", false,
 		"Skip scanning archive contents after import")
+	modsImportCmd.Flags().BoolVar(&modsImportSkipNexusLink, "skip-nexus-link", false,
+		"Skip linking to a specific nexus file")
 
 	// name only makes sense when creating a new page
 	modsImportCmd.MarkFlagsMutuallyExclusive("name", "page-id")
@@ -420,4 +455,85 @@ func wrapIntoTarGz(tmpDir, srcPath string) (wrappedPath string, cleanup func(), 
 	}
 
 	return tmpName, cleanup, nil
+}
+
+type nexusLinkParams struct {
+	pageID           int64
+	fileID           int64
+	versionID        int64
+	gameDomain       string
+	modID            int64
+	originalBasename string
+	archiveSize      int64
+	nameProvided     bool
+	labelProvided    bool
+	label            string
+}
+
+func attemptNexusLink(
+	ctx context.Context,
+	q *dbq.Queries,
+	client *nexusclient.Client,
+	p nexusLinkParams,
+) error {
+	// TODO: extract these somewhere else
+	subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+
+	// Always try to fetch mod info - useful for name even if file ID fails
+	modInfo, err := client.GetModCached(p.gameDomain, int(p.modID))
+	if err != nil {
+		return fmt.Errorf("fetching nexus mod info: %w", err)
+	}
+
+	// Update mod page name if not explicitly provided
+	if !p.nameProvided {
+		if err := q.UpdateModPageName(ctx, dbq.UpdateModPageNameParams{
+			ID:   p.pageID,
+			Name: modInfo.Name,
+		}); err != nil {
+			return fmt.Errorf("updating mod page name: %w", err)
+		}
+		fmt.Println(subtleStyle.Render(fmt.Sprintf("  updated mod page name: %s", modInfo.Name)))
+	}
+
+	// Fetch file list for identification
+	filesResp, err := client.GetModFiles(p.gameDomain, int(p.modID))
+	if err != nil {
+		return fmt.Errorf("fetching nexus file list: %w", err)
+	}
+
+	match, warnings, err := nexus.IdentifyNexusFile(p.originalBasename, p.archiveSize, p.label, filesResp.Files)
+	if err != nil {
+		return fmt.Errorf("identifying nexus file: %w", err)
+	}
+	for _, warn := range warnings {
+		fmt.Println(warnStyle.Render(fmt.Sprintf("  ⚠ %s", warn)))
+	}
+	if match == nil {
+		fmt.Println(warnStyle.Render("  ⚠ could not identify nexus file id - run `mods nexus link` to resolve"))
+		return nil
+	}
+
+	fmt.Println(subtleStyle.Render(fmt.Sprintf("  identified nexus file: %s v%s (file_id: %d, confidence: %s)",
+		match.File.Name, match.File.Version, match.File.FileID, match.Confidence)))
+
+	if err := q.UpdateModFileVersionNexusFileID(ctx, dbq.UpdateModFileVersionNexusFileIDParams{
+		ID:          p.versionID,
+		NexusFileID: sql.NullInt64{Int64: int64(match.File.FileID), Valid: true},
+	}); err != nil {
+		return fmt.Errorf("updating nexus file id: %w", err)
+	}
+
+	if !p.labelProvided {
+		if err := q.UpdateModFileLabel(ctx, dbq.UpdateModFileLabelParams{
+			ID:    p.fileID,
+			Label: match.File.Name,
+		}); err != nil {
+			return fmt.Errorf("updating mod file label: %w", err)
+		}
+		fmt.Println(subtleStyle.Render(fmt.Sprintf("  updated mod file label: %s", match.File.Name)))
+	}
+
+	return nil
 }

@@ -64,10 +64,6 @@ func (c *Client) GetModCached(gameDomain string, modID int) (*ModInfo, error) {
 		return nil, err
 	}
 
-	if err := c.cacheModInfo(info); err != nil {
-		c.logger.Warn("failed to cache nexus mod info", "error", err)
-	}
-
 	return info, nil
 }
 
@@ -116,10 +112,6 @@ func (c *Client) GetModFilesCached(gameDomain string, modID int) (*ModFilesRespo
 	resp, err := c.GetModFiles(gameDomain, modID)
 	if err != nil {
 		return nil, err
-	}
-
-	if err := c.cacheModFiles(gameDomain, modID, resp); err != nil {
-		c.logger.Warn("failed to cache nexus mod files", "error", err)
 	}
 
 	return resp, nil

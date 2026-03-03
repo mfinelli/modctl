@@ -169,6 +169,9 @@ func (c *Client) GetMod(gameDomain string, modID int) (*ModInfo, error) {
 		return nil, fmt.Errorf("fetching mod %d (%s): %w", modID, gameDomain, err)
 	}
 	result.RawJSON = raw
+	if err := c.cacheModInfo(&result); err != nil {
+		c.logger.Warn("failed to cache nexus mod info", "error", err)
+	}
 	return &result, nil
 }
 
@@ -178,6 +181,9 @@ func (c *Client) GetModFiles(gameDomain string, modID int) (*ModFilesResponse, e
 	var raw []byte
 	if err := c.doRequest(http.MethodGet, path, &result, &raw); err != nil {
 		return nil, fmt.Errorf("fetching files for mod %d (%s): %w", modID, gameDomain, err)
+	}
+	if err := c.cacheModFiles(gameDomain, modID, &result); err != nil {
+		c.logger.Warn("failed to cache nexus mod files", "error", err)
 	}
 	result.RawJSON = raw
 	return &result, nil

@@ -7,6 +7,7 @@ CREATE TABLE mod_file_versions
 -- - References blobs.sha256 (kind must be 'archive' by application invariant).
 -- - Multiple versions can exist even if the source doesn’t provide versioning.
 -- - Profiles will typically pin a specific mod_file_version_id.
+-- - For Nexus, nexus_file_id identifies the file on the mod page.
 (
   id INTEGER PRIMARY KEY,
 
@@ -19,6 +20,9 @@ CREATE TABLE mod_file_versions
 
   -- optioal version string (nexus might provide one; other sources may not)
   version_string TEXT,
+
+  -- nexus file id (optional)
+  nexus_file_id INTEGER,
 
   -- optional upstream timestamps (best-effort)
   uploaded_at TEXT,
