@@ -147,7 +147,7 @@ func IdentifyNexusFile(
 		}, warnings, nil
 	}
 
-	// Step 6: size only against candidate pool — not confident, skip
+	// Step 6: size only against candidate pool - not confident, skip
 	if archiveSize > 0 {
 		var matches []nexusclient.ModFileInfo
 		for _, f := range candidates {
@@ -156,7 +156,7 @@ func IdentifyNexusFile(
 			}
 		}
 		if len(matches) == 1 {
-			// Single size match but not confident — caller should warn and skip
+			// Single size match but not confident - caller should warn and skip
 			return nil, warnings, nil
 		}
 	}
