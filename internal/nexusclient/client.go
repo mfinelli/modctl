@@ -1,0 +1,157 @@
+/*
+ * mod control (modctl): command-line mod manager
+ * Copyright © 2026 Mario Finelli
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package nexusclient
+
+import (
+	"context"
+	"database/sql"
+	_ "embed"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"path/filepath"
+	"runtime"
+	"time"
+
+	"github.com/adrg/xdg"
+	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/nexusclient/dbc"
+	"golang.org/x/time/rate"
+)
+
+const (
+	baseURL            = "https://api.nexusmods.com"
+	cacheSchemaVersion = "1"
+)
+
+//go:embed schema.sql
+var cacheSchema string
+
+type Client struct {
+	ctx        context.Context
+	apiKey     string
+	userAgent  string
+	httpClient *http.Client
+	cacheDB    *sql.DB
+	logger     *slog.Logger
+	limiter    *rate.Limiter
+}
+
+func New(ctx context.Context, apiKey string, logger *slog.Logger, version string) (*Client, error) {
+	ua := buildUserAgent(version)
+
+	httpClient := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	cacheDB, err := openCacheDB(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("opening nexus cache db: %w", err)
+	}
+
+	// 30 req/sec with a burst of 10
+	limiter := rate.NewLimiter(rate.Limit(30), 10)
+
+	return &Client{
+		ctx:        ctx,
+		apiKey:     apiKey,
+		userAgent:  ua,
+		httpClient: httpClient,
+		cacheDB:    cacheDB,
+		logger:     logger,
+		limiter:    limiter,
+	}, nil
+}
+
+func (c *Client) Close() error {
+	return c.cacheDB.Close()
+}
+
+func (c *Client) RateLimitState() (*RateLimitState, error) {
+	return LoadRateLimitState()
+}
+
+func buildUserAgent(version string) string {
+	return fmt.Sprintf("modctl/%s (%s; %s) https://github.com/mfinelli/modctl",
+		version,
+		runtime.GOOS,
+		runtime.GOARCH,
+	)
+}
+
+func openCacheDB(ctx context.Context) (*sql.DB, error) {
+	path, err := xdg.CacheFile(filepath.Join("modctl", "nexus_cache.db"))
+	if err != nil {
+		return nil, fmt.Errorf("resolving cache db path: %w", err)
+	}
+
+	db, err := sql.Open("sqlite3", fmt.Sprintf("%s%s", path, internal.DB_PRAGMAS))
+	if err != nil {
+		return nil, fmt.Errorf("opening cache db: %w", err)
+	}
+
+	if err := initCacheDB(ctx, db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("initializing cache db: %w", err)
+	}
+
+	return db, nil
+}
+
+func initCacheDB(ctx context.Context, db *sql.DB) error {
+	if err := applyCacheSchema(ctx, db); err != nil {
+		return err
+	}
+
+	q := dbc.New(db)
+	version, err := q.ReadSchemaVersion(ctx)
+	if err != nil {
+		return fmt.Errorf("reading cache schema version: %w", err)
+	}
+
+	if version != cacheSchemaVersion {
+		if err := resetCacheDB(ctx, db); err != nil {
+			return fmt.Errorf("resetting stale cache db: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func applyCacheSchema(ctx context.Context, db *sql.DB) error {
+	if _, err := db.ExecContext(ctx, cacheSchema); err != nil {
+		return fmt.Errorf("applying cache schema: %w", err)
+	}
+	return nil
+}
+
+func resetCacheDB(ctx context.Context, db *sql.DB) error {
+	drops := []string{
+		`DROP TABLE IF EXISTS nexus_file_updates`,
+		`DROP TABLE IF EXISTS nexus_file_info`,
+		`DROP TABLE IF EXISTS nexus_mod_info`,
+		`DROP TABLE IF EXISTS cache_meta`,
+	}
+	for _, stmt := range drops {
+		if _, err := db.ExecContext(ctx, stmt); err != nil {
+			return fmt.Errorf("dropping table: %w", err)
+		}
+	}
+	return applyCacheSchema(ctx, db)
+}

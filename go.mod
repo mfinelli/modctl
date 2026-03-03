@@ -12,6 +12,7 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	go.finelli.dev/util v0.0.0-20260225184140-820f3748656b
+	golang.org/x/time v0.14.0
 )
 
 require (

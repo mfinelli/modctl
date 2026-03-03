@@ -1,7 +1,11 @@
 GO := go
 SQLC := sqlc
 
-SOURCES := $(wildcard *.go cmd/*.go internal/*.go migrations/*.sql)
+SOURCES := $(wildcard *.go cmd/*.go internal/*.go \
+	   internal/archivescanner/*.go internal/blobstore/*.go \
+	   internal/completion/*.go internal/importer/*.go \
+	   internal/nexus/*.go internal/nexusclient/*.go \
+	   internal/state/*.go migrations/*.sql)
 
 all: modctl
 
@@ -9,7 +13,8 @@ clean:
 	rm -rf modctl dbq sample.tar.gz
 
 modctl: export CGO_ENABLED = 1
-modctl: $(SOURCES) go.mod go.sum dbq/db.go sample.tar.gz
+modctl: $(SOURCES) go.mod go.sum dbq/db.go internal/nexusclient/dbc/db.go \
+	sample.tar.gz
 	$(GO) build -o $@ \
 		-buildmode=pie \
 		-trimpath \
@@ -32,6 +37,10 @@ sample.tar.gz:
 	rm hello.txt
 
 dbq/db.go: sqlc.yaml queries.sql $(wildcard migrations/*.sql)
+	$(SQLC) generate
+
+internal/nexusclient/dbc/db.go: sqlc.yaml internal/nexusclient/queries.sql \
+	internal/nexusclient/schema.sql
 	$(SQLC) generate
 
 .PHONY: all clean

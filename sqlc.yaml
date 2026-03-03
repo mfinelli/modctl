@@ -10,3 +10,12 @@ sql:
         emit_prepared_queries: true
         out: dbq
         package: dbq
+  - engine: sqlite
+    queries: internal/nexusclient/queries.sql
+    schema: internal/nexusclient/schema.sql
+    gen:
+      go:
+        emit_empty_slices: true
+        emit_prepared_queries: true
+        out: internal/nexusclient/dbc
+        package: dbc
