@@ -519,3 +519,69 @@ WHERE id = ?;
 UPDATE mod_file_versions
 SET nexus_file_id = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 WHERE id = ?;
+
+-- name: UpdateModPageNexusInfo :exec
+UPDATE mod_pages
+SET
+    nexus_game_domain = ?,
+    nexus_mod_id = ?,
+    source_kind = 'nexus',
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE id = ?;
+
+-- name: GetModFileVersionLinkState :one
+SELECT
+    mfv.id,
+    mfv.nexus_file_id,
+    mfv.archive_sha256,
+    mf.id as mod_file_id,
+    mf.label,
+    mf.mod_page_id,
+    mp.nexus_game_domain,
+    mp.nexus_mod_id,
+    mp.source_kind,
+    b.size_bytes as archive_size
+FROM mod_file_versions mfv
+JOIN mod_files mf ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp ON mp.id = mf.mod_page_id
+JOIN blobs b ON b.sha256 = mfv.archive_sha256
+WHERE mfv.id = ?
+AND mp.game_install_id = ?;
+
+-- name: GetUnlinkedNexusModFileVersions :many
+SELECT
+    mfv.id as version_id,
+    mfv.original_name,
+    mfv.archive_sha256,
+    mf.id as mod_file_id,
+    mf.label,
+    mp.id as mod_page_id,
+    mp.name as mod_page_name,
+    mp.nexus_game_domain,
+    mp.nexus_mod_id,
+    b.size_bytes as archive_size
+FROM mod_file_versions mfv
+JOIN mod_files mf ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp ON mp.id = mf.mod_page_id
+JOIN blobs b ON b.sha256 = mfv.archive_sha256
+WHERE mp.game_install_id = ?
+AND mp.source_kind = 'nexus'
+AND mp.nexus_game_domain IS NOT NULL
+AND mp.nexus_mod_id IS NOT NULL
+AND mfv.nexus_file_id IS NULL;
+
+-- name: GetSkippableModFileVersions :many
+SELECT
+    mfv.id as version_id,
+    mf.label,
+    mp.name as mod_page_name
+FROM mod_file_versions mfv
+JOIN mod_files mf ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp ON mp.id = mf.mod_page_id
+WHERE mp.game_install_id = ?
+AND (
+    mp.source_kind != 'nexus'
+    OR mp.nexus_game_domain IS NULL
+    OR mp.nexus_mod_id IS NULL
+)
+AND mfv.nexus_file_id IS NULL;

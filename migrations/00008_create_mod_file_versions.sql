@@ -51,6 +51,14 @@ CREATE INDEX idx_mod_file_versions_archive ON mod_file_versions(archive_sha256);
 -- +goose StatementEnd
 
 -- +goose StatementBegin
+-- A given file_id can only ever refer to one specific uploaded archive
+-- regardless of which mod page it belongs to.
+CREATE UNIQUE INDEX uq_mod_file_versions_nexus_file_id
+  ON mod_file_versions(nexus_file_id)
+  WHERE nexus_file_id IS NOT NULL;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
 -- prevent duplicate attachment of the same blob archive to the same mod_file
 CREATE UNIQUE INDEX uq_mod_file_versions_file_blob
   ON mod_file_versions(mod_file_id, archive_sha256);
@@ -103,6 +111,10 @@ DROP INDEX uq_mod_file_versions_file_blob;
 
 -- +goose StatementBegin
 DROP INDEX idx_mod_file_versions_archive;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+DROP INDEX uq_mod_file_versions_nexus_file_id;
 -- +goose StatementEnd
 
 -- +goose StatementBegin

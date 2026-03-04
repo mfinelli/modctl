@@ -59,6 +59,7 @@ func IdentifyNexusFile(
 	originalBasename string,
 	archiveSize int64,
 	label string, // empty string means no --label provided
+	fileVersion string,
 	files []nexusclient.ModFileInfo,
 ) (*IdentifyResult, []string, error) {
 	var warnings []string
@@ -74,12 +75,13 @@ func IdentifyNexusFile(
 		}
 	}
 
-	// Step 2: apply label pre-filter if provided (case-insensitive)
+	// Step 2: apply label and/or file version pre-filters if provided (case-insensitive)
 	candidates := files
 	labelFiltered := false
+
 	if label != "" {
 		var filtered []nexusclient.ModFileInfo
-		for _, f := range files {
+		for _, f := range candidates {
 			if strings.EqualFold(f.Name, label) {
 				filtered = append(filtered, f)
 			}
@@ -96,9 +98,32 @@ func IdentifyNexusFile(
 		}
 	}
 
-	// Step 3: timestamp parse from originalBasename, match against uploaded_timestamp
-	ts, ok := parseTimestampFromFilename(originalBasename)
-	if ok {
+	if fileVersion != "" {
+		var filtered []nexusclient.ModFileInfo
+		for _, f := range candidates {
+			if strings.EqualFold(f.Version, fileVersion) {
+				filtered = append(filtered, f)
+			}
+		}
+		if len(filtered) == 0 {
+			warnings = append(warnings, fmt.Sprintf(
+				"file version %q did not match any files on the Nexus mod page; searching without version filter",
+				fileVersion,
+			))
+		} else {
+			// Only update labelFiltered if we actually narrowed the pool
+			if len(filtered) < len(candidates) {
+				labelFiltered = true
+			}
+			candidates = filtered
+		}
+	}
+
+	// Parse timestamp once for reuse in steps 3 and 4
+	ts, hasTimestamp := parseTimestampFromFilename(originalBasename)
+
+	// Step 3: timestamp match
+	if hasTimestamp {
 		var matches []nexusclient.ModFileInfo
 		for _, f := range candidates {
 			if f.UploadedTimestamp == ts {
@@ -118,7 +143,7 @@ func IdentifyNexusFile(
 	}
 
 	// Step 4: size + timestamp
-	if ok {
+	if hasTimestamp {
 		var matches []nexusclient.ModFileInfo
 		for _, f := range candidates {
 			if f.UploadedTimestamp == ts && f.SizeInBytes == archiveSize {
@@ -137,13 +162,12 @@ func IdentifyNexusFile(
 		}
 	}
 
-	// Step 5: label + size (only meaningful if label filter succeeded and left
-	// exactly one candidate)
-	if labelFiltered && len(candidates) == 1 && candidates[0].SizeInBytes == archiveSize {
+	// Step 5: label/version + size (confident only if exactly one candidate)
+	if labelFiltered && len(candidates) == 1 && archiveSize > 0 && candidates[0].SizeInBytes == archiveSize {
 		return &IdentifyResult{
 			File:       candidates[0],
 			Confidence: MatchConfidenceConfident,
-			Strategy:   "label and size match",
+			Strategy:   "label/version and size match",
 		}, warnings, nil
 	}
 

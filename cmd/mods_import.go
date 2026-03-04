@@ -235,7 +235,7 @@ has been safely stored and the database has been updated successfully.`,
 			if apiKey == "" {
 				fmt.Println(subtleStyle.Render("  nexus api key not configured, skipping link"))
 			} else {
-				client, err := nexusclient.New(ctx, apiKey, slog.Default(), rootCmd.Version)
+				client, err := nexusclient.New(ctx, apiKey, logger, rootCmd.Version)
 				if err != nil {
 					// Non-fatal, warn and continue
 					fmt.Println(warnStyle.Render(fmt.Sprintf("  ⚠ failed to initialize nexus client: %s", err)))
@@ -503,7 +503,8 @@ func attemptNexusLink(
 		return fmt.Errorf("fetching nexus file list: %w", err)
 	}
 
-	match, warnings, err := nexus.IdentifyNexusFile(p.originalBasename, p.archiveSize, p.label, filesResp.Files)
+	// TODO add an optional --file-version flag
+	match, warnings, err := nexus.IdentifyNexusFile(p.originalBasename, p.archiveSize, p.label, "", filesResp.Files)
 	if err != nil {
 		return fmt.Errorf("identifying nexus file: %w", err)
 	}
