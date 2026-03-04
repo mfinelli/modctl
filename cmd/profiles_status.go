@@ -34,6 +34,7 @@ import (
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/nexusclient"
+	"github.com/mfinelli/modctl/internal/nexusclient/dbc"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
@@ -159,7 +160,8 @@ func init() {
 }
 
 type nexusVersionInfo struct {
-	CachedVersion string
+	CachedVersion string // version of what the user has installed
+	LatestVersion string // version of the latest available (only set when HasUpdate is true)
 	FetchedAt     time.Time
 	HasUpdate     bool
 }
@@ -265,7 +267,7 @@ func renderProfileStatus(
 				if info, ok := nexusInfo[item.ModFileVersionID]; ok {
 					if info.HasUpdate {
 						writeKVIndented16(&b, "nexus version:",
-							nexusUpdateStyle.Render(fmt.Sprintf("%s ↑ update available", info.CachedVersion)))
+							nexusUpdateStyle.Render(fmt.Sprintf("%s ↑ update available", info.LatestVersion)))
 					} else {
 						writeKVIndented16(&b, "nexus version:",
 							fmt.Sprintf("%s ✓ %s",
@@ -350,6 +352,13 @@ func buildNexusInfo(
 		return result
 	}
 
+	// cache update chains per mod page to avoid redundant lookups
+	type modPageKey struct {
+		domain string
+		modID  int64
+	}
+	chains := make(map[modPageKey][]dbc.GetNexusFileUpdateChainRow)
+
 	for _, item := range items {
 		if !item.NexusFileID.Valid ||
 			!item.NexusGameDomain.Valid ||
@@ -357,6 +366,28 @@ func buildNexusInfo(
 			continue
 		}
 
+		key := modPageKey{item.NexusGameDomain.String, item.NexusModID.Int64}
+
+		// fetch chain once per mod page
+		if _, ok := chains[key]; !ok {
+			chain, err := cache.GetNexusFileUpdateChain(
+				item.NexusGameDomain.String,
+				item.NexusModID.Int64,
+			)
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				logger.Warn("failed to fetch nexus file update chain",
+					"game_domain", key.domain,
+					"mod_id", key.modID,
+					"error", err,
+				)
+			}
+			chains[key] = chain // store even if empty/nil so we don't retry
+		}
+
+		latestFileID := walkUpdateChain(item.NexusFileID.Int64, chains[key])
+		hasUpdate := latestFileID != item.NexusFileID.Int64
+
+		// fetch current file info for fetched_at and version
 		row, err := cache.GetNexusFileInfo(
 			item.NexusGameDomain.String,
 			item.NexusModID.Int64,
@@ -378,18 +409,53 @@ func buildNexusInfo(
 			continue
 		}
 
-		hasUpdate := row.Version.Valid &&
-			item.VersionString.Valid &&
-			row.Version.String != item.VersionString.String
-
-		result[item.ModFileVersionID] = &nexusVersionInfo{
+		info := &nexusVersionInfo{
 			CachedVersion: row.Version.String,
 			FetchedAt:     fetchedAt,
 			HasUpdate:     hasUpdate,
 		}
+
+		if hasUpdate {
+			latestRow, err := cache.GetNexusFileInfo(
+				item.NexusGameDomain.String,
+				item.NexusModID.Int64,
+				latestFileID,
+			)
+			if err == nil && latestRow.Version.Valid {
+				info.LatestVersion = latestRow.Version.String
+			}
+		}
+
+		result[item.ModFileVersionID] = info
 	}
 
 	return result
+}
+
+// walkUpdateChain follows the file_updates chain from startFileID and returns
+// the terminal (latest) file_id, or startFileID if no updates exist.
+func walkUpdateChain(startFileID int64, chain []dbc.GetNexusFileUpdateChainRow) int64 {
+	// build a map of old -> new
+	next := make(map[int64]int64, len(chain))
+	for _, row := range chain {
+		next[row.OldFileID] = row.NewFileID
+	}
+
+	current := startFileID
+	seen := make(map[int64]struct{}) // guard against cycles
+	for {
+		if _, visited := seen[current]; visited {
+			break
+		}
+		seen[current] = struct{}{}
+		if n, ok := next[current]; ok {
+			current = n
+		} else {
+			break
+		}
+	}
+
+	return current
 }
 
 // truncateSha returns the first 16 hex characters of a sha256 followed by "..."

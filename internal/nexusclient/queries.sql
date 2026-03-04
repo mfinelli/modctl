@@ -96,3 +96,9 @@ FROM nexus_file_info
 WHERE nexus_game_domain = ?
 AND nexus_mod_id = ?
 AND nexus_file_id = ?;
+
+-- name: GetNexusFileUpdateChain :many
+SELECT old_file_id, new_file_id
+FROM nexus_file_updates
+WHERE nexus_game_domain = ?
+AND nexus_mod_id = ?;

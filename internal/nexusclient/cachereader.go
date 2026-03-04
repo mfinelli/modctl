@@ -63,3 +63,11 @@ func (r *CacheReader) GetNexusFileInfo(gameDomain string, modID int64, fileID in
 	}
 	return &row, nil
 }
+
+func (r *CacheReader) GetNexusFileUpdateChain(gameDomain string, modID int64) ([]dbc.GetNexusFileUpdateChainRow, error) {
+	q := dbc.New(r.db)
+	return q.GetNexusFileUpdateChain(r.ctx, dbc.GetNexusFileUpdateChainParams{
+		NexusGameDomain: gameDomain,
+		NexusModID:      modID,
+	})
+}
