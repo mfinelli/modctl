@@ -608,3 +608,31 @@ AND mod_file_versions.id IN (
     JOIN mod_pages mp ON mp.id = mf.mod_page_id
     WHERE mp.game_install_id = ?
 );
+
+-- name: GetNexusLinkedModPages :many
+SELECT DISTINCT
+    mp.id as mod_page_id,
+    mp.nexus_game_domain,
+    mp.nexus_mod_id
+FROM mod_pages mp
+JOIN mod_files mf ON mf.mod_page_id = mp.id
+JOIN mod_file_versions mfv ON mfv.mod_file_id = mf.id
+WHERE mp.game_install_id = ?
+AND mp.source_kind = 'nexus'
+AND mp.nexus_game_domain IS NOT NULL
+AND mp.nexus_mod_id IS NOT NULL
+AND mfv.nexus_file_id IS NOT NULL;
+
+-- name: GetLinkedModFileVersionsForPage :many
+SELECT
+    mfv.id as version_id,
+    mfv.nexus_file_id,
+    mfv.version_string,
+    mf.id as mod_file_id,
+    mf.label as file_label,
+    mp.name as mod_page_name
+FROM mod_file_versions mfv
+JOIN mod_files mf ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp ON mp.id = mf.mod_page_id
+WHERE mf.mod_page_id = ?
+AND mfv.nexus_file_id IS NOT NULL;

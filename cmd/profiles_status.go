@@ -384,7 +384,12 @@ func buildNexusInfo(
 			chains[key] = chain // store even if empty/nil so we don't retry
 		}
 
-		latestFileID := walkUpdateChain(item.NexusFileID.Int64, chains[key])
+		// build next map from the cached chain for this mod page
+		next := make(map[int64]int64, len(chains[key]))
+		for _, row := range chains[key] {
+			next[row.OldFileID] = row.NewFileID
+		}
+		latestFileID := internal.WalkUpdateChain(item.NexusFileID.Int64, next)
 		hasUpdate := latestFileID != item.NexusFileID.Int64
 
 		// fetch current file info for fetched_at and version
@@ -430,32 +435,6 @@ func buildNexusInfo(
 	}
 
 	return result
-}
-
-// walkUpdateChain follows the file_updates chain from startFileID and returns
-// the terminal (latest) file_id, or startFileID if no updates exist.
-func walkUpdateChain(startFileID int64, chain []dbc.GetNexusFileUpdateChainRow) int64 {
-	// build a map of old -> new
-	next := make(map[int64]int64, len(chain))
-	for _, row := range chain {
-		next[row.OldFileID] = row.NewFileID
-	}
-
-	current := startFileID
-	seen := make(map[int64]struct{}) // guard against cycles
-	for {
-		if _, visited := seen[current]; visited {
-			break
-		}
-		seen[current] = struct{}{}
-		if n, ok := next[current]; ok {
-			current = n
-		} else {
-			break
-		}
-	}
-
-	return current
 }
 
 // truncateSha returns the first 16 hex characters of a sha256 followed by "..."
