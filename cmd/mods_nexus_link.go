@@ -51,7 +51,7 @@ var (
 
 var modsNexusLinkCmd = &cobra.Command{
 	Use:   "link",
-	Short: "ink mod file versions to their Nexus mod page entries",
+	Short: "Link mod file versions to their Nexus mod page entries",
 	Long: `Attempt to identify and link mod file versions to their corresponding
 Nexus file IDs. Without --version-id, runs automatically against all unlinked
 mod file versions for the active game. With --version-id, targets a specific
