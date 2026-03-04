@@ -585,3 +585,24 @@ AND (
     OR mp.nexus_mod_id IS NULL
 )
 AND mfv.nexus_file_id IS NULL;
+
+-- name: GetModFileVersionNexusFileID :one
+SELECT mfv.nexus_file_id
+FROM mod_file_versions mfv
+JOIN mod_files mf ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp ON mp.id = mf.mod_page_id
+WHERE mfv.id = ?
+AND mp.game_install_id = ?;
+
+-- name: UnlinkModFileVersionNexus :exec
+UPDATE mod_file_versions
+SET nexus_file_id = NULL,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE mod_file_versions.id = ?
+AND mod_file_versions.id IN (
+    SELECT mfv.id
+    FROM mod_file_versions mfv
+    JOIN mod_files mf ON mf.id = mfv.mod_file_id
+    JOIN mod_pages mp ON mp.id = mf.mod_page_id
+    WHERE mp.game_install_id = ?
+);
