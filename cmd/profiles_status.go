@@ -20,16 +20,20 @@ package cmd
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
@@ -67,6 +71,14 @@ or mod incompatibilities.`,
 		err = internal.MigrateDB(ctx, db)
 		if err != nil {
 			return fmt.Errorf("error migrating database: %w", err)
+		}
+
+		cacheReader, err := nexusclient.NewCacheReader(ctx, logger)
+		if err != nil {
+			// non-fatal, just means we can't show nexus version info
+			logger.Warn("failed to open nexus cache", "error", err)
+		} else {
+			defer cacheReader.Close()
 		}
 
 		q := dbq.New(db)
@@ -112,12 +124,16 @@ or mod incompatibilities.`,
 			}
 		}
 
+		// pass cacheReader (possibly nil) to the nexusInfo builder
+		nexusInfo := buildNexusInfo(ctx, items, cacheReader)
+
 		fmt.Println(renderProfileStatus(
 			p,
 			gi,
 			items,
 			appliedState,
 			incompatibilities,
+			nexusInfo,
 		))
 
 		return nil
@@ -142,12 +158,19 @@ func init() {
 		})
 }
 
+type nexusVersionInfo struct {
+	CachedVersion string
+	FetchedAt     time.Time
+	HasUpdate     bool
+}
+
 func renderProfileStatus(
 	profile dbq.Profile,
 	gi dbq.GameInstall,
 	items []dbq.GetProfileStatusItemsRow,
 	appliedState dbq.GetGameInstallAppliedStateRow,
 	incompatibilities []dbq.GetIncompatibleModPairsForProfileRow,
+	nexusInfo map[int64]*nexusVersionInfo,
 ) string {
 	// styles TODO extract somewhere...
 	cardBorder := lipgloss.NewStyle().
@@ -238,9 +261,22 @@ func renderProfileStatus(
 				writeKVIndented16(&b, "version:", subtleStyle.Render("(none)"))
 			}
 
-			// nexus version placeholder - shown only when mod has a nexus_mod_id
 			if item.NexusFileID.Valid {
-				writeKVIndented16(&b, "nexus version:", nexusUpdateStyle.Render("(run 'modctl nexus check' to fetch)"))
+				if info, ok := nexusInfo[item.ModFileVersionID]; ok {
+					if info.HasUpdate {
+						writeKVIndented16(&b, "nexus version:",
+							nexusUpdateStyle.Render(fmt.Sprintf("%s ↑ update available", info.CachedVersion)))
+					} else {
+						writeKVIndented16(&b, "nexus version:",
+							fmt.Sprintf("%s ✓ %s",
+								info.CachedVersion,
+								subtleStyle.Render(fmt.Sprintf("(last fetched %s)", formatAge(info.FetchedAt))),
+							))
+					}
+				} else {
+					writeKVIndented16(&b, "nexus version:",
+						subtleStyle.Render("(run 'mods nexus check-updates' to fetch)"))
+				}
 			}
 
 			writeKVIndented16(&b, "archive:", truncateSha(item.ArchiveSha256))
@@ -270,6 +306,18 @@ func renderProfileStatus(
 		))
 	}
 
+	updatesAvailable := 0
+	for _, info := range nexusInfo {
+		if info.HasUpdate {
+			updatesAvailable++
+		}
+	}
+	if updatesAvailable > 0 {
+		warnings = append(warnings, fmt.Sprintf(
+			"⚠  %d mod(s) have updates available", updatesAvailable,
+		))
+	}
+
 	for _, pair := range incompatibilities {
 		warnings = append(warnings, fmt.Sprintf(
 			"⚠  %s and %s are marked incompatible",
@@ -292,6 +340,58 @@ func renderProfileStatus(
 	return strings.TrimRight(b.String(), "\n")
 }
 
+func buildNexusInfo(
+	ctx context.Context,
+	items []dbq.GetProfileStatusItemsRow,
+	cache *nexusclient.CacheReader,
+) map[int64]*nexusVersionInfo {
+	result := make(map[int64]*nexusVersionInfo)
+	if cache == nil {
+		return result
+	}
+
+	for _, item := range items {
+		if !item.NexusFileID.Valid ||
+			!item.NexusGameDomain.Valid ||
+			!item.NexusModID.Valid {
+			continue
+		}
+
+		row, err := cache.GetNexusFileInfo(
+			item.NexusGameDomain.String,
+			item.NexusModID.Int64,
+			item.NexusFileID.Int64,
+		)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			logger.Warn("failed to fetch nexus file info from cache",
+				"mod_file_version_id", item.ModFileVersionID,
+				"error", err,
+			)
+			continue
+		}
+
+		fetchedAt, err := time.Parse(time.RFC3339, row.FetchedAt)
+		if err != nil {
+			continue
+		}
+
+		hasUpdate := row.Version.Valid &&
+			item.VersionString.Valid &&
+			row.Version.String != item.VersionString.String
+
+		result[item.ModFileVersionID] = &nexusVersionInfo{
+			CachedVersion: row.Version.String,
+			FetchedAt:     fetchedAt,
+			HasUpdate:     hasUpdate,
+		}
+	}
+
+	return result
+}
+
 // truncateSha returns the first 16 hex characters of a sha256 followed by "..."
 func truncateSha(sha string) string {
 	if len(sha) <= 16 {
@@ -312,6 +412,20 @@ func formatBytes(b int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
+}
+
+func formatAge(t time.Time) string {
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%d minutes ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%d hours ago", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%d days ago", int(d.Hours()/24))
+	}
 }
 
 func writeKV16(b *strings.Builder, label, value string) {

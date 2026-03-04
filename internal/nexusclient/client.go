@@ -44,43 +44,35 @@ const (
 var cacheSchema string
 
 type Client struct {
-	ctx        context.Context
+	CacheReader
 	apiKey     string
 	userAgent  string
 	httpClient *http.Client
-	cacheDB    *sql.DB
-	logger     *slog.Logger
 	limiter    *rate.Limiter
 }
 
 func New(ctx context.Context, apiKey string, logger *slog.Logger, version string) (*Client, error) {
 	ua := buildUserAgent(version)
 
-	httpClient := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-
-	cacheDB, err := openCacheDB(ctx)
+	reader, err := NewCacheReader(ctx, logger)
 	if err != nil {
 		return nil, fmt.Errorf("opening nexus cache db: %w", err)
+	}
+
+	httpClient := &http.Client{
+		Timeout: 30 * time.Second,
 	}
 
 	// 30 req/sec with a burst of 10
 	limiter := rate.NewLimiter(rate.Limit(30), 10)
 
 	return &Client{
-		ctx:        ctx,
-		apiKey:     apiKey,
-		userAgent:  ua,
-		httpClient: httpClient,
-		cacheDB:    cacheDB,
-		logger:     logger,
-		limiter:    limiter,
+		CacheReader: *reader,
+		apiKey:      apiKey,
+		userAgent:   ua,
+		httpClient:  httpClient,
+		limiter:     limiter,
 	}, nil
-}
-
-func (c *Client) Close() error {
-	return c.cacheDB.Close()
 }
 
 func (c *Client) RateLimitState() (*RateLimitState, error) {

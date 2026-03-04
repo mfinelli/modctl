@@ -32,7 +32,7 @@ const (
 )
 
 func (c *Client) cacheModInfo(info *ModInfo) error {
-	q := dbc.New(c.cacheDB)
+	q := dbc.New(c.db)
 	err := q.UpsertNexusModInfo(c.ctx, dbc.UpsertNexusModInfoParams{
 		NexusGameDomain: info.DomainName,
 		NexusModID:      int64(info.ModID),
@@ -52,7 +52,7 @@ func (c *Client) cacheModInfo(info *ModInfo) error {
 func (c *Client) cacheModFiles(gameDomain string, modID int, resp *ModFilesResponse) error {
 	fetchedAt := time.Now().UTC().Format(time.RFC3339)
 
-	tx, err := c.cacheDB.BeginTx(c.ctx, nil)
+	tx, err := c.db.BeginTx(c.ctx, nil)
 	if err != nil {
 		return fmt.Errorf("beginning transaction: %w", err)
 	}

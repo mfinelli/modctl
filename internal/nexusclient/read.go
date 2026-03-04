@@ -28,7 +28,7 @@ import (
 )
 
 func (c *Client) GetModCached(gameDomain string, modID int) (*ModInfo, error) {
-	q := dbc.New(c.cacheDB)
+	q := dbc.New(c.db)
 
 	row, err := q.GetNexusModInfo(c.ctx, dbc.GetNexusModInfoParams{
 		NexusGameDomain: gameDomain,
@@ -68,7 +68,7 @@ func (c *Client) GetModCached(gameDomain string, modID int) (*ModInfo, error) {
 }
 
 func (c *Client) GetModFilesCached(gameDomain string, modID int) (*ModFilesResponse, error) {
-	q := dbc.New(c.cacheDB)
+	q := dbc.New(c.db)
 
 	rows, err := q.GetNexusFileInfoForMod(c.ctx, dbc.GetNexusFileInfoForModParams{
 		NexusGameDomain: gameDomain,

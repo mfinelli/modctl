@@ -85,3 +85,14 @@ WHERE nexus_game_domain = ? AND nexus_mod_id = ?;
 -- name: GetNexusFileUpdatesForMod :many
 SELECT * FROM nexus_file_updates
 WHERE nexus_game_domain = ? AND nexus_mod_id = ?;
+
+-- name: GetNexusFileInfo :one
+-- TODO: think about making this use IN() to avoid needing to run a query
+-- per mod, but unless you have 100s of mods installed it's probably fine
+SELECT
+    version,
+    fetched_at
+FROM nexus_file_info
+WHERE nexus_game_domain = ?
+AND nexus_mod_id = ?
+AND nexus_file_id = ?;

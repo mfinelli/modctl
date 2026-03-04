@@ -452,6 +452,8 @@ SELECT
     mp.id                       AS mod_page_id,
     mp.name                     AS mod_page_name,
     mp.source_kind,
+    mp.nexus_game_domain,
+    mp.nexus_mod_id,
     mf.id                       AS mod_file_id,
     mf.label                    AS file_label,
     mfv.id                      AS mod_file_version_id,
