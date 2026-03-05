@@ -102,3 +102,12 @@ SELECT old_file_id, new_file_id
 FROM nexus_file_updates
 WHERE nexus_game_domain = ?
 AND nexus_mod_id = ?;
+
+-- name: GetNexusFileInfoFetchedAt :one
+-- We use LIMIT 1 since all rows for a mod page share the same fetched_at from
+-- the atomic write in cacheModFiles
+SELECT fetched_at
+FROM nexus_file_info
+WHERE nexus_game_domain = ?
+AND nexus_mod_id = ?
+LIMIT 1;

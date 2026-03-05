@@ -27,8 +27,8 @@ import (
 )
 
 const (
-	modInfoTTL  = 7 * 24 * time.Hour
-	modFilesTTL = 24 * time.Hour
+	ModInfoTTL  = 7 * 24 * time.Hour
+	ModFilesTTL = 24 * time.Hour
 )
 
 func (c *Client) cacheModInfo(info *ModInfo) error {

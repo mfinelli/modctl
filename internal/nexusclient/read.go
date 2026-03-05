@@ -40,7 +40,7 @@ func (c *Client) GetModCached(gameDomain string, modID int) (*ModInfo, error) {
 
 	if err == nil {
 		fetchedAt, parseErr := time.Parse(time.RFC3339, row.FetchedAt)
-		if parseErr == nil && time.Since(fetchedAt) < modInfoTTL {
+		if parseErr == nil && time.Since(fetchedAt) < ModInfoTTL {
 			c.logger.Debug("nexus mod info cache hit",
 				"game_domain", gameDomain,
 				"mod_id", modID,
@@ -83,7 +83,7 @@ func (c *Client) GetModFilesCached(gameDomain string, modID int) (*ModFilesRespo
 		// all rows for a mod are written atomically with the same
 		// fetched_at in cacheModFiles
 		fetchedAt, parseErr := time.Parse(time.RFC3339, rows[0].FetchedAt)
-		if parseErr == nil && time.Since(fetchedAt) < modFilesTTL {
+		if parseErr == nil && time.Since(fetchedAt) < ModFilesTTL {
 			c.logger.Debug("nexus file info cache hit",
 				"game_domain", gameDomain,
 				"mod_id", modID,

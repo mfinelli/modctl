@@ -20,10 +20,13 @@ package cmd
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
 	"strconv"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
@@ -36,8 +39,9 @@ import (
 )
 
 var (
-	modsNexusCheckUpdatesGame  string
-	modsNexusCheckUpdatesForce bool
+	modsNexusCheckUpdatesGame      string
+	modsNexusCheckUpdatesForce     bool
+	modsNexusCheckUpdatesIgnoreTTL bool
 )
 
 var modsNexusCheckUpdatesCmd = &cobra.Command{
@@ -116,8 +120,40 @@ Use --force to proceed even if the operation would exhaust your API quota.`,
 			return nil
 		}
 
+		// determine which mod pages actually need a fetch
+		needsFetch := make(map[int64]bool, len(modPages))
+		for _, mp := range modPages {
+			if modsNexusCheckUpdatesIgnoreTTL {
+				needsFetch[mp.ModPageID] = true
+				continue
+			}
+			row, err := client.GetNexusFileInfoFetchedAt(
+				mp.NexusGameDomain.String,
+				mp.NexusModID.Int64,
+			)
+			if errors.Is(err, sql.ErrNoRows) {
+				needsFetch[mp.ModPageID] = true
+				continue
+			}
+			if err != nil {
+				// if we can't check, assume we need to fetch
+				needsFetch[mp.ModPageID] = true
+				continue
+			}
+			fetchedAt, err := time.Parse(time.RFC3339, row)
+			if err != nil || time.Since(fetchedAt) >= nexusclient.ModFilesTTL {
+				needsFetch[mp.ModPageID] = true
+			}
+		}
+
+		needed := int64(0)
+		for _, needs := range needsFetch {
+			if needs {
+				needed++
+			}
+		}
+
 		// Pre-flight rate limit check
-		needed := int64(len(modPages))
 		rateLimitState, err := client.RateLimitState()
 		if err != nil {
 			logger.Warn("failed to load rate limit state", "error", err)
@@ -146,17 +182,30 @@ Use --force to proceed even if the operation would exhaust your API quota.`,
 		failed := 0
 
 		for _, mp := range modPages {
-			filesResp, err := client.GetModFiles(
-				mp.NexusGameDomain.String,
-				int(mp.NexusModID.Int64),
-			)
-			if err != nil {
-				fmt.Println(warnStyle.Render(fmt.Sprintf(
-					"  ⚠ failed to fetch file info for mod page %d: %s",
-					mp.ModPageID, err,
-				)))
-				failed++
-				continue
+			var filesResp *nexusclient.ModFilesResponse
+
+			if needsFetch[mp.ModPageID] {
+				fresh, err := client.GetModFiles(mp.NexusGameDomain.String, int(mp.NexusModID.Int64))
+				if err != nil {
+					fmt.Println(warnStyle.Render(fmt.Sprintf(
+						"  ⚠ failed to fetch file info for mod page %d: %s",
+						mp.ModPageID, err,
+					)))
+					failed++
+					continue
+				}
+				filesResp = fresh
+			} else {
+				cached, err := client.GetModFilesCached(mp.NexusGameDomain.String, int(mp.NexusModID.Int64))
+				if err != nil {
+					logger.Warn("failed to read cached mod files",
+						"mod_page_id", mp.ModPageID,
+						"error", err,
+					)
+					failed++
+					continue
+				}
+				filesResp = cached
 			}
 
 			// build a map of file_id -> version for quick lookup
@@ -245,4 +294,6 @@ func init() {
 
 	modsNexusCheckUpdatesCmd.Flags().BoolVar(&modsNexusCheckUpdatesForce, "force", false,
 		"proceed even if API quota may be exhausted")
+	modsNexusCheckUpdatesCmd.Flags().BoolVar(&modsNexusCheckUpdatesIgnoreTTL, "ignore-ttl", false,
+		"fetch data from the nexus even if cached data is fresh")
 }

@@ -83,3 +83,11 @@ func (r *CacheReader) GetNexusModInfo(gameDomain string, modID int64) (*dbc.Nexu
 	}
 	return &row, nil
 }
+
+func (r *CacheReader) GetNexusFileInfoFetchedAt(gameDomain string, modID int64) (string, error) {
+	q := dbc.New(r.db)
+	return q.GetNexusFileInfoFetchedAt(r.ctx, dbc.GetNexusFileInfoFetchedAtParams{
+		NexusGameDomain: gameDomain,
+		NexusModID:      modID,
+	})
+}
