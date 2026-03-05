@@ -171,6 +171,9 @@ func runModsInfo(
 	// fetch nexus cache data if applicable
 	var nexusModInfo *dbc.NexusModInfo
 	nexusFileInfos := make(map[int64]*nexusFileCache)
+	// next map and superseded set are built here and passed to renderModInfo
+	next := make(map[int64]int64)
+	superseded := make(map[int64]struct{})
 
 	if mp.SourceKind == "nexus" && mp.NexusGameDomain.Valid && mp.NexusModID.Valid {
 		cacheReader, err := nexusclient.NewCacheReader(ctx, logger)
@@ -196,9 +199,10 @@ func runModsInfo(
 				logger.Warn("failed to fetch nexus file update chain", "error", err)
 			}
 
-			next := make(map[int64]int64, len(chain))
+			// build next and superseded from the chain
 			for _, row := range chain {
 				next[row.OldFileID] = row.NewFileID
+				superseded[row.OldFileID] = struct{}{}
 			}
 
 			// fetch per-file cache info
@@ -227,23 +231,25 @@ func runModsInfo(
 					continue
 				}
 
-				latestFileID := internal.WalkUpdateChain(fv.NexusFileID.Int64, next)
-				hasUpdate := latestFileID != fv.NexusFileID.Int64
-
+				// only walk the chain for non-superseded versions
+				_, isSuperseded := superseded[fv.NexusFileID.Int64]
 				info := &nexusFileCache{
 					Version:   row.Version.String,
 					FetchedAt: fetchedAt,
-					HasUpdate: hasUpdate,
 				}
 
-				if hasUpdate {
-					latestRow, err := cacheReader.GetNexusFileInfo(
-						mp.NexusGameDomain.String,
-						mp.NexusModID.Int64,
-						latestFileID,
-					)
-					if err == nil && latestRow.Version.Valid {
-						info.LatestVersion = latestRow.Version.String
+				if !isSuperseded {
+					latestFileID := internal.WalkUpdateChain(fv.NexusFileID.Int64, next)
+					info.HasUpdate = latestFileID != fv.NexusFileID.Int64
+					if info.HasUpdate {
+						latestRow, err := cacheReader.GetNexusFileInfo(
+							mp.NexusGameDomain.String,
+							mp.NexusModID.Int64,
+							latestFileID,
+						)
+						if err == nil && latestRow.Version.Valid {
+							info.LatestVersion = latestRow.Version.String
+						}
 					}
 				}
 
@@ -252,7 +258,7 @@ func runModsInfo(
 		}
 	}
 
-	fmt.Println(renderModInfo(mp, fileVersions, versionProfiles, nexusModInfo, nexusFileInfos))
+	fmt.Println(renderModInfo(mp, fileVersions, versionProfiles, nexusModInfo, nexusFileInfos, superseded))
 	return nil
 }
 
@@ -262,6 +268,7 @@ func renderModInfo(
 	versionProfiles map[int64][]profileMembership,
 	nexusModInfo *dbc.NexusModInfo,
 	nexusFileInfos map[int64]*nexusFileCache,
+	superseded map[int64]struct{},
 ) string {
 	// TODO: extract styles
 	cardBorder := lipgloss.NewStyle().
@@ -389,7 +396,11 @@ func renderModInfo(
 				// nexus file link state
 				if v.NexusFileID.Valid {
 					if info, ok := nexusFileInfos[v.ModFileVersionID]; ok {
-						if info.HasUpdate {
+						_, isSuperseded := superseded[v.NexusFileID.Int64]
+						if isSuperseded {
+							writeKVIndented16(&b, "  nexus version:",
+								subtleStyle.Render(fmt.Sprintf("%s (old version)", info.Version)))
+						} else if info.HasUpdate {
 							writeKVIndented16(&b, "  nexus version:",
 								nexusUpdateStyle.Render(fmt.Sprintf("%s ↑ update available → %s",
 									info.Version, info.LatestVersion)))
