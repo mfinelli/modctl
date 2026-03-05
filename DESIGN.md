@@ -314,6 +314,12 @@ Field notes:
 
 ## 5. Extraction model
 
+Directory entries in archives are ignored during apply. Directories are
+created implicitly as parent paths when files are written to disk. Explicit
+empty directory installation is not supported in v1. If a mod requires an
+empty directory to exist, the recommended workaround is to place a
+placeholder file at that path using the overrides system.
+
 ### v1 extraction: external `bsdtar`
 
 - Inventory: `bsdtar -t` to list entries (best-effort metadata).
@@ -329,6 +335,11 @@ Possible future backends:
 To keep this option open, extraction is an interface with multiple backends.
 
 ## 6. Safety model
+
+Only entries with `entry_type = 'file'` are considered during planning.
+Directory, symlink, and other entry types are filtered out before remap
+rules are applied. Symlink and special file support may be added in a
+future version behind an explicit opt-in flag.
 
 ### Staging + safe move
 
