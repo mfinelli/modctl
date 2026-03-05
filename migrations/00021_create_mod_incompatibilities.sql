@@ -30,7 +30,49 @@ CREATE INDEX idx_mod_incompatibilities_a ON mod_incompatibilities(mod_page_id_a)
 CREATE INDEX idx_mod_incompatibilities_b ON mod_incompatibilities(mod_page_id_b);
 -- +goose StatementEnd
 
+-- +goose StatementBegin
+CREATE TRIGGER trg_mod_incompatibilities_same_game_ins
+BEFORE INSERT ON mod_incompatibilities
+FOR EACH ROW
+BEGIN
+  SELECT
+  CASE
+    WHEN (
+      SELECT game_install_id FROM mod_pages WHERE id = NEW.mod_page_id_a
+    ) != (
+      SELECT game_install_id FROM mod_pages WHERE id = NEW.mod_page_id_b
+    )
+    THEN RAISE(ABORT, 'mod_incompatibilities: both mod pages must belong to the same game install')
+  END;
+END;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE TRIGGER trg_mod_incompatibilities_same_game_upd
+BEFORE UPDATE OF mod_page_id_a, mod_page_id_b ON mod_incompatibilities
+FOR EACH ROW
+BEGIN
+  SELECT
+  CASE
+    WHEN (
+      SELECT game_install_id FROM mod_pages WHERE id = NEW.mod_page_id_a
+    ) != (
+      SELECT game_install_id FROM mod_pages WHERE id = NEW.mod_page_id_b
+    )
+    THEN RAISE(ABORT, 'mod_incompatibilities: both mod pages must belong to the same game install')
+  END;
+END;
+-- +goose StatementEnd
+
 -- +goose Down
+-- +goose StatementBegin
+DROP TRIGGER trg_mod_incompatibilities_same_game_upd;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+DROP TRIGGER trg_mod_incompatibilities_same_game_ins;
+-- +goose StatementEnd
+
 -- +goose StatementBegin
 DROP INDEX idx_mod_incompatibilities_a;
 -- +goose StatementEnd

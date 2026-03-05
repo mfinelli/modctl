@@ -653,6 +653,10 @@ FROM mod_pages mp
 WHERE mp.id = ?
 AND mp.game_install_id = ?;
 
+-- name: GetModPage :one
+SELECT * FROM mod_pages
+WHERE id = ?;
+
 -- name: GetModFilesWithVersions :many
 SELECT
     mf.id                   AS mod_file_id,
@@ -682,3 +686,37 @@ JOIN profiles p ON p.id = pi.profile_id
 WHERE pi.mod_file_version_id = ?
 AND p.game_install_id = ?
 ORDER BY p.name ASC;
+
+-- name: AddModIncompatibility :exec
+INSERT INTO mod_incompatibilities (
+    mod_page_id_a,
+    mod_page_id_b,
+    reason,
+    source
+) VALUES (
+    -- enforce canonical ordering so (A,B) and (B,A) are always the same row
+    MIN(sqlc.arg(mod_page_id_a), sqlc.arg(mod_page_id_b)),
+    MAX(sqlc.arg(mod_page_id_a), sqlc.arg(mod_page_id_b)),
+    ?,
+    'user'
+);
+
+-- name: RemoveModIncompatibility :execrows
+DELETE FROM mod_incompatibilities
+WHERE mod_page_id_a = MIN(sqlc.arg(mod_page_id_a), sqlc.arg(mod_page_id_b))
+  AND mod_page_id_b = MAX(sqlc.arg(mod_page_id_a), sqlc.arg(mod_page_id_b));
+
+-- name: ListModIncompatibilities :many
+SELECT
+    mi.id,
+    mi.mod_page_id_a,
+    mi.mod_page_id_b,
+    mpa.name AS mod_page_name_a,
+    mpb.name AS mod_page_name_b,
+    mi.reason,
+    mi.created_at
+FROM mod_incompatibilities mi
+JOIN mod_pages mpa ON mpa.id = mi.mod_page_id_a
+JOIN mod_pages mpb ON mpb.id = mi.mod_page_id_b
+WHERE mpa.game_install_id = ?
+ORDER BY mi.created_at DESC;
