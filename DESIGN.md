@@ -113,7 +113,7 @@ Model it like Nexus does:
   - archive blob hash
   - extracted inventory cache (optional)
   - observed version metadata (if available)
-  - `nexus_file_id` (optional) — Nexus file IDs identify a specific uploaded
+  - `nexus_file_id` (optional) - Nexus file IDs identify a specific uploaded
     archive, not a logical file slot. A new upload of the same logical file
     gets a new file_id. The Nexus `file_updates` chain links old to new
     file_ids and is used for update detection.
@@ -702,7 +702,7 @@ Include in `testdata/`:
   nested via `t.Run()`
 - Use table-driven subtests where cases share the same assertion shape;
   use separate named subtests where they don't
-- Call `t.Parallel()` at every level — top-level test, subtest group, and
+- Call `t.Parallel()` at every level - top-level test, subtest group, and
   individual table case
 - Capture loop variables with `tc := tc` before spawning parallel subtests
 - Adversarial test inputs (path traversal, absolute paths, symlinks, duplicate
@@ -759,8 +759,8 @@ Nexus `file_id` using the following strategy in priority order:
 4. Timestamp parsed from filename matched against `uploaded_timestamp` (confident)
 5. Size + timestamp match (confident)
 6. Label/version filter + single candidate + size match (confident)
-7. Size only, single unambiguous match (not confident — skipped with warning)
-8. Ambiguous or no match — skipped with warning, user directed to
+7. Size only, single unambiguous match (not confident - skipped with warning)
+8. Ambiguous or no match - skipped with warning, user directed to
    `mods nexus link`
 
 Once identified, `nexus_file_id` is stored on `mod_file_versions`. The

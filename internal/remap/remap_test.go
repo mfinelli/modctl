@@ -374,7 +374,7 @@ func TestApply(t *testing.T) {
 				stripRule(0, 1),
 				subdirRule(1, "Data"),
 			}
-			// after strip: "readme.txt" — not under Data
+			// after strip: "readme.txt" - not under Data
 			result, err := Apply(rules, "ModName/readme.txt")
 			require.NoError(t, err)
 			assert.True(t, result.Skip)
