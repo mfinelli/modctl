@@ -126,6 +126,21 @@ pin a **ModFileVersion**:
 
 This cleanly distinguishes "multiple archives under one Nexus mod".
 
+### Tracking vs. Desired State
+
+`installed_files` is the authoritative record of what the tool has written
+to disk. Profiles describe desired state only.
+
+Removing or disabling a mod version from a profile changes desired state but
+does not untrack anything. Files written by a previous apply remain recorded
+in `installed_files` until an apply reconciles the difference. This means
+the tool can always safely clean up, even if the profile that produced the
+current install has been modified or deleted.
+
+"Pending changes" (desired state diverges from installed state) is derived
+at query time by the planner and surfaced by `status`. No additional schema
+column tracks this.
+
 ### Profile
 
 A named set of enabled mod versions for a `GameInstall`, with:
@@ -141,13 +156,19 @@ Exactly one profile can be active/applied at a time per `GameInstall`.
 `GameInstall` tracks the currently-applied profile as denormalized state:
 - `applied_profile_id` - the profile whose file set is currently on disk
 - `applied_at` - timestamp of the last successful apply
-- `applied_operrtion_id` - the operation that produced the current on-disk
-  state
+- `applied_operation_id` - the operation that produced the current on-disk state
 
-This is intentionally denormalized for fast status queries ("what is deployed
-right now?") without joining through operations. It is updated atomically at
-the end of a successful `apply` or `unapply`. On unapply, all three fields are
-set to NULL.
+All three fields are NULL until a real apply has been performed. They are
+never set during game refresh or profile creation. On unapply, all three
+fields are set back to NULL.
+
+This is intentionally denormalized for fast status queries without joining
+through operations. It is updated atomically at the end of a successful
+`apply` or `unapply`.
+
+A trigger enforces that `applied_profile_id` refers to a profile belonging
+to the same `game_install_id`. This is enforced on UPDATE only, since the
+fields are always NULL at insert time.
 
 ### Plan
 
@@ -381,9 +402,11 @@ engine but requires care during reorder operations:
 
 - Swapping two items or inserting at an occupied priority cannot be done with
   naive sequential updates - a second update would temporarily collide.
-- Recommended approach: perform all priority changes in a single transaction
-  using a gap strategy or a full bulk rewrite of the profile's priority
-  sequence.
+- Recommended approach: use a sentinel priority value (e.g. a large value
+  outside the normal range) as a temporary placeholder within a single
+  transaction to vacate the target slot before writing final values. This
+  avoids transient unique constraint violations without requiring a full bulk
+  rewrite of the profile's priority sequence.
 - The `profiles order` command must account for this.
 
 ## 8. Remap rules
@@ -400,6 +423,14 @@ v1 remap capabilities (stored as structured data):
 
 Remap rules are per profile + mod version (or mayber per mod version with
 profile overrides later).
+
+### Remap evaluation
+
+Remap configs are profile-scoped and are re-evaluated on every apply. Because
+the same `mod_file_version_id` can appear in multiple profiles with different
+remap configs, there is no caching of remap results. The planner always derives
+the final destination path set fresh from the active profile's remap rules at
+plan time.
 
 ## 9. User overrides / editable files
 
@@ -506,7 +537,7 @@ implicit since mod page IDs are globally unique and carry their own
 `game_install_id`. For `list` the current game install context is used to
 scope results.
 
-## 10. Backups strategy
+## 11. Backups strategy
 
 ### When to back up
 
@@ -526,7 +557,7 @@ On unapply/rollback:
 - if user changed file since backup, require explicit choice (or use hash
   checks)
 
-## 11. Multi-store support
+## 12. Multi-store support
 
 ### Store integration responsibilities
 
@@ -550,7 +581,7 @@ Requirements
 - map appid → name + install dir
 - Store games in DB and allow refresh.
 
-## 12. Extensibility for game-specific integrations
+## 13. Extensibility for game-specific integrations
 
 ### Integration type
 
@@ -572,9 +603,11 @@ Game-specific integrations add/override:
 
 This preserves a clean v1 while allowing richer v2.
 
-## 13. Commands
+## 14. Commands
 
-- `doctor` (environment checks, bsdtar presence, store health)
+- `doctor` performs environment checks including bsdtar presence, store health,
+  and blob verification (presence + size check). A `--rehash` flag is reserved
+  for future full content integrity verification via sha256 rehash.
 - `stores list` (supported integrations)
 - `games list|refresh|info`
 - `mods import|list|info|remove`
@@ -583,6 +616,9 @@ This preserves a clean v1 while allowing richer v2.
 - `nexus link` (attach mod_id/file_id metadata)
 - `profiles
   create|list|delete|set-active|apply|diff|add|remove|enable|disable|order|status`
+  - Items are added to a profile enabled by default. The schema default is `FALSE`
+    but the CLI overrides this at insert time. Use `--disabled` to explicitly add
+    an item without enabling it.
 - `profiles order compact|move|set|swap`
 - `overrides set|unset|list` (v2 behavior; schema ready in v1)
 - `policy set` (future: merge/manual policy)
@@ -596,7 +632,26 @@ Key behavior:
 - apply performs reconciliation
 - always support --dry-run where destructive
 
-## 14. Testing strategy
+### command-specifc information
+
+#### `profiles delete`
+
+`profiles delete` enforces two independent guards:
+
+- If the profile is the active editing profile (`is_active = TRUE`), deletion
+  requires `--force`.
+- If the profile is the currently applied profile
+  (`game_installs.applied_profile_id`), deletion requires `--delete-applied`,
+  with an explicit warning that the profile definition will be unrecoverable
+  even though `installed_files` remains intact and the disk state can still
+  be reconciled by a future apply or unapply.
+- If both conditions are true, both flags are required.
+
+The active profile is never automatically switched to default on deletion.
+When the applied profile is deleted, `applied_profile_id` is set to NULL
+automatically via the FK `ON DELETE SET NULL` behavior.
+
+## 15. Testing strategy
 
 ### Unit tests
 
@@ -643,14 +698,14 @@ Include in `testdata/`:
   entries, malformed lines) should be tested at the unit level and included
   in `testdata/` fixture archives for integration tests
 
-## 15. Operational considerations
+## 16. Operational considerations
 
 - lock per game during apply to avoid concurrent changes
 - refuse to operate if game is running (optional v1, but helpful)
 - friendly errors if `bsdtar` missing or unsupported format
 - logging with operation IDs for debugging
 
-## 16. Nexus Mods integration
+## 17. Nexus Mods integration
 
 ### Overview
 

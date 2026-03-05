@@ -14,7 +14,7 @@ CREATE TABLE operation_changes
 -- - old/new hashes reflect on-disk bytes when known.
 -- - backup_blob_sha256 is set when the operation captured/used a backup blob.
 --
--- For remove: set net_content_sha256/new_size_bytes to NULL
+-- For remove: set new_content_sha256/new_size_bytes to NULL
 -- For write: set old_* to NULL
 -- For restore_backup set backup_blob_sha256 and new_content_sha256 (and
 --   optionally old_* if computed)
