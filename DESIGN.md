@@ -24,6 +24,7 @@ stores.
 ### Non-goals for v1
 
 - No `nxm://` protocol handler.
+- No downloading from Nexus or other mod sources (user downloads manually).
 - No dependency resolution.
 - No virtual filesystem.
 - No in-process extraction (external bsdtar is required).
@@ -62,6 +63,19 @@ This allows:
 - multiple stores
 - multiple installs of same game (rare, but possible)
 
+#### Discovery State
+
+`GameInstall` tracks soft-delete/staleness state from store refresh:
+  - `is_present` - set to `FALSE` when a game is not found during refresh;
+    the install is never deleted so that profile and mod data is preserved
+  - `last_seen_at` - timestamp of the last refresh that observed this install
+  - `display_name` - human-facing name as reported by the store; stored on
+    `GameInstall` rather than derived at query time
+
+The decision not to hard-delete missing installs is intentional: a game
+temporarily moved to a different drive or library should not lose its profiles
+and mod configuration.
+
 ### Target
 
 A named install root within a `GameInstall`. v1 supports:
@@ -78,20 +92,31 @@ extend beyond game directory later.
 
 #### "Mod Page" vs "Mod File" vs "Mod File Version"
 
+Here are the specific changes:
+
+Section 2 - Mods model, update the "Mod Page" vs "Mod File" vs "Mod File Version" subsection:
+markdown
+
+#### "Mod Page" vs "Mod File" vs "Mod File Version"
+
 Model it like Nexus does:
 - **ModPage** (a mod "project")
   - Source: local/manual or Nexus
   - If Nexus: `nexus.mod_id`, maybe `nexus.game_domain`/slug
   - Human name, notes, tags
 - **ModFile** (a downloadable file under a mod page)
-  - If Nexus: `nexus.file_id`
+  - If Nexus: `nexus.file_id` is NOT stored here - it belongs to ModFileVersion
   - Human label (e.g., "Main File", "Optional - 2K Textures", "Update",
     "Patch")
-  - May have its own version string, or none
+  - `is_primary` flag identifies the main file
 - **ModFileVersion** (a specific archive blob)
   - archive blob hash
   - extracted inventory cache (optional)
   - observed version metadata (if available)
+  - `nexus_file_id` (optional) — Nexus file IDs identify a specific uploaded
+    archive, not a logical file slot. A new upload of the same logical file
+    gets a new file_id. The Nexus `file_updates` chain links old to new
+    file_ids and is used for update detection.
   - imported_at, original filename
 
 Profiles should enable **ModFile** (with a chosen version policy) or directly
@@ -157,6 +182,15 @@ SQLite stores:
 
 Version schema from day 1.
 
+### Nexus cache: separate SQLite in XDG cache
+
+A separate SQLite database at `$XDG_CACHE_HOME/modctl/nexus_cache.db` stores
+cached Nexus API responses. This is intentionally separate from the main DB:
+- It is safe to delete (will be repopulated on next `mods nexus check-updates`)
+- It is excluded from export/import bundles
+- It uses a simple internal version number; if the schema version does not
+  match the expected version the cache is blown away and recreated
+
 ### Blob stores: on-disk, content-addressed
 
 Two separate stores:
@@ -187,7 +221,77 @@ A single file (tar + zstd) containing:
 
 Import verifies integrity and schema compatibility.
 
-## 4. Extraction model
+## 4. Archive Inventory
+
+### Purpose
+
+The archive inventory caches the contents of mod archives in the database so
+that conflict planning and status checks can operate without reading archives
+from disk. It is the authoritative record of what files a mod version provides,
+before any remap rules are applied.
+
+### Storage
+
+`archive_inventory_entries` stores one row per entry in an archive:
+- Keyed on `(archive_sha256, position)` - position is the zero-based index
+  of the entry in the `bsdtar -tvvf` listing and is the canonical key since
+  archives may contain duplicate paths (last entry wins during extraction,
+  matching bsdtar behavior)
+- `raw_path` stores the path exactly as it appears in the archive with no
+  normalization; path validation and remap rule application are deferred to
+  the planner
+- `entry_type` is one of `file`, `dir`, `symlink`, `other` - derived from
+  the first character of the bsdtar permission string
+- `parse_error` is non-null when a line could not be fully parsed; the entry
+  is still recorded with whatever fields were extractable so the inventory
+  is a faithful mirror of the archive
+- `raw_path` is nullable only when `parse_error` is non-null (enforced by
+  CHECK constraint); a fully parsed entry always has a non-empty path
+- `content_sha256` is reserved for future per-entry hashing; currently
+  always NULL
+
+`mod_file_versions` has an `inventory_scanned_at` timestamp that is NULL
+until the archive has been scanned. Since the inventory is keyed on
+`archive_sha256` (not `mod_file_version_id`), scanning one version updates
+all versions that reference the same blob.
+
+### Scanning
+
+Scanning uses `bsdtar -tvvf <archive>` via a subprocess. libarchive
+normalises the listing format across zip, rar, 7z, tar.gz and other archive
+types so the parser is format-agnostic. The parser faithfully records all
+entries including dangerous paths (traversal, absolute paths, symlinks) -
+rejection of unsafe entries is deferred to the planner.
+
+The `archivescanner` package provides two functions:
+- `ScanOne` - scans a single archive by sha256; no-op if already scanned.
+  Used by `mods import` to scan the just-imported archive only, avoiding
+  the surprising behavior of scanning unrelated archives as a side effect.
+- `ScanAll` - scans all unscanned archives by iterating `ScanOne`; used
+  by `mods scan-inventory`. Each archive is committed in its own
+  transaction so progress is saved as we go.
+
+### Import behavior
+
+`mods import` scans the imported archive by default immediately after the
+import transaction commits, before the `--rm` cleanup step. The `--skip-inventory`
+flag opts out for users importing many archives in bulk. Archives imported
+with `--skip-inventory` can be backfilled with `mods scan-inventory`.
+
+### bsdtar output format
+
+`bsdtar -tvvf` produces one line per entry in `ls -l` style:
+
+    <perms> <links> <uid> <gid> <size> <month> <day> <time|year> <path>
+
+Field notes:
+- uid/gid may be numeric or named depending on archive type and platform
+- A summary trailer is always printed as the final line:
+  `Archive Format: <format>,  Compression: <compression>`
+  This line is skipped by the parser and does not produce an entry.
+- Verified against: tar.gz, zip, 7z, RAR
+
+## 5. Extraction model
 
 ### v1 extraction: external `bsdtar`
 
@@ -203,7 +307,7 @@ Possible future backends:
 
 To keep this option open, extraction is an interface with multiple backends.
 
-## 5. Safety model
+## 6. Safety model
 
 ### Staging + safe move
 
@@ -235,7 +339,7 @@ Never blindly delete:
   `--force`).
 - If changed externally, mark "drifted" and require explicit action.
 
-## 6. Conflict and priority rules
+## 7. Conflict and priority rules
 
 ### Winner selection
 
@@ -282,7 +386,11 @@ engine but requires care during reorder operations:
   sequence.
 - The `profiles order` command must account for this.
 
-## 7. Remap rules
+## 8. Remap rules
+
+Remap configs are attached to `profile_items`, meaning remaps are
+profile-scoped by default. There is currently no mechanism for version-level
+remaps that apply across profiles; this is a future extension point.
 
 v1 remap capabilities (stored as structured data):
 - strip-components (remove N leading path segments)
@@ -293,7 +401,7 @@ v1 remap capabilities (stored as structured data):
 Remap rules are per profile + mod version (or mayber per mod version with
 profile overrides later).
 
-## 8. User overrides / editable files
+## 9. User overrides / editable files
 
 ### Goal
 
@@ -354,7 +462,51 @@ When a file has an active override, drift detection distinguishes:
 - Base file differs from expected mod content (mod was changed externally)
 - Override result differs from expected hash (override was changed externally)
 
-## 9. Backups strategy
+## 10. Mod Incompatibilities
+
+### Purpose
+
+Users can flag pairs of mod pages as incompatible with each other. The
+reason is freeform - it might be known crashes, conflicting game mechanics,
+or anything else. Incompatibilities are surfaced as warnings in
+`profiles status` but never block apply.
+
+### Scope
+
+Incompatibilities are at the **mod page** level, not the version or profile
+level. "Mod A and Mod B don't work together" is a property of the mods
+themselves independent of which version or profile is in use.
+
+### Storage
+
+`mod_incompatibilities` stores pairs with canonical ordering enforced by
+`CHECK (mod_page_id_a < mod_page_id_b)` plus a unique index, preventing
+both `(A,B)` and `(B,A)` from being recorded. The `MIN`/`MAX` trick in
+the insert and delete queries means argument order doesn't matter at the
+call site.
+
+A `source` column (`'user'` only in v1) is a forward-looking hook for
+future Nexus-sourced or community-sourced incompatibility data.
+
+Cross-game incompatibilities are prevented by a trigger
+(`trg_mod_incompatibilities_same_game_ins/upd`) that verifies both mod
+pages share the same `game_install_id`. This is enforced at the DB layer
+for consistency with other cross-referential triggers in the schema, even
+though the application layer also checks before inserting.
+
+### Commands
+
+`mods incompatible add <mod-page-id-a> <mod-page-id-b> [--reason "..."]`
+`mods incompatible remove <mod-page-id-a> <mod-page-id-b>`
+`mods incompatible list`
+
+Mod pages are identified by numeric ID for now; fuzzy name matching is a
+planned future improvement. For `add` and `remove` the game install is
+implicit since mod page IDs are globally unique and carry their own
+`game_install_id`. For `list` the current game install context is used to
+scope results.
+
+## 10. Backups strategy
 
 ### When to back up
 
@@ -374,7 +526,7 @@ On unapply/rollback:
 - if user changed file since backup, require explicit choice (or use hash
   checks)
 
-## 10. Multi-store support
+## 11. Multi-store support
 
 ### Store integration responsibilities
 
@@ -398,7 +550,7 @@ Requirements
 - map appid → name + install dir
 - Store games in DB and allow refresh.
 
-## 11. Extensibility for game-specific integrations
+## 12. Extensibility for game-specific integrations
 
 ### Integration type
 
@@ -420,15 +572,18 @@ Game-specific integrations add/override:
 
 This preserves a clean v1 while allowing richer v2.
 
-## 12. Commands
+## 13. Commands
 
 - `doctor` (environment checks, bsdtar presence, store health)
 - `stores list` (supported integrations)
 - `games list|refresh|info`
 - `mods import|list|info|remove`
+- `mods scan-inventory`
+- `mods incompatible add|remove|list`
 - `nexus link` (attach mod_id/file_id metadata)
 - `profiles
-  create|list|delete|set-active|apply|diff|add|remove|enable|disable|order`
+  create|list|delete|set-active|apply|diff|add|remove|enable|disable|order|status`
+- `profiles order compact|move|set|swap`
 - `overrides set|unset|list` (v2 behavior; schema ready in v1)
 - `policy set` (future: merge/manual policy)
 - `status` (conflicts, drift, missing)
@@ -441,7 +596,7 @@ Key behavior:
 - apply performs reconciliation
 - always support --dry-run where destructive
 
-## 13. Testing strategy
+## 14. Testing strategy
 
 ### Unit tests
 
@@ -472,9 +627,101 @@ Include in `testdata/`:
 - override application on top of base deployment
 - (future) merge-text tests with simple line-based merge or structured merge
 
-## 14. Operational considerations
+### Testing conventions
+
+- Use `github.com/stretchr/testify` throughout: `assert` for non-fatal
+  checks, `require` for checks where failure makes subsequent assertions
+  meaningless (wrong slice length, unexpected error, etc.)
+- One top-level `TestFunctionName` per function under test, with all cases
+  nested via `t.Run()`
+- Use table-driven subtests where cases share the same assertion shape;
+  use separate named subtests where they don't
+- Call `t.Parallel()` at every level — top-level test, subtest group, and
+  individual table case
+- Capture loop variables with `tc := tc` before spawning parallel subtests
+- Adversarial test inputs (path traversal, absolute paths, symlinks, duplicate
+  entries, malformed lines) should be tested at the unit level and included
+  in `testdata/` fixture archives for integration tests
+
+## 15. Operational considerations
 
 - lock per game during apply to avoid concurrent changes
 - refuse to operate if game is running (optional v1, but helpful)
 - friendly errors if `bsdtar` missing or unsupported format
 - logging with operation IDs for debugging
+
+## 16. Nexus Mods integration
+
+### Overview
+
+The Nexus integration is intentionally limited in v1: there is no download
+manager or `nxm://` handler. The user downloads files manually and the tool
+handles identification, linking, and update checking.
+
+### Rate limiting
+
+Nexus enforces per-user rate limits (2,500 requests/24h, 100 requests/hour
+once the daily limit is exceeded). Rate limit state is persisted to
+`$XDG_STATE_HOME/modctl/nexus_rate_limits.json` and updated after every API
+call from response headers. Batch operations perform a pre-flight check and
+warn the user if quota may be insufficient, with `--force` to proceed anyway.
+The client also enforces a local 30 req/sec limit via a token bucket rate
+limiter to avoid nginx-level 429s.
+
+### Caching
+
+API responses are cached in a separate SQLite database at
+`$XDG_CACHE_HOME/modctl/nexus_cache.db`. The cache stores:
+- `nexus_mod_info`: mod page metadata (name, author, summary). TTL: 7 days.
+- `nexus_file_info`: per-file metadata (version, size, filename, category).
+  TTL: 24 hours.
+- `nexus_file_updates`: the file update chain (old_file_id -> new_file_id).
+  TTL: same as file info (fetched together in one API call).
+
+`profiles status` and `mods info` are read-only and always read from cache.
+`mods nexus check-updates` fetches fresh data (respecting TTL unless
+`--ignore-ttl` is passed) and updates the cache.
+
+### File identification
+
+When importing a mod archive, the tool attempts to identify the corresponding
+Nexus `file_id` using the following strategy in priority order:
+
+1. Exact filename match against `ModFileInfo.FileName` (certain)
+2. `--label` pre-filter applied to candidate pool (case-insensitive)
+3. `--file-version` pre-filter applied to candidate pool (case-insensitive)
+4. Timestamp parsed from filename matched against `uploaded_timestamp` (confident)
+5. Size + timestamp match (confident)
+6. Label/version filter + single candidate + size match (confident)
+7. Size only, single unambiguous match (not confident — skipped with warning)
+8. Ambiguous or no match — skipped with warning, user directed to
+   `mods nexus link`
+
+Once identified, `nexus_file_id` is stored on `mod_file_versions`. The
+`mods nexus link` command can be used to identify or correct links after
+import.
+
+### Update detection
+
+Update availability is determined by walking the Nexus `file_updates` chain
+forward from the installed `nexus_file_id`. If the chain leads to a different
+(newer) `file_id` the mod is considered to have an update available. Version
+string comparison is not used as mod authors do not consistently follow any
+versioning scheme.
+
+For display purposes, only the "head" version (one not appearing as an
+`old_file_id` in the update chain) is checked for updates. Older retained
+versions are shown as "old version" without an update indicator.
+
+### Client architecture
+
+The `internal/nexusclient` package provides:
+- `Client`: full client with API key, HTTP client, rate limiter, and cache DB.
+  Used for commands that make API calls.
+- `CacheReader`: lightweight read-only cache accessor. Used by `profiles
+  status` and `mods info` which need cached data but should not make API calls.
+  `Client` embeds `CacheReader`.
+
+The API key is read from config (`nexus.apikey`). If not configured, Nexus
+linking is silently skipped at import time; commands that require it error
+with a helpful message.
