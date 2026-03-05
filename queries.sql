@@ -461,7 +461,12 @@ SELECT
     mfv.nexus_file_id,
     mfv.archive_sha256,
     mfv.inventory_scanned_at,
-    b.size_bytes
+    b.size_bytes,
+    CAST(COALESCE((
+        SELECT COUNT(*)
+        FROM remap_rules rr
+        WHERE rr.remap_config_id = pi.remap_config_id
+    ), 0) AS INTEGER)           AS remap_rule_count
 FROM profile_items pi
 JOIN mod_file_versions mfv ON mfv.id = pi.mod_file_version_id
 JOIN mod_files mf           ON mf.id = mfv.mod_file_id

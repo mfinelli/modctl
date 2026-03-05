@@ -288,6 +288,12 @@ func renderProfileStatus(
 				writeKVIndented16(&b, "notes:", item.ItemNotes.String)
 			}
 
+			if item.RemapRuleCount > 0 {
+				writeKVIndented16(&b, "remap rules:",
+					subtleStyle.Render(fmt.Sprintf("%d active (run 'profiles remap list %d' to view)",
+						item.RemapRuleCount, item.ModFileVersionID)))
+			}
+
 			b.WriteString("\n")
 		}
 	}
