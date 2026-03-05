@@ -636,3 +636,49 @@ JOIN mod_files mf ON mf.id = mfv.mod_file_id
 JOIN mod_pages mp ON mp.id = mf.mod_page_id
 WHERE mf.mod_page_id = ?
 AND mfv.nexus_file_id IS NOT NULL;
+
+-- name: GetModPageByID :one
+SELECT
+    mp.id,
+    mp.name,
+    mp.source_kind,
+    mp.source_url,
+    mp.source_ref,
+    mp.nexus_game_domain,
+    mp.nexus_mod_id,
+    mp.notes,
+    mp.created_at,
+    mp.updated_at
+FROM mod_pages mp
+WHERE mp.id = ?
+AND mp.game_install_id = ?;
+
+-- name: GetModFilesWithVersions :many
+SELECT
+    mf.id                   AS mod_file_id,
+    mf.label                AS file_label,
+    mf.is_primary,
+    mfv.id                  AS mod_file_version_id,
+    mfv.version_string,
+    mfv.archive_sha256,
+    mfv.nexus_file_id,
+    mfv.inventory_scanned_at,
+    mfv.original_name,
+    b.size_bytes
+FROM mod_files mf
+JOIN mod_file_versions mfv ON mfv.mod_file_id = mf.id
+JOIN blobs b ON b.sha256 = mfv.archive_sha256
+WHERE mf.mod_page_id = ?
+ORDER BY mf.id ASC, mfv.id ASC;
+
+-- name: GetModFileVersionProfiles :many
+SELECT
+    p.id        AS profile_id,
+    p.name      AS profile_name,
+    pi.enabled,
+    pi.priority
+FROM profile_items pi
+JOIN profiles p ON p.id = pi.profile_id
+WHERE pi.mod_file_version_id = ?
+AND p.game_install_id = ?
+ORDER BY p.name ASC;

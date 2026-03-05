@@ -71,3 +71,15 @@ func (r *CacheReader) GetNexusFileUpdateChain(gameDomain string, modID int64) ([
 		NexusModID:      modID,
 	})
 }
+
+func (r *CacheReader) GetNexusModInfo(gameDomain string, modID int64) (*dbc.NexusModInfo, error) {
+	q := dbc.New(r.db)
+	row, err := q.GetNexusModInfo(r.ctx, dbc.GetNexusModInfoParams{
+		NexusGameDomain: gameDomain,
+		NexusModID:      modID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
