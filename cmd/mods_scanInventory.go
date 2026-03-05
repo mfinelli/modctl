@@ -21,7 +21,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/signal"
 
@@ -88,7 +87,7 @@ previous scan was interrupted.`,
 			q,
 			bs,
 			scanner,
-			slog.Default(),
+			logger,
 		)
 		if err != nil {
 			return fmt.Errorf("scan-inventory: %w", err)
