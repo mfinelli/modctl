@@ -137,7 +137,7 @@ known crashes, conflicting game mechanics, or anything else.`,
 						pageA.Name, pageA.ID, pageB.Name, pageB.ID)
 				}
 				if se.Code == sqlite3.ErrConstraint && se.ExtendedCode == sqlite3.ErrConstraintTrigger {
-					// Fired by trg_mod_incompatibilities_same_game_ins — shouldn't be
+					// Fired by trg_mod_incompatibilities_same_game_ins - shouldn't be
 					// reachable in normal use since we verify game_install_id above,
 					// but handle it gracefully in case of a race or direct DB access.
 					return fmt.Errorf("mod pages %d and %d do not belong to the same game install",
