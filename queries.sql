@@ -720,3 +720,127 @@ JOIN mod_pages mpa ON mpa.id = mi.mod_page_id_a
 JOIN mod_pages mpb ON mpb.id = mi.mod_page_id_b
 WHERE mpa.game_install_id = ?
 ORDER BY mi.created_at DESC;
+
+-- name: GetProfileItemForPlanning :many
+SELECT
+    pi.id                       AS item_id,
+    pi.priority,
+    pi.enabled,
+    pi.remap_config_id,
+    mfv.id                      AS mod_file_version_id,
+    mfv.archive_sha256,
+    mfv.inventory_scanned_at
+FROM profile_items pi
+JOIN mod_file_versions mfv ON mfv.id = pi.mod_file_version_id
+WHERE pi.profile_id = ?
+  AND pi.enabled = TRUE
+ORDER BY pi.priority DESC;
+
+-- name: GetInventoryEntriesForArchive :many
+SELECT
+    id,
+    archive_sha256,
+    raw_path,
+    entry_type,
+    size_bytes,
+    position
+FROM archive_inventory_entries
+WHERE archive_sha256 = ?
+  AND entry_type = 'file'
+  AND parse_error IS NULL
+ORDER BY position ASC;
+
+-- name: GetRemapRulesForConfig :many
+SELECT
+    id,
+    remap_config_id,
+    position,
+    rule_type,
+    int_value,
+    text_value
+FROM remap_rules
+WHERE remap_config_id = ?
+ORDER BY position ASC;
+
+-- name: GetInstalledFilesForTarget :many
+SELECT
+    id,
+    game_install_id,
+    target_id,
+    relpath,
+    content_sha256,
+    size_bytes,
+    owner_mod_file_version_id,
+    owner_override_id,
+    owner_profile_id,
+    last_operation_id
+FROM installed_files
+WHERE game_install_id = ?
+  AND target_id = ?;
+
+-- name: GetBackupForPath :one
+SELECT
+    id,
+    backup_blob_sha256,
+    original_content_sha256,
+    size_bytes
+FROM backups
+WHERE game_install_id = ?
+  AND target_id = ?
+  AND relpath = ?;
+
+-- name: GetMaxRemapRulePosition :one
+SELECT CAST(COALESCE(MAX(position), -1) AS INTEGER) AS max_position
+FROM remap_rules
+WHERE remap_config_id = ?;
+
+-- name: CreateRemapConfig :one
+INSERT INTO remap_configs (created_at, updated_at)
+VALUES (
+    strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+    strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+)
+RETURNING id;
+
+-- name: CreateRemapRule :one
+INSERT INTO remap_rules (
+    remap_config_id,
+    position,
+    rule_type,
+    int_value,
+    text_value,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+RETURNING id, position;
+
+-- name: SetProfileItemRemapConfig :exec
+UPDATE profile_items
+SET remap_config_id = ?,
+    updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+WHERE id = ?;
+
+-- name: DeleteRemapRule :exec
+DELETE FROM remap_rules
+WHERE remap_config_id = ? AND position = ?;
+
+-- name: DeleteRemapConfig :exec
+DELETE FROM remap_configs
+WHERE id = ?;
+
+-- name: ListRemapRulesForProfileItem :many
+SELECT
+    rr.id,
+    rr.position,
+    rr.rule_type,
+    rr.int_value,
+    rr.text_value
+FROM remap_rules rr
+JOIN profile_items pi ON pi.remap_config_id = rr.remap_config_id
+WHERE pi.id = ?
+ORDER BY rr.position ASC;
+
+-- name: GetProfileItemRemapConfigID :one
+SELECT remap_config_id
+FROM profile_items
+WHERE id = ?;
