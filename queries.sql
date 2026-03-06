@@ -846,3 +846,123 @@ WHERE mfv.id = ?;
 UPDATE archive_inventory_entries
 SET content_sha256 = ?
 WHERE archive_sha256 = ? AND position = ?;
+
+-- name: UpsertBackup :exec
+INSERT OR REPLACE INTO backups (
+    game_install_id,
+    target_id,
+    relpath,
+    backup_blob_sha256,
+    original_content_sha256,
+    size_bytes,
+    created_by_operation_id,
+    created_at
+) VALUES (
+    ?, ?, ?, ?, ?, ?,
+    ?,
+    strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+);
+
+-- name: CreateOperation :one
+INSERT INTO operations (
+    game_install_id,
+    profile_id,
+    op_type,
+    status,
+    started_at
+) VALUES (
+    ?,
+    ?,
+    ?,
+    'running',
+    strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+)
+RETURNING id, started_at;
+
+-- name: FinishOperation :exec
+UPDATE operations
+SET status = ?,
+    finished_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+    message = ?
+WHERE id = ?;
+
+-- name: InsertOperationChange :exec
+INSERT INTO operation_changes (
+    operation_id,
+    game_install_id,
+    target_id,
+    relpath,
+    action,
+    old_content_sha256,
+    new_content_sha256,
+    old_size_bytes,
+    new_size_bytes,
+    mod_file_version_id,
+    backup_blob_sha256,
+    notes
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: UpsertInstalledFile :exec
+INSERT INTO installed_files (
+    game_install_id,
+    target_id,
+    relpath,
+    content_sha256,
+    size_bytes,
+    owner_mod_file_version_id,
+    owner_override_id,
+    owner_profile_id,
+    last_operation_id,
+    installed_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+ON CONFLICT(game_install_id, target_id, relpath) DO UPDATE SET
+    content_sha256 = excluded.content_sha256,
+    size_bytes = excluded.size_bytes,
+    owner_mod_file_version_id = excluded.owner_mod_file_version_id,
+    owner_override_id = excluded.owner_override_id,
+    owner_profile_id = excluded.owner_profile_id,
+    last_operation_id = excluded.last_operation_id,
+    installed_at = excluded.installed_at;
+
+-- name: DeleteInstalledFile :exec
+DELETE FROM installed_files
+WHERE game_install_id = ? AND target_id = ? AND relpath = ?;
+
+-- name: UpdateGameInstallAppliedState :exec
+UPDATE game_installs
+SET applied_profile_id = ?,
+    applied_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+    applied_operation_id = ?,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE id = ?;
+
+-- name: ClearGameInstallAppliedState :exec
+UPDATE game_installs
+SET applied_profile_id = NULL,
+    applied_at = NULL,
+    applied_operation_id = NULL,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE id = ?;
+
+-- name: UpdateInventoryEntryContentSha256 :exec
+UPDATE archive_inventory_entries
+SET content_sha256 = ?
+WHERE archive_sha256 = ? AND position = ?
+  AND content_sha256 IS NULL;
+
+-- name: GetLastOperationForGameInstall :one
+SELECT id, op_type, status, started_at, finished_at, message
+FROM operations
+WHERE game_install_id = ?
+ORDER BY started_at DESC
+LIMIT 1;
+
+-- name: GetCompletedPathsForOperation :many
+SELECT relpath
+FROM operation_changes
+WHERE operation_id = ?
+  AND action != 'noop';
+
+-- name: DeleteBackup :exec
+DELETE FROM backups
+WHERE game_install_id = ? AND target_id = ? AND relpath = ?;
