@@ -971,3 +971,8 @@ WHERE operation_id = ?
 -- name: DeleteBackup :exec
 DELETE FROM backups
 WHERE game_install_id = ? AND target_id = ? AND relpath = ?;
+
+-- name: GetProfileByID :one
+SELECT *
+FROM profiles
+WHERE id = ?;
