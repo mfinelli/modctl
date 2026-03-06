@@ -268,8 +268,10 @@ before any remap rules are applied.
   is a faithful mirror of the archive
 - `raw_path` is nullable only when `parse_error` is non-null (enforced by
   CHECK constraint); a fully parsed entry always has a non-empty path
-- `content_sha256` is reserved for future per-entry hashing; currently
-  always NULL
+- `content_sha256` stores the sha256 of the entry's extracted content. It is
+  NULL until the file is first deployed by apply, at which point it is
+  populated from the hash computed during staging. It is never overwritten
+  once set.
 
 `mod_file_versions` has an `inventory_scanned_at` timestamp that is NULL
 until the archive has been scanned. Since the inventory is keyed on
@@ -334,6 +336,23 @@ Possible future backends:
 
 To keep this option open, extraction is an interface with multiple backends.
 
+### Staging directory
+
+All extraction uses a per-archive subdirectory under the configured `tmp_dir`:
+```
+<tmp_dir>/staging/<archive_sha256>/
+```
+
+The entire archive is extracted in a single `bsdtar -x` pass. Only winning
+files are moved into the target directory; losers are discarded when staging
+is cleaned up. Staging is cleared at the start of each apply run and removed
+on success unless `--keep-staging` is set.
+
+The default `tmp_dir` is under `$XDG_RUNTIME_DIR`. This is intentional since
+`$XDG_RUNTIME_DIR` is typically on tmpfs (fast, no persistent writes) and is
+cleaned up on logout. Users with large mod archives or small tmpfs allocations
+can override `tmp_dir` in config to point elsewhere.
+
 ## 6. Safety model
 
 Only entries with `entry_type = 'file'` are considered during planning.
@@ -366,6 +385,12 @@ Configurable safety limits:
 
 ### Uninstall safety
 
+During remove ops, the file is deleted from disk and its `installed_files`
+row is removed. The on-disk hash is computed before deletion and recorded
+in `operation_changes.old_content_sha256` for auditing. Hash verification
+before deletion (to detect external modifications) is not performed by
+default — use `apply --recheck` to detect drift before applying.
+
 Never blindly delete:
 - Only delete a file if its hash matches what the tool installed (unless
   `--force`).
@@ -381,12 +406,22 @@ For each destination path:
 ### Apply semantics
 
 Apply reconciles filesystem to profile state:
-- write/overwrite winners
-- remove files that are no longer winners and are tool-owned (hash match)
-- restore backups when "rolling back to tool vanilla" where applicable
+- write/overwrite winners (extracting from staging)
+- remove files that are no longer winners and are tool-owned
+- restore backups when a previously overwritten non-tool-owned file has no
+  new winner
+- promote the highest-priority loser when the current winner is removed from
+  the profile but other mods still provide the same path
 
-Reordering priorities is supported by recalculating winners and applying plan;
-implementation may be "unapply + apply" in v1.
+When a pre-existing non-tool-owned file would be overwritten, it is backed
+up to the backup blob store before being replaced. Backups are restored
+automatically during unapply or when no mod claims the path.
+
+Apply detects four filesystem states for each planned path:
+1. Tool-owned and present on disk -> overwrite, no backup needed
+2. Tool-owned but missing from disk -> drift warning, treat as fresh write
+3. Not tool-owned but present on disk -> back up then write
+4. Not tool-owned and not present on disk -> clean write
 
 ### Future conflict resolution types
 
@@ -631,10 +666,21 @@ This preserves a clean v1 while allowing richer v2.
     but the CLI overrides this at insert time. Use `--disabled` to explicitly add
     an item without enabling it.
 - `profiles order compact|move|set|swap`
+- `profiles remap add|remove|list|clear|copy` - manage remap rules for a
+  mod version within a profile. Rules are appended by default; use
+  `--position` on `add` to insert at a specific position. Use `copy` to
+  transfer remap rules from one mod version to another (e.g. when upgrading
+  a mod).
 - `overrides set|unset|list` (v2 behavior; schema ready in v1)
 - `policy set` (future: merge/manual policy)
 - `status` (conflicts, drift, missing)
-- `unapply` (remove tool-installed, restore backups)
+- `apply` (top-level) - apply the active profile to the game directory.
+  Supports `--dry-run`, `--recheck`, `--keep-staging`, `--print-ops`,
+  `--force`, `--abort`. `--recheck` computes on-disk hashes to detect
+  external modifications before applying. `--dry-run` shows the full plan
+  including conflict winners without making any changes.
+- `unapply` (top-level) - remove all tool-managed files and restore backups.
+  Supports `--dry-run`, `--print-ops`, `--force`, `--abort`.
 - `export|import`
 - `gc archives|gc backups`
 
@@ -661,6 +707,31 @@ Key behavior:
 The active profile is never automatically switched to default on deletion.
 When the applied profile is deleted, `applied_profile_id` is set to NULL
 automatically via the FK `ON DELETE SET NULL` behavior.
+
+### Incomplete operations
+
+If a previous `apply` or `unapply` did not complete (e.g. due to a crash or
+cancellation), the next run will detect `operations.status = 'running'` and
+refuse to proceed. Two flags are available:
+
+- `--abort`: marks the incomplete operation as failed and exits. The disk
+  state is left as-is. The user can then run `apply` or `unapply` to
+  reconcile.
+- `--force`: marks the incomplete operation as failed and starts a fresh
+  run from scratch.
+
+Resume of a partial operation is not supported in v1 because the plan is
+not persisted. This may be added in v2 by storing the serialized plan in
+`operations.metadata`.
+
+### Pending changes detection in `profiles status`
+
+When a profile is currently applied, `profiles status` shows whether pending
+changes exist by comparing the set of enabled mod file versions in the profile
+against the set of `owner_mod_file_version_id` values in `installed_files`.
+This check detects added, removed, or swapped mod versions but does not
+detect priority reordering between mods that conflict on the same path. Run
+`apply --dry-run` for a precise diff.
 
 ## 15. Testing strategy
 
@@ -715,6 +786,9 @@ Include in `testdata/`:
 - refuse to operate if game is running (optional v1, but helpful)
 - friendly errors if `bsdtar` missing or unsupported format
 - logging with operation IDs for debugging
+- detect and surface incomplete operations (`status = 'running'`) on startup
+  of any apply/unapply command, refusing to proceed without `--force` or
+  `--abort`
 
 ## 17. Nexus Mods integration
 

@@ -112,7 +112,7 @@ func initConfig() {
 	viper.SetDefault("overrides_dir",
 		filepath.Join(xdg.DataHome, "modctl", "overrides"))
 	viper.SetDefault("tmp_dir",
-		filepath.Join(xdg.DataHome, "modctl", "tmp"))
+		filepath.Join(xdg.RuntimeDir, "modctl"))
 
 	if cfgFile != "" {
 		// User explicitly provided a config file: it must work.
