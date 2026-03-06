@@ -100,9 +100,5 @@ func IngestBackup(
 		return BackupResult{}, fmt.Errorf("commit: %w", err)
 	}
 
-	return BackupResult{
-		SHA256Hex: ingestResult.SHA256Hex,
-		SizeBytes: ingestResult.SizeBytes,
-		Existed:   ingestResult.Existed,
-	}, nil
+	return BackupResult(ingestResult), nil
 }
