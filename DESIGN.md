@@ -369,6 +369,23 @@ All extraction goes to staging, then the tool:
 - applies remap rules deterministically
 - moves files into place
 
+### Drift detection on overwrite
+
+During apply, before overwriting any tool-owned file the planner hashes the
+on-disk content and compares it against `installed_files.content_sha256`. This
+detects external modifications (e.g. a game update overwriting a modded file)
+and handles them as follows:
+
+- Same owner, content drifted -> back up current on-disk content before
+  overwriting, preserving the updated game file in the backup store
+- Different owner, any content -> plain overwrite (tool owns the file, no
+  backup needed)
+- Same owner, content matches -> noop, file is already correct, skip entirely
+
+Noop ops are never shown to the user but are logged at debug level.
+Use `--no-recheck` to skip hash checks for faster applies at the cost of
+not detecting external modifications.
+
 ### Symlinks and special files
 
 Default v1 policy:
@@ -675,10 +692,11 @@ This preserves a clean v1 while allowing richer v2.
 - `policy set` (future: merge/manual policy)
 - `status` (conflicts, drift, missing)
 - `apply` (top-level) - apply the active profile to the game directory.
-  Supports `--dry-run`, `--recheck`, `--keep-staging`, `--print-ops`,
-  `--force`, `--abort`. `--recheck` computes on-disk hashes to detect
-  external modifications before applying. `--dry-run` shows the full plan
-  including conflict winners without making any changes.
+  Supports `--dry-run`, `--no-recheck`, `--keep-staging`, `--print-ops`,
+  `--force`, `--abort`. By default, files already correctly deployed are
+  skipped (noop) and externally modified files are detected and backed up
+  before overwriting. `--no-recheck` skips on-disk hash checks for faster
+  applies.
 - `unapply` (top-level) - remove all tool-managed files and restore backups.
   Supports `--dry-run`, `--print-ops`, `--force`, `--abort`.
 - `export|import`
