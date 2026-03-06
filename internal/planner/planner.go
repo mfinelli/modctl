@@ -40,6 +40,7 @@ const (
 	PlanOpOverwrite     PlanOpKind = "overwrite"
 	PlanOpRemove        PlanOpKind = "remove"
 	PlanOpRestoreBackup PlanOpKind = "restore_backup"
+	PlanOpNoop          PlanOpKind = "noop"
 )
 
 // RemappedEntry is a single archive entry after remap rules have been applied.
@@ -126,7 +127,7 @@ func (e *UninventoriedArchiveError) Error() string {
 // BuildApplyPlan computes the desired file state for applying profileID to
 // gameInstallID. It reads the filesystem to check file existence and
 // ownership but does not modify anything.
-func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileID int64, recheck bool) (Plan, error) {
+func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileID int64, skipRecheck bool) (Plan, error) {
 	target, err := q.GetTargetByName(ctx, dbq.GetTargetByNameParams{
 		GameInstallID: gameInstallID,
 		Name:          "game_dir",
@@ -264,6 +265,7 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 	// For each winner, determine op kind and whether a backup is needed.
 	for i := range plan.Files {
 		pf := &plan.Files[i]
+		winner := pf.Winner()
 		absPath := filepath.Join(target.RootPath, pf.DestPath)
 
 		op := PlanOp{
@@ -276,19 +278,33 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 
 		switch {
 		case isInstalled && existsOnDisk:
-			// Tool owns it and it's on disk - normal overwrite, no backup.
-			op.Kind = PlanOpOverwrite
-
-			if recheck && existingInstall.ContentSha256 != "" {
+			if !skipRecheck {
 				onDiskHash, err := hashFile(absPath)
 				if err != nil {
 					plan.Warnings = append(plan.Warnings,
 						fmt.Sprintf("recheck: could not hash %q: %v", pf.DestPath, err))
-				} else if onDiskHash != existingInstall.ContentSha256 {
+					// Fall through to plain overwrite if we can't hash
+					op.Kind = PlanOpOverwrite
+				} else if onDiskHash == existingInstall.ContentSha256 &&
+					existingInstall.OwnerModFileVersionID.Int64 == winner.ModFileVersionID {
+					// File is already correct - noop.
+					op.Kind = PlanOpNoop
+				} else if onDiskHash != existingInstall.ContentSha256 &&
+					existingInstall.OwnerModFileVersionID.Int64 == winner.ModFileVersionID {
+					// Same owner but content drifted externally - back up new content
+					op.Kind = PlanOpOverwrite
+					op.NeedsBackup = true
 					plan.Warnings = append(plan.Warnings,
-						fmt.Sprintf("drift: %q has been modified externally (expected %s, got %s)",
-							pf.DestPath, existingInstall.ContentSha256[:16], onDiskHash[:16]))
+						fmt.Sprintf("drift: %q was modified externally (game update?), will back up current content before overwriting",
+							pf.DestPath))
+				} else {
+					// Different winner - plain overwrite, no backup needed since
+					// tool owns the file
+					op.Kind = PlanOpOverwrite
 				}
+			} else {
+				// Tool owns it and it's on disk - normal overwrite, no backup
+				op.Kind = PlanOpOverwrite
 			}
 
 		case isInstalled && !existsOnDisk:

@@ -46,7 +46,7 @@ var (
 	applyGame        string
 	applyProfile     string
 	applyDryRun      bool
-	applyRecheck     bool
+	applySkipRecheck bool
 	applyKeepStaging bool
 	applyVerbose     bool
 	applyForce       bool
@@ -64,6 +64,10 @@ archives to a staging directory and then moved into the game directory.
 
 Pre-existing files that would be overwritten are backed up automatically
 and can be restored with 'modctl unapply'.
+
+By default, files that are already correctly deployed are skipped (noop)
+and externally modified files are detected and backed up before being
+overwritten. Use --no-recheck to skip hash checks for faster applies.
 
 Use --dry-run to preview the plan without making any changes.`,
 	Args:         cobra.ExactArgs(0),
@@ -144,7 +148,7 @@ Use --dry-run to preview the plan without making any changes.`,
 		}
 		defer unlock()
 
-		plan, err := planner.BuildApplyPlan(ctx, q, gi.ID, p.ID, applyRecheck)
+		plan, err := planner.BuildApplyPlan(ctx, q, gi.ID, p.ID, applySkipRecheck)
 		if err != nil {
 			var uninvErr *planner.UninventoriedArchiveError
 			if errors.As(err, &uninvErr) {
@@ -222,6 +226,8 @@ Use --dry-run to preview the plan without making any changes.`,
 				removeOps = append(removeOps, planOp)
 			case planner.PlanOpRestoreBackup:
 				restoreOps = append(restoreOps, planOp)
+			case planner.PlanOpNoop:
+				logger.Debug("skipping noop op", "path", planOp.DestPath)
 			}
 		}
 
@@ -423,8 +429,8 @@ func init() {
 
 	applyCmd.Flags().BoolVar(&applyDryRun, "dry-run", false,
 		"Preview the plan without making any changes")
-	applyCmd.Flags().BoolVar(&applyRecheck, "recheck", false,
-		"Recompute on-disk hashes to detect external modifications")
+	applyCmd.Flags().BoolVar(&applySkipRecheck, "no-recheck", false,
+		"Skip on-disk hash checks during apply (faster but will not detect or back up externally modified files)")
 	applyCmd.Flags().BoolVar(&applyKeepStaging, "keep-staging", false,
 		"Keep staging directory after apply (useful for debugging)")
 	applyCmd.Flags().BoolVar(&applyVerbose, "print-ops", false,

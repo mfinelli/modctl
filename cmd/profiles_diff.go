@@ -177,7 +177,7 @@ func classifyDiffRow(row dbq.GetProfileDiffItemsRow) diffKind {
 	case !inA && inB:
 		return diffAdded
 	default:
-		// Both present — check if anything differs.
+		// Both present - check if anything differs.
 		if row.PriorityA != row.PriorityB ||
 			row.EnabledA != row.EnabledB ||
 			row.RemapConfigIDA.Valid != row.RemapConfigIDB.Valid {
