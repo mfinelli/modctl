@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-sqlite3"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
@@ -122,17 +123,6 @@ Use --dry-run to preview what would be removed without making any changes.`,
 				gcMinAge, minAge.String())))
 		}
 		fmt.Println()
-
-		type gcResult struct {
-			kind           blobstore.Kind
-			removed        int
-			removedBytes   int64
-			orphans        int
-			orphanBytes    int64
-			missing        int
-			missingCleaned int
-			warnings       []string
-		}
 
 		var kinds []blobstore.Kind
 		if !gcNoArchives {
@@ -316,6 +306,12 @@ func runGC(
 				if opts.cleanMissing {
 					if !opts.dryRun {
 						if err := q.DeleteBlob(ctx, b.Sha256); err != nil {
+							var se sqlite3.Error
+							if errors.As(err, &se) {
+								if se.Code == sqlite3.ErrConstraint && se.ExtendedCode == sqlite3.ErrConstraintForeignKey {
+									return res, fmt.Errorf("blob %s is still referenced by another row; skipping", b.Sha256)
+								}
+							}
 							return res, fmt.Errorf("delete missing blob row %s: %w", b.Sha256, err)
 						}
 					}
@@ -343,7 +339,15 @@ func runGC(
 			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 				return res, fmt.Errorf("remove blob file %s: %w", path, err)
 			}
+			// best-effort: remove fan-out dir if now empty; ignore error
+			_ = os.Remove(filepath.Dir(path))
 			if err := q.DeleteBlob(ctx, b.Sha256); err != nil {
+				var se sqlite3.Error
+				if errors.As(err, &se) {
+					if se.Code == sqlite3.ErrConstraint && se.ExtendedCode == sqlite3.ErrConstraintForeignKey {
+						return res, fmt.Errorf("blob %s is still referenced by another row; skipping", b.Sha256)
+					}
+				}
 				return res, fmt.Errorf("delete blob row %s: %w", b.Sha256, err)
 			}
 			fmt.Printf("  %s %s %s\n",
