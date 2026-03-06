@@ -6,6 +6,7 @@ require (
 	github.com/adrg/xdg v0.5.3
 	github.com/andygrunwald/vdf v1.1.0
 	github.com/charmbracelet/lipgloss v1.1.0
+	github.com/klauspost/compress v1.18.4
 	github.com/mattn/go-sqlite3 v1.14.34
 	github.com/pressly/goose/v3 v3.27.0
 	github.com/spf13/cobra v1.10.2

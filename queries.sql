@@ -1133,3 +1133,17 @@ LEFT JOIN mod_file_versions mfv ON mfv.archive_sha256 = b.sha256
 LEFT JOIN mod_files mf          ON mf.id = mfv.mod_file_id
 LEFT JOIN mod_pages mp          ON mp.id = mf.mod_page_id
 WHERE b.sha256 = sqlc.arg(sha256);
+
+-- name: ListArchiveBlobsForGameInstall :many
+SELECT DISTINCT b.sha256, b.kind, b.size_bytes, b.original_name, b.created_at
+FROM blobs b
+JOIN mod_file_versions mfv ON mfv.archive_sha256 = b.sha256
+JOIN mod_files mf ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp ON mp.id = mf.mod_page_id
+WHERE mp.game_install_id = sqlc.arg(game_install_id);
+
+-- name: ListBackupBlobsForGameInstall :many
+SELECT DISTINCT b.sha256, b.kind, b.size_bytes, b.original_name, b.created_at
+FROM blobs b
+JOIN backups bk ON bk.backup_blob_sha256 = b.sha256
+WHERE bk.game_install_id = sqlc.arg(game_install_id);
