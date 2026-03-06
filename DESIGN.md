@@ -389,7 +389,7 @@ During remove ops, the file is deleted from disk and its `installed_files`
 row is removed. The on-disk hash is computed before deletion and recorded
 in `operation_changes.old_content_sha256` for auditing. Hash verification
 before deletion (to detect external modifications) is not performed by
-default — use `apply --recheck` to detect drift before applying.
+default - use `apply --recheck` to detect drift before applying.
 
 Never blindly delete:
 - Only delete a file if its hash matches what the tool installed (unless

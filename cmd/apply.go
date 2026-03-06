@@ -365,7 +365,7 @@ Use --dry-run to preview the plan without making any changes.`,
 		// Cleanup staging unless --keep-staging
 		if !applyKeepStaging {
 			if err := ext.CleanupStaging(ctx); err != nil {
-				// Non-fatal — warn but don't fail the apply
+				// Non-fatal - warn but don't fail the apply
 				fmt.Println(warnStyle.Render(fmt.Sprintf("  warning: cleanup staging: %v", err)))
 			}
 		} else {

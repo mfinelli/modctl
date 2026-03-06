@@ -260,7 +260,7 @@ Use --dry-run to preview the plan without making any changes.`,
 
 			default:
 				plan.Warnings = append(plan.Warnings,
-					fmt.Sprintf("unexpected op kind %q for %q during unapply — skipped", planOp.Kind, planOp.DestPath))
+					fmt.Sprintf("unexpected op kind %q for %q during unapply - skipped", planOp.Kind, planOp.DestPath))
 			}
 		}
 
