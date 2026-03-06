@@ -134,6 +134,8 @@ func init() {
 		"Show operations across all game installs")
 	operationsListCmd.Flags().IntVar(&operationsListLimit, "limit", 20,
 		"Maximum number of operations to show")
+
+	operationsListCmd.MarkFlagsMutuallyExclusive("all", "game")
 }
 
 func renderAllOperations(ops []dbq.ListAllOperationsRow) string {
