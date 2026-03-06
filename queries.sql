@@ -756,30 +756,13 @@ WHERE archive_sha256 = ?
 ORDER BY position ASC;
 
 -- name: GetRemapRulesForConfig :many
-SELECT
-    id,
-    remap_config_id,
-    position,
-    rule_type,
-    int_value,
-    text_value
+SELECT *
 FROM remap_rules
 WHERE remap_config_id = ?
 ORDER BY position ASC;
 
 -- name: GetInstalledFilesForTarget :many
-SELECT
-    id,
-    game_install_id,
-    target_id,
-    relpath,
-    content_sha256,
-    size_bytes,
-    owner_mod_file_version_id,
-    owner_override_id,
-    owner_profile_id,
-    last_operation_id
-FROM installed_files
+SELECT * FROM installed_files
 WHERE game_install_id = ?
   AND target_id = ?;
 
@@ -849,3 +832,17 @@ ORDER BY rr.position ASC;
 SELECT remap_config_id
 FROM profile_items
 WHERE id = ?;
+
+-- name: GetModFileVersionLabel :one
+SELECT
+    mp.name  AS mod_page_name,
+    mf.label AS file_label
+FROM mod_file_versions mfv
+JOIN mod_files mf  ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp  ON mp.id = mf.mod_page_id
+WHERE mfv.id = ?;
+
+-- name: SetInventoryEntryContentSha256 :exec
+UPDATE archive_inventory_entries
+SET content_sha256 = ?
+WHERE archive_sha256 = ? AND position = ?;
