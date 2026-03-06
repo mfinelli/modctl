@@ -35,6 +35,7 @@ import (
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/extractor"
+	"github.com/mfinelli/modctl/internal/lock"
 	"github.com/mfinelli/modctl/internal/planner"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
@@ -135,6 +136,13 @@ Use --dry-run to preview the plan without making any changes.`,
 				return nil
 			}
 		}
+
+		// Acquire per-game lock to prevent concurrent apply/unapply
+		unlock, err := lock.GameInstall(viper.GetString("locks_dir"), gi.ID)
+		if err != nil {
+			return err
+		}
+		defer unlock()
 
 		plan, err := planner.BuildApplyPlan(ctx, q, gi.ID, p.ID, applyRecheck)
 		if err != nil {
