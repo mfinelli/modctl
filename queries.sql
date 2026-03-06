@@ -734,9 +734,14 @@ SELECT
     pi.remap_config_id,
     mfv.id                      AS mod_file_version_id,
     mfv.archive_sha256,
-    mfv.inventory_scanned_at
+    mfv.inventory_scanned_at,
+    mfv.version_string,
+    mf.label                    AS file_label,
+    mp.name                     AS mod_page_name
 FROM profile_items pi
 JOIN mod_file_versions mfv ON mfv.id = pi.mod_file_version_id
+JOIN mod_files mf           ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp            ON mp.id = mf.mod_page_id
 WHERE pi.profile_id = ?
   AND pi.enabled = TRUE
 ORDER BY pi.priority DESC;

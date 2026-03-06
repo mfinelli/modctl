@@ -445,6 +445,7 @@ func renderModInfo(
 	return strings.TrimRight(b.String(), "\n")
 }
 
+// mustParseTime parses a timestamp string from the DB
 func mustParseTime(s string) time.Time {
 	t, err := time.Parse(time.RFC3339, s)
 	if err != nil {

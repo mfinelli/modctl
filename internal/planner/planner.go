@@ -58,6 +58,10 @@ type Conflict struct {
 	Entry            RemappedEntry
 	Priority         int64
 	Won              bool
+	// Display fields for dry-run output and status reporting.
+	ModPageName   string
+	FileLabel     string
+	VersionString string // empty if not set
 }
 
 // PlanFile is the resolved state for a single destination path. The winner
@@ -217,6 +221,9 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 				ProfileItemID:    item.ItemID,
 				Entry:            re,
 				Priority:         item.Priority,
+				ModPageName:      item.ModPageName,
+				FileLabel:        item.FileLabel,
+				VersionString:    item.VersionString.String, // empty string if NULL
 			}
 
 			if idx, exists := winners[destPath]; exists {
