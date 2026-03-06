@@ -221,9 +221,16 @@ Two separate stores:
 No per-game partitioning; per-game accounting derived from references. Blobs
 are keyed by sha256 and immutable.
 
-Suggested layout with directory fanout:
-- `archives/sha256/ab/<fullhash>`
-- `backups/sha256/ab/<fullhash>`
+Layout with directory fanout:
+- `archives/<fan2>/<fullhash>`
+- `backups/<fan2>/<fullhash>`
+
+Where `<fan2>` is the first two characters of the sha256 hex digest
+(e.g. `archives/ab/abcdef1234...`). Note: there is no intermediate `sha256/`
+directory level.
+
+The blob store directories are purely blob content. Files placed there
+manually are unsupported and may be silently removed by `gc`.
 
 Rationale:
 - simplicity (one storage mode)
@@ -275,8 +282,9 @@ before any remap rules are applied.
 
 `mod_file_versions` has an `inventory_scanned_at` timestamp that is NULL
 until the archive has been scanned. Since the inventory is keyed on
-`archive_sha256` (not `mod_file_version_id`), scanning one version updates
-all versions that reference the same blob.
+`archive_sha256` (not `mod_file_version_id`), scanning updates all
+`mod_file_versions` rows that share the same `archive_sha256` in a single
+pass - not just the version that triggered the scan.
 
 ### Scanning
 
@@ -700,7 +708,7 @@ This preserves a clean v1 while allowing richer v2.
 - `unapply` (top-level) - remove all tool-managed files and restore backups.
   Supports `--dry-run`, `--print-ops`, `--force`, `--abort`.
 - `export|import`
-- `gc archives|gc backups`
+- `gc` - garbage collect unreferenced blobs from the blob store
 
 Key behavior:
 - "intent changes" (enable/disable/order) are cheap
@@ -883,3 +891,61 @@ The `internal/nexusclient` package provides:
 The API key is read from config (`nexus.apikey`). If not configured, Nexus
 linking is silently skipped at import time; commands that require it error
 with a helpful message.
+
+## 18. Garbage Collection
+
+### Purpose
+
+The `gc` command removes unreferenced blobs from the blob store to reclaim
+disk space. It is run explicitly by the user and never triggered automatically
+by other commands.
+
+### Eligibility
+
+A blob is eligible for collection when no live database row references it:
+- **Archives**: not referenced by any `mod_file_versions.archive_sha256`
+- **Backups**: not referenced by any `backups.backup_blob_sha256`
+
+Removing a mod file version or backup row from the database does not
+immediately delete the blob. The blob remains on disk until the next `gc` run
+reconciles the difference.
+
+### Orphaned on-disk files
+
+On-disk files with no corresponding database row (orphans) are also removed
+by default. Orphans can appear when an import was interrupted before the
+database entry was written (e.g. process killed mid-import). Use
+`--skip-orphans` to leave them in place.
+
+Note: there is a small TOCTOU window between detecting an orphan and deleting
+it — a concurrent import could have written the DB row in between. `gc` should
+not be run while imports are in progress. If a race does occur the affected
+blob will simply appear as a normal referenced blob on the next run.
+
+### Missing blobs
+
+If a blob is recorded in the database but missing from disk, `gc` prints a
+warning identifying the blob by original filename and, for archives, by mod
+page and file label. These dangling rows are left in place by default.
+Pass `--clean-missing` to also remove them. The `doctor` command also surfaces
+missing blobs.
+
+### Fan-out directory cleanup
+
+After removing a blob file, `gc` attempts to remove the two-character fan-out
+directory (e.g. `archives/ab/`). This is best-effort: if the directory is
+non-empty the removal is silently skipped.
+
+### Commands
+
+`gc [--dry-run] [--no-archives] [--no-backups] [--min-age <duration>] [--clean-missing] [--skip-orphans]`
+
+Flags:
+- `--dry-run`: preview what would be removed without making any changes
+- `--no-archives`: skip archive blob collection
+- `--no-backups`: skip backup blob collection
+- `--min-age <duration>`: skip blobs created more recently than this duration;
+  supports `h` (hours), `d` (days), `w` (weeks) — e.g. `7d`, `24h`, `2w`
+- `--clean-missing`: remove database rows for blobs missing from disk
+- `--skip-orphans`: skip on-disk files with no database row (orphans are
+  removed by default)
