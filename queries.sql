@@ -999,3 +999,21 @@ SELECT
         SELECT 1 FROM current
         WHERE mod_file_version_id NOT IN (SELECT mod_file_version_id FROM desired)
     ) AS has_pending_changes;
+
+-- name: GetInstalledFileCountForGameInstall :one
+SELECT COUNT(*) AS count
+FROM installed_files
+WHERE game_install_id = ?;
+
+-- name: GetBackupCountForGameInstall :one
+SELECT COUNT(*) AS count
+FROM backups
+WHERE game_install_id = ?;
+
+-- name: GetLastIncompleteOperationForGameInstall :one
+SELECT id, op_type, started_at
+FROM operations
+WHERE game_install_id = ?
+  AND status = 'running'
+ORDER BY started_at DESC
+LIMIT 1;
