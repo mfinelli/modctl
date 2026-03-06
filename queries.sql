@@ -1042,3 +1042,56 @@ JOIN mod_files mf ON mf.id = mfv.mod_file_id
 JOIN mod_pages mp ON mp.id = mf.mod_page_id
 WHERE a.profile_id = ?
 ORDER BY COALESCE(a.priority, b.priority) DESC;
+
+-- name: ListOperationsForGameInstall :many
+SELECT
+    o.id,
+    o.op_type,
+    o.status,
+    o.started_at,
+    o.finished_at,
+    o.message,
+    p.name AS profile_name
+FROM operations o
+LEFT JOIN profiles p ON p.id = o.profile_id
+WHERE o.game_install_id = ?
+ORDER BY o.started_at DESC
+LIMIT ?;
+
+-- name: ListAllOperations :many
+SELECT
+    o.id,
+    o.op_type,
+    o.status,
+    o.started_at,
+    o.finished_at,
+    o.message,
+    p.name  AS profile_name,
+    gi.display_name AS game_name
+FROM operations o
+LEFT JOIN profiles p ON p.id = o.profile_id
+LEFT JOIN game_installs gi ON gi.id = o.game_install_id
+ORDER BY o.started_at DESC
+LIMIT ?;
+
+-- name: GetOperationByID :one
+SELECT
+    o.id,
+    o.game_install_id,
+    o.op_type,
+    o.status,
+    o.started_at,
+    o.finished_at,
+    o.message,
+    p.name AS profile_name,
+    gi.display_name AS game_name
+FROM operations o
+LEFT JOIN profiles p ON p.id = o.profile_id
+LEFT JOIN game_installs gi ON gi.id = o.game_install_id
+WHERE o.id = ?;
+
+-- name: ListOperationChanges :many
+SELECT *
+FROM operation_changes
+WHERE operation_id = ?
+ORDER BY created_at ASC;
