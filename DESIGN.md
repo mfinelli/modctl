@@ -918,7 +918,7 @@ database entry was written (e.g. process killed mid-import). Use
 `--skip-orphans` to leave them in place.
 
 Note: there is a small TOCTOU window between detecting an orphan and deleting
-it — a concurrent import could have written the DB row in between. `gc` should
+it - a concurrent import could have written the DB row in between. `gc` should
 not be run while imports are in progress. If a race does occur the affected
 blob will simply appear as a normal referenced blob on the next run.
 
