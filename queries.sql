@@ -1095,3 +1095,26 @@ SELECT *
 FROM operation_changes
 WHERE operation_id = ?
 ORDER BY created_at ASC;
+
+-- name: ListUnreferencedBlobs :many
+-- Returns blobs of the given kind that are not referenced by any live row.
+-- Archives are referenced by mod_file_versions.archive_sha256.
+-- Backups are referenced by backups.backup_blob_sha256.
+SELECT b.sha256, b.kind, b.size_bytes, b.original_name, b.created_at
+FROM blobs b
+WHERE b.kind = sqlc.arg(kind)
+  AND CASE b.kind
+    WHEN 'archive' THEN NOT EXISTS (
+      SELECT TRUE FROM mod_file_versions mfv WHERE mfv.archive_sha256 = b.sha256
+    )
+    WHEN 'backup' THEN NOT EXISTS (
+      SELECT TRUE FROM backups bk WHERE bk.backup_blob_sha256 = b.sha256
+    )
+    WHEN 'override' THEN NOT EXISTS (
+      SELECT TRUE FROM overrides ov WHERE ov.blob_sha256 = b.sha256
+    )
+    ELSE FALSE
+  END;
+
+-- name: DeleteBlob :exec
+DELETE FROM blobs WHERE sha256 = sqlc.arg(sha256);
