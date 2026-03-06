@@ -976,3 +976,26 @@ WHERE game_install_id = ? AND target_id = ? AND relpath = ?;
 SELECT *
 FROM profiles
 WHERE id = ?;
+
+-- name: GetProfileHasPendingChanges :one
+WITH desired AS (
+    SELECT mod_file_version_id
+    FROM profile_items
+    WHERE profile_id = ?
+      AND enabled = TRUE
+),
+current AS (
+    SELECT owner_mod_file_version_id AS mod_file_version_id
+    FROM installed_files
+    WHERE game_install_id = ?
+      AND owner_mod_file_version_id IS NOT NULL
+)
+SELECT
+    EXISTS (
+        SELECT 1 FROM desired
+        WHERE mod_file_version_id NOT IN (SELECT mod_file_version_id FROM current)
+    ) OR
+    EXISTS (
+        SELECT 1 FROM current
+        WHERE mod_file_version_id NOT IN (SELECT mod_file_version_id FROM desired)
+    ) AS has_pending_changes;

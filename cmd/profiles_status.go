@@ -52,7 +52,12 @@ var profilesStatusCmd = &cobra.Command{
 
 Displays the mods in the profile in priority order, their enabled/disabled
 state, version information, and any warnings such as missing inventory scans
-or mod incompatibilities.`,
+or mod incompatibilities.
+
+When the profile is currently applied, pending changes are detected by
+comparing the set of enabled mod versions against installed files. This
+check does not account for priority reordering between mods that conflict
+on the same path — run 'modctl apply --dry-run' for a precise diff.`,
 	Args: cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -116,6 +121,17 @@ or mod incompatibilities.`,
 			return fmt.Errorf("loading applied state: %w", err)
 		}
 
+		var hasPendingChanges bool
+		if appliedState.AppliedProfileID.Valid && appliedState.AppliedProfileID.Int64 == p.ID {
+			pendingResult, err := q.GetProfileHasPendingChanges(ctx, dbq.GetProfileHasPendingChangesParams{
+				ProfileID:     p.ID,
+				GameInstallID: gi.ID,
+			})
+			if err == nil {
+				hasPendingChanges = pendingResult.Bool
+			}
+		}
+
 		// Only fetch incompatibilities if there are mods to check
 		var incompatibilities []dbq.GetIncompatibleModPairsForProfileRow
 		if len(items) > 0 {
@@ -135,6 +151,7 @@ or mod incompatibilities.`,
 			appliedState,
 			incompatibilities,
 			nexusInfo,
+			hasPendingChanges,
 		))
 
 		return nil
@@ -173,6 +190,7 @@ func renderProfileStatus(
 	appliedState dbq.GetGameInstallAppliedStateRow,
 	incompatibilities []dbq.GetIncompatibleModPairsForProfileRow,
 	nexusInfo map[int64]*nexusVersionInfo,
+	hasPendingChanges bool,
 ) string {
 	// styles TODO extract somewhere...
 	cardBorder := lipgloss.NewStyle().
@@ -232,6 +250,11 @@ func renderProfileStatus(
 		writeKV16(&b, "Applied at:", appliedState.AppliedAt.String)
 		if appliedState.AppliedOperationID.Valid {
 			writeKV16(&b, "Operation:", fmt.Sprintf("#%d", appliedState.AppliedOperationID.Int64))
+		}
+		if hasPendingChanges {
+			writeKV16(&b, "Pending changes:", warnStyle.Render("yes ⚠"))
+		} else {
+			writeKV16(&b, "Pending changes:", subtleStyle.Render("none"))
 		}
 	}
 
