@@ -1118,3 +1118,18 @@ WHERE b.kind = sqlc.arg(kind)
 
 -- name: DeleteBlob :exec
 DELETE FROM blobs WHERE sha256 = sqlc.arg(sha256);
+
+-- name: GetBlobContext :many
+-- Returns identifying context for a blob: its original name and, for archive
+-- blobs, the mod page and file it belongs to.
+SELECT
+    b.sha256,
+    b.original_name,
+    mp.name        AS mod_page_name,
+    mf.label       AS mod_file_label,
+    mfv.version_string
+FROM blobs b
+LEFT JOIN mod_file_versions mfv ON mfv.archive_sha256 = b.sha256
+LEFT JOIN mod_files mf          ON mf.id = mfv.mod_file_id
+LEFT JOIN mod_pages mp          ON mp.id = mf.mod_page_id
+WHERE b.sha256 = sqlc.arg(sha256);

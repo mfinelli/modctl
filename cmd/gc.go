@@ -418,6 +418,12 @@ type orphanFile struct {
 
 // findOrphans walks the blob store root directory and returns any files
 // whose sha256 filename has no corresponding row in the blobs table.
+//
+// NOTE: there is a small TOCTOU race between GetBlob returning ErrNoRows and
+// us deleting the orphan file - a concurrent mods import could have written
+// the DB row in between. GC should not be run while imports are in progress.
+// If a race does occur, the orphaned file will simply be caught by a subsequent
+// gc run, and any missing DB row will be surfaced by doctor.
 func findOrphans(ctx context.Context, q *dbq.Queries, root string) ([]orphanFile, error) {
 	var orphans []orphanFile
 

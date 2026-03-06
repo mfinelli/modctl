@@ -502,10 +502,41 @@ func checkBlobs(ctx context.Context) error {
 			st, serr := os.Stat(path)
 			if serr != nil {
 				if errors.Is(serr, os.ErrNotExist) {
-					// TODO: there should be a way to surface to the user
-					//       _which_ blobs are missing (eg original filename or
-					//       which games a blob is associated with)
 					missing++
+
+					// surface context about which blob is missing
+					contexts, cerr := q.GetBlobContext(ctx, b.Sha256)
+					if cerr != nil || len(contexts) == 0 {
+						// fall back to whatever we have on the blob row itself
+						name := "(unknown)"
+						if b.OriginalName.Valid {
+							name = b.OriginalName.String
+						}
+						fmt.Println(warnStyle.Render(fmt.Sprintf(
+							"    missing: %s... %s",
+							b.Sha256[:16], name,
+						)))
+					} else {
+						for _, c := range contexts {
+							var parts []string
+							if c.ModPageName.Valid {
+								parts = append(parts, c.ModPageName.String)
+							}
+							if c.ModFileLabel.Valid {
+								parts = append(parts, c.ModFileLabel.String)
+							}
+							if c.VersionString.Valid {
+								parts = append(parts, "("+c.VersionString.String+")")
+							} else if c.OriginalName.Valid {
+								parts = append(parts, "("+c.OriginalName.String+")")
+							}
+							fmt.Println(warnStyle.Render(fmt.Sprintf(
+								"    missing: %s... %s",
+								b.Sha256[:16],
+								strings.Join(parts, " › "),
+							)))
+						}
+					}
 					continue
 				}
 				return fmt.Errorf("stat blob kind=%s sha=%s path=%s: %w", kind, b.Sha256, path, serr)
