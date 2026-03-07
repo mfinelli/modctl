@@ -21,7 +21,7 @@ modctl: $(SOURCES) go.mod go.sum dbq/db.go internal/nexusclient/dbc/db.go \
 		-buildmode=pie \
 		-trimpath \
 		-mod=readonly \
-		-ldflags "-linkmode=external" \
+		-ldflags "-s -w -linkmode=external" \
 		-tags='no_clickhouse no_libsql no_mssql no_mysql no_postgres \
 			no_vertica no_ydb' \
 		main.go
