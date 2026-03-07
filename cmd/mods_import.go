@@ -52,6 +52,7 @@ var (
 	modsImportGame          string
 	modsImportName          string
 	modsImportLabel         string
+	modsImportFileVersion   string
 	modsImportNexusUrl      string
 	modsImportRm            bool
 	modsImportListTimeout   int64
@@ -251,6 +252,7 @@ has been safely stored and the database has been updated successfully.`,
 						nameProvided:     modsImportName != "",
 						labelProvided:    modsImportLabel != "",
 						label:            modsImportLabel,
+						fileVersion:      modsImportFileVersion,
 					}); err != nil {
 						fmt.Println(warnStyle.Render(fmt.Sprintf("  ⚠ nexus link failed: %s", err)))
 					}
@@ -292,6 +294,8 @@ func init() {
 		"Name for the mod (defaults to archive filename)")
 	modsImportCmd.Flags().StringVar(&modsImportLabel, "label", "",
 		"Label for the mod file (defaults to 'Main File')")
+	modsImportCmd.Flags().StringVar(&modsImportFileVersion, "file-version", "",
+		"Set version for the linked file")
 	modsImportCmd.Flags().StringVar(&modsImportNexusUrl, "nexus-url", "",
 		"Nexus mod page URL (sets source_kind=nexus)")
 	modsImportCmd.Flags().Int64Var(&modsImportPageID, "page-id", 0,
@@ -467,6 +471,7 @@ type nexusLinkParams struct {
 	nameProvided     bool
 	labelProvided    bool
 	label            string
+	fileVersion      string
 }
 
 func attemptNexusLink(
@@ -503,7 +508,7 @@ func attemptNexusLink(
 	}
 
 	// TODO add an optional --file-version flag
-	match, warnings, err := nexus.IdentifyNexusFile(p.originalBasename, p.archiveSize, p.label, "", filesResp.Files)
+	match, warnings, err := nexus.IdentifyNexusFile(p.originalBasename, p.archiveSize, p.label, p.fileVersion, filesResp.Files)
 	if err != nil {
 		return fmt.Errorf("identifying nexus file: %w", err)
 	}
