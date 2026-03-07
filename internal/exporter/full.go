@@ -95,7 +95,7 @@ func Full(
 	}
 
 	// 5. Write database snapshot
-	if err := writeFileToTar(tw, dbPath, "meta.sqlite"); err != nil {
+	if err := writeFileToTar(tw, dbPath, DatabaseFilename); err != nil {
 		return fmt.Errorf("write database: %w", err)
 	}
 

@@ -111,7 +111,7 @@ func Game(
 	}
 
 	// 5. Write scoped database
-	if err := writeFileToTar(tw, scopedDBPath, "meta.sqlite"); err != nil {
+	if err := writeFileToTar(tw, scopedDBPath, DatabaseFilename); err != nil {
 		return fmt.Errorf("write database: %w", err)
 	}
 
@@ -262,15 +262,7 @@ func exportStore(ctx context.Context, src, dst *dbq.Queries, storeID string) err
 	if err != nil {
 		return fmt.Errorf("get store %s: %w", storeID, err)
 	}
-	return dst.ExportInsertStore(ctx, dbq.ExportInsertStoreParams{
-		ID:             row.ID,
-		DisplayName:    row.DisplayName,
-		Implementation: row.Implementation,
-		Enabled:        row.Enabled,
-		Config:         row.Config,
-		CreatedAt:      row.CreatedAt,
-		UpdatedAt:      row.UpdatedAt,
-	})
+	return dst.ExportInsertStore(ctx, dbq.ExportInsertStoreParams(row))
 }
 
 func exportGameInstall(ctx context.Context, dst *dbq.Queries, gi dbq.GameInstall) error {
@@ -296,16 +288,7 @@ func exportTargets(ctx context.Context, src, dst *dbq.Queries, gameInstallID int
 		return fmt.Errorf("get targets: %w", err)
 	}
 	for _, row := range rows {
-		if err := dst.ExportInsertTarget(ctx, dbq.ExportInsertTargetParams{
-			ID:            row.ID,
-			GameInstallID: row.GameInstallID,
-			Name:          row.Name,
-			RootPath:      row.RootPath,
-			Origin:        row.Origin,
-			Metadata:      row.Metadata,
-			CreatedAt:     row.CreatedAt,
-			UpdatedAt:     row.UpdatedAt,
-		}); err != nil {
+		if err := dst.ExportInsertTarget(ctx, dbq.ExportInsertTargetParams(row)); err != nil {
 			return fmt.Errorf("insert target %d: %w", row.ID, err)
 		}
 	}
@@ -318,14 +301,7 @@ func exportBlobs(ctx context.Context, src, dst *dbq.Queries, gameInstallID int64
 		return 0, 0, fmt.Errorf("get archive blobs: %w", err)
 	}
 	for _, row := range archiveRows {
-		if err := dst.ExportInsertBlob(ctx, dbq.ExportInsertBlobParams{
-			Sha256:       row.Sha256,
-			Kind:         row.Kind,
-			SizeBytes:    row.SizeBytes,
-			OriginalName: row.OriginalName,
-			VerifiedAt:   row.VerifiedAt,
-			CreatedAt:    row.CreatedAt,
-		}); err != nil {
+		if err := dst.ExportInsertBlob(ctx, dbq.ExportInsertBlobParams(row)); err != nil {
 			return 0, 0, fmt.Errorf("insert archive blob %s: %w", row.Sha256, err)
 		}
 		archiveCount++
@@ -336,14 +312,7 @@ func exportBlobs(ctx context.Context, src, dst *dbq.Queries, gameInstallID int64
 		return 0, 0, fmt.Errorf("get backup blobs: %w", err)
 	}
 	for _, row := range backupRows {
-		if err := dst.ExportInsertBlob(ctx, dbq.ExportInsertBlobParams{
-			Sha256:       row.Sha256,
-			Kind:         row.Kind,
-			SizeBytes:    row.SizeBytes,
-			OriginalName: row.OriginalName,
-			VerifiedAt:   row.VerifiedAt,
-			CreatedAt:    row.CreatedAt,
-		}); err != nil {
+		if err := dst.ExportInsertBlob(ctx, dbq.ExportInsertBlobParams(row)); err != nil {
 			return 0, 0, fmt.Errorf("insert backup blob %s: %w", row.Sha256, err)
 		}
 		backupCount++
@@ -358,20 +327,7 @@ func exportModPages(ctx context.Context, src, dst *dbq.Queries, gameInstallID in
 		return fmt.Errorf("get mod pages: %w", err)
 	}
 	for _, row := range rows {
-		if err := dst.ExportInsertModPage(ctx, dbq.ExportInsertModPageParams{
-			ID:              row.ID,
-			GameInstallID:   row.GameInstallID,
-			Name:            row.Name,
-			SourceKind:      row.SourceKind,
-			SourceUrl:       row.SourceUrl,
-			SourceRef:       row.SourceRef,
-			NexusGameDomain: row.NexusGameDomain,
-			NexusModID:      row.NexusModID,
-			Notes:           row.Notes,
-			Metadata:        row.Metadata,
-			CreatedAt:       row.CreatedAt,
-			UpdatedAt:       row.UpdatedAt,
-		}); err != nil {
+		if err := dst.ExportInsertModPage(ctx, dbq.ExportInsertModPageParams(row)); err != nil {
 			return fmt.Errorf("insert mod page %d: %w", row.ID, err)
 		}
 	}
@@ -384,16 +340,7 @@ func exportModFiles(ctx context.Context, src, dst *dbq.Queries, gameInstallID in
 		return fmt.Errorf("get mod files: %w", err)
 	}
 	for _, row := range rows {
-		if err := dst.ExportInsertModFile(ctx, dbq.ExportInsertModFileParams{
-			ID:        row.ID,
-			ModPageID: row.ModPageID,
-			Label:     row.Label,
-			IsPrimary: row.IsPrimary,
-			SourceUrl: row.SourceUrl,
-			Metadata:  row.Metadata,
-			CreatedAt: row.CreatedAt,
-			UpdatedAt: row.UpdatedAt,
-		}); err != nil {
+		if err := dst.ExportInsertModFile(ctx, dbq.ExportInsertModFileParams(row)); err != nil {
 			return fmt.Errorf("insert mod file %d: %w", row.ID, err)
 		}
 	}
@@ -406,21 +353,7 @@ func exportModFileVersions(ctx context.Context, src, dst *dbq.Queries, gameInsta
 		return fmt.Errorf("get mod file versions: %w", err)
 	}
 	for _, row := range rows {
-		if err := dst.ExportInsertModFileVersion(ctx, dbq.ExportInsertModFileVersionParams{
-			ID:                 row.ID,
-			ModFileID:          row.ModFileID,
-			ArchiveSha256:      row.ArchiveSha256,
-			OriginalName:       row.OriginalName,
-			VersionString:      row.VersionString,
-			NexusFileID:        row.NexusFileID,
-			UploadedAt:         row.UploadedAt,
-			InventoryScannedAt: row.InventoryScannedAt,
-			UpstreamNotes:      row.UpstreamNotes,
-			Notes:              row.Notes,
-			Metadata:           row.Metadata,
-			CreatedAt:          row.CreatedAt,
-			UpdatedAt:          row.UpdatedAt,
-		}); err != nil {
+		if err := dst.ExportInsertModFileVersion(ctx, dbq.ExportInsertModFileVersionParams(row)); err != nil {
 			return fmt.Errorf("insert mod file version %d: %w", row.ID, err)
 		}
 	}
@@ -433,18 +366,7 @@ func exportInventory(ctx context.Context, src, dst *dbq.Queries, gameInstallID i
 		return fmt.Errorf("get inventory: %w", err)
 	}
 	for _, row := range rows {
-		if err := dst.ExportInsertInventoryEntry(ctx, dbq.ExportInsertInventoryEntryParams{
-			ID:            row.ID,
-			ArchiveSha256: row.ArchiveSha256,
-			RawPath:       row.RawPath,
-			EntryType:     row.EntryType,
-			SizeBytes:     row.SizeBytes,
-			LinkTarget:    row.LinkTarget,
-			ContentSha256: row.ContentSha256,
-			Position:      row.Position,
-			ParseError:    row.ParseError,
-			CreatedAt:     row.CreatedAt,
-		}); err != nil {
+		if err := dst.ExportInsertInventoryEntry(ctx, dbq.ExportInsertInventoryEntryParams(row)); err != nil {
 			return fmt.Errorf("insert inventory entry %d: %w", row.ID, err)
 		}
 	}
@@ -457,11 +379,7 @@ func exportRemapConfigs(ctx context.Context, src, dst *dbq.Queries, gameInstallI
 		return fmt.Errorf("get remap configs: %w", err)
 	}
 	for _, cfg := range configs {
-		if err := dst.ExportInsertRemapConfig(ctx, dbq.ExportInsertRemapConfigParams{
-			ID:        cfg.ID,
-			CreatedAt: cfg.CreatedAt,
-			UpdatedAt: cfg.UpdatedAt,
-		}); err != nil {
+		if err := dst.ExportInsertRemapConfig(ctx, dbq.ExportInsertRemapConfigParams(cfg)); err != nil {
 			return fmt.Errorf("insert remap config %d: %w", cfg.ID, err)
 		}
 
@@ -470,17 +388,7 @@ func exportRemapConfigs(ctx context.Context, src, dst *dbq.Queries, gameInstallI
 			return fmt.Errorf("get remap rules for config %d: %w", cfg.ID, err)
 		}
 		for _, rule := range rules {
-			if err := dst.ExportInsertRemapRule(ctx, dbq.ExportInsertRemapRuleParams{
-				ID:            rule.ID,
-				RemapConfigID: rule.RemapConfigID,
-				Position:      rule.Position,
-				RuleType:      rule.RuleType,
-				IntValue:      rule.IntValue,
-				TextValue:     rule.TextValue,
-				JsonValue:     rule.JsonValue,
-				CreatedAt:     rule.CreatedAt,
-				UpdatedAt:     rule.UpdatedAt,
-			}); err != nil {
+			if err := dst.ExportInsertRemapRule(ctx, dbq.ExportInsertRemapRuleParams(rule)); err != nil {
 				return fmt.Errorf("insert remap rule %d: %w", rule.ID, err)
 			}
 		}
@@ -494,15 +402,7 @@ func exportProfiles(ctx context.Context, src, dst *dbq.Queries, gameInstallID in
 		return fmt.Errorf("get profiles: %w", err)
 	}
 	for _, row := range rows {
-		if err := dst.ExportInsertProfile(ctx, dbq.ExportInsertProfileParams{
-			ID:            row.ID,
-			GameInstallID: row.GameInstallID,
-			Name:          row.Name,
-			Description:   row.Description,
-			IsActive:      row.IsActive,
-			CreatedAt:     row.CreatedAt,
-			UpdatedAt:     row.UpdatedAt,
-		}); err != nil {
+		if err := dst.ExportInsertProfile(ctx, dbq.ExportInsertProfileParams(row)); err != nil {
 			return fmt.Errorf("insert profile %d: %w", row.ID, err)
 		}
 	}
@@ -515,18 +415,7 @@ func exportProfileItems(ctx context.Context, src, dst *dbq.Queries, gameInstallI
 		return fmt.Errorf("get profile items: %w", err)
 	}
 	for _, row := range rows {
-		if err := dst.ExportInsertProfileItem(ctx, dbq.ExportInsertProfileItemParams{
-			ID:               row.ID,
-			ProfileID:        row.ProfileID,
-			Policy:           row.Policy,
-			ModFileVersionID: row.ModFileVersionID,
-			Enabled:          row.Enabled,
-			Priority:         row.Priority,
-			RemapConfigID:    row.RemapConfigID,
-			Notes:            row.Notes,
-			CreatedAt:        row.CreatedAt,
-			UpdatedAt:        row.UpdatedAt,
-		}); err != nil {
+		if err := dst.ExportInsertProfileItem(ctx, dbq.ExportInsertProfileItemParams(row)); err != nil {
 			return fmt.Errorf("insert profile item %d: %w", row.ID, err)
 		}
 	}
@@ -539,16 +428,7 @@ func exportProfilePathPolicies(ctx context.Context, src, dst *dbq.Queries, gameI
 		return fmt.Errorf("get profile path policies: %w", err)
 	}
 	for _, row := range rows {
-		if err := dst.ExportInsertProfilePathPolicy(ctx, dbq.ExportInsertProfilePathPolicyParams{
-			ID:          row.ID,
-			ProfileID:   row.ProfileID,
-			TargetName:  row.TargetName,
-			PathPattern: row.PathPattern,
-			Policy:      row.Policy,
-			Metadata:    row.Metadata,
-			CreatedAt:   row.CreatedAt,
-			UpdatedAt:   row.UpdatedAt,
-		}); err != nil {
+		if err := dst.ExportInsertProfilePathPolicy(ctx, dbq.ExportInsertProfilePathPolicyParams(row)); err != nil {
 			return fmt.Errorf("insert profile path policy %d: %w", row.ID, err)
 		}
 	}
@@ -583,15 +463,7 @@ func exportModIncompatibilities(ctx context.Context, src, dst *dbq.Queries, game
 		return fmt.Errorf("get mod incompatibilities: %w", err)
 	}
 	for _, row := range rows {
-		if err := dst.ExportInsertModIncompatibility(ctx, dbq.ExportInsertModIncompatibilityParams{
-			ID:         row.ID,
-			ModPageIDA: row.ModPageIDA,
-			ModPageIDB: row.ModPageIDB,
-			Reason:     row.Reason,
-			Source:     row.Source,
-			CreatedAt:  row.CreatedAt,
-			UpdatedAt:  row.UpdatedAt,
-		}); err != nil {
+		if err := dst.ExportInsertModIncompatibility(ctx, dbq.ExportInsertModIncompatibilityParams(row)); err != nil {
 			return fmt.Errorf("insert mod incompatibility %d: %w", row.ID, err)
 		}
 	}

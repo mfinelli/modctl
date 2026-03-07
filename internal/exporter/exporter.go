@@ -53,6 +53,8 @@ const (
 	ExportKindGame ExportKind = "game"
 )
 
+const DatabaseFilename = "modctl.db"
+
 type ManifestGame struct {
 	StoreID     string `json:"store_id"`
 	StoreGameID string `json:"store_game_id"`
@@ -185,7 +187,9 @@ func writeBlobToTar(ctx context.Context, tw *tar.Writer, bs blobstore.Store, kin
 }
 
 // slugify converts a game display name to a safe filename slug.
+//
 // e.g. "Cyberpunk 2077" -> "cyberpunk2077"
+//
 //	"The Elder Scrolls V: Skyrim" -> "the-elder-scrolls-v-skyrim"
 func Slugify(s string) string {
 	var b strings.Builder
