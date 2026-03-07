@@ -241,13 +241,54 @@ Rationale:
 ### Export/import bundle
 
 A single file (tar + zstd) containing:
-- `meta.sqlite`
-- `archives/`
-- `backups/`
-- `manifest.json` including versions (bundle version, schema version), counts,
-  and optional hashes
+- `manifest.json` - bundle metadata (see below)
+- `modctl.db` - database snapshot
+- `archives/<fan2>/<fullhash>` - referenced archive blobs
+- `backups/<fan2>/<fullhash>` - referenced backup blobs
+
+The bundle is compressed using zstd at the default compression level.
 
 Import verifies integrity and schema compatibility.
+
+#### Manifest
+
+`manifest.json` contains:
+- `export_format_version`: integer, currently `1`. Used by import to handle
+  future format changes.
+- `export_kind`: `"full"` or `"game"`
+- `exported_at`: ISO 8601 timestamp
+- `modctl_version`: version of modctl that produced the bundle
+- `schema_version`: goose migration version of the database snapshot
+- `db_sha256`: sha256 of `modctl.db` as it appears in the bundle, used
+  to verify integrity on import
+- `counts`: `{ "archives": N, "backups": N }`
+- `game` (game-scoped only): `{ "store_id", "store_game_id", "display_name" }`
+
+#### Full export
+
+Includes the complete database snapshot (via `VACUUM INTO`) and all blobs
+of all kinds. Suitable for full machine migration or complete backup.
+
+#### Game-scoped export
+
+Includes only data relevant to a single game install:
+- The store row for that game's store
+- The game install, targets, profiles, mod pages, mod files, mod file
+  versions, remap configs and rules, profile items, profile path policies,
+  backups, and mod incompatibilities for that game
+- Only blobs referenced by that game's mod file versions and backups
+- Archive inventory entries (unless `--skip-inventory` is passed)
+- `applied_profile_id`, `applied_at`, and `applied_operation_id` are
+  nulled out - disk state is not valid on the destination machine
+- Operation history is not included
+
+The game-scoped database is constructed as a fresh SQLite file with
+migrations applied, then populated with only the relevant rows. This
+ensures no other games' data leaks into the bundle.
+
+If any blob is missing from disk at export time, a warning is printed and
+the blob is skipped. The bundle will be incomplete; `doctor` can identify
+missing blobs before exporting.
 
 ## 4. Archive Inventory
 
@@ -707,7 +748,14 @@ This preserves a clean v1 while allowing richer v2.
   applies.
 - `unapply` (top-level) - remove all tool-managed files and restore backups.
   Supports `--dry-run`, `--print-ops`, `--force`, `--abort`.
-- `export|import`
+- `export` - export modctl state to a portable bundle. Defaults to a full
+  export of all games and blobs. Use `--game` to scope to a single game
+  install. Supports `--output`/`-o` to override the output filename,
+  and `--skip-inventory` to omit archive inventory entries.
+  Default output filename: `modctl-export-<date>.tar.zst` (full) or
+  `modctl-export-<slug>-<date>.tar.zst` (game-scoped), where slug is the
+  game display name lowercased and slugified, truncated to 100 characters.
+- `import`
 - `gc` - garbage collect unreferenced blobs from the blob store
 
 Key behavior:
@@ -949,3 +997,58 @@ Flags:
 - `--clean-missing`: remove database rows for blobs missing from disk
 - `--skip-orphans`: skip on-disk files with no database row (orphans are
   removed by default)
+
+## 19. Export and Import
+
+### Purpose
+
+Export produces a portable bundle that can be used to migrate modctl state
+to a new machine, share a mod setup with another user, or archive a game's
+mod configuration before uninstalling.
+
+### Format version
+
+The `export_format_version` field in `manifest.json` is `1` for all bundles
+produced by the current implementation. Import checks this field first and
+rejects bundles with an unrecognized version, allowing the format to evolve
+without silent data corruption.
+
+### Full vs. game-scoped
+
+A full export includes the entire database and all blobs. It is intended for
+machine migration and full backup.
+
+A game-scoped export includes only data for a single game install and is
+suitable for sharing or archiving. It never includes other games' data.
+
+### Database snapshot
+
+For full exports, `VACUUM INTO` is used to produce a clean, consistent
+SQLite snapshot without requiring the backup C API.
+
+For game-scoped exports, a fresh SQLite database is created, migrations are
+run to bring it to the current schema, and only the relevant rows are
+inserted in foreign key dependency order.
+
+### Blob integrity
+
+Blobs are already content-addressed by sha256 so individual blob files do
+not need a separate integrity check - the filename is the hash. The
+`db_sha256` field in the manifest covers the database snapshot, which is
+verified on import.
+
+### Partial exports
+
+If a blob is missing from disk at export time, a warning is printed to
+stderr and the blob is omitted from the bundle. The export is not aborted.
+Run `doctor` before exporting to identify missing blobs.
+
+If the export is interrupted (e.g. Ctrl+C or any error), the partial output
+file is deleted automatically.
+
+### Import (v1)
+
+Import verifies `export_format_version` and `schema_version` compatibility,
+verifies `db_sha256`, extracts blobs into the appropriate store directories,
+and merges or restores the database. For game-scoped imports, ID conflicts
+with the destination database are resolved by remapping IDs to fresh values.

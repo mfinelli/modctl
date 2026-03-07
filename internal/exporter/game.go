@@ -46,7 +46,15 @@ func Game(
 	if err != nil {
 		return fmt.Errorf("create output file: %w", err)
 	}
-	defer out.Close()
+
+	// clean up partial output on any failure
+	success := false
+	defer func() {
+		if !success {
+			out.Close()
+			os.Remove(opts.OutputPath)
+		}
+	}()
 
 	zw, err := zstd.NewWriter(out)
 	if err != nil {
@@ -83,12 +91,6 @@ func Game(
 	}
 
 	// 4. Write manifest
-	store, err := q.GetStoreById(ctx, gi.StoreID)
-	if err != nil {
-		return fmt.Errorf("get store: %w", err)
-	}
-	_ = store // used for store display name if we want it later
-
 	manifest := Manifest{
 		ExportFormatVersion: ExportFormatVersion,
 		ExportKind:          ExportKindGame,
@@ -116,16 +118,25 @@ func Game(
 	}
 
 	// 6. Write archive blobs
+	var skipped []string
 	for _, b := range archiveBlobs {
-		if err := writeBlobToTar(ctx, tw, bs, blobstore.KindArchive, b.Sha256); err != nil {
+		skip, err := writeBlobToTar(ctx, tw, bs, blobstore.KindArchive, b.Sha256)
+		if err != nil {
 			return fmt.Errorf("write archive blob %s: %w", b.Sha256, err)
+		}
+		if skip {
+			skipped = append(skipped, b.Sha256)
 		}
 	}
 
 	// 7. Write backup blobs
 	for _, b := range backupBlobs {
-		if err := writeBlobToTar(ctx, tw, bs, blobstore.KindBackup, b.Sha256); err != nil {
+		skip, err := writeBlobToTar(ctx, tw, bs, blobstore.KindBackup, b.Sha256)
+		if err != nil {
 			return fmt.Errorf("write backup blob %s: %w", b.Sha256, err)
+		}
+		if skip {
+			skipped = append(skipped, b.Sha256)
 		}
 	}
 
@@ -135,8 +146,17 @@ func Game(
 	if err := zw.Close(); err != nil {
 		return fmt.Errorf("close zstd: %w", err)
 	}
+	if err := out.Close(); err != nil {
+		return fmt.Errorf("close output: %w", err)
+	}
+	success = true
 
-	return out.Close()
+	// TODO: we should probably push this up to the caller
+	for _, sha := range skipped {
+		fmt.Fprintf(os.Stderr, "warning: blob %s... missing from disk, skipped in export\n", sha[:16])
+	}
+
+	return nil
 }
 
 // buildGameScopedDB constructs a fresh SQLite database containing only rows

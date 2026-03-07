@@ -147,25 +147,25 @@ func writeFileToTar(tw *tar.Writer, srcPath, tarName string) error {
 	return err
 }
 
-func writeBlobToTar(ctx context.Context, tw *tar.Writer, bs blobstore.Store, kind blobstore.Kind, sha256hex string) error {
+func writeBlobToTar(ctx context.Context, tw *tar.Writer, bs blobstore.Store, kind blobstore.Kind, sha256hex string) (bool, error) {
 	path, err := bs.PathFor(kind, sha256hex)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// blob missing from disk - skip with no error; doctor surfaces this
-			return nil
+			return true, nil
 		}
-		return err
+		return false, err
 	}
 	defer f.Close()
 
 	st, err := f.Stat()
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	fan := sha256hex[:2]
@@ -178,12 +178,12 @@ func writeBlobToTar(ctx context.Context, tw *tar.Writer, bs blobstore.Store, kin
 		ModTime: st.ModTime(),
 	}
 	if err := tw.WriteHeader(hdr); err != nil {
-		return err
+		return false, err
 	}
 
 	buf := make([]byte, 1024*1024)
 	_, err = blobstore.CopyWithContext(ctx, tw, f, buf)
-	return err
+	return false, err
 }
 
 // slugify converts a game display name to a safe filename slug.
