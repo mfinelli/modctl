@@ -1431,3 +1431,45 @@ SELECT * FROM mod_file_versions;
 
 -- name: ExportUnmarkInventoried :exec
 UPDATE mod_file_versions SET inventory_scanned_at = NULL;
+
+-- name: CompleteModFileVersionsByGameInstall :many
+SELECT
+    mfv.id,
+    mp.name    AS mod_page_name,
+    mf.label   AS file_label,
+    mfv.version_string
+FROM mod_file_versions mfv
+JOIN mod_files mf ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp  ON mp.id = mf.mod_page_id
+WHERE mp.game_install_id = ?
+  AND (
+    (lower(mp.name) LIKE lower(sqlc.arg(prefix)) ESCAPE '\')
+    OR (lower(mf.label) LIKE lower(sqlc.arg(prefix)) ESCAPE '\')
+  )
+ORDER BY mp.name COLLATE NOCASE, mf.label COLLATE NOCASE, mfv.id DESC
+LIMIT 20;
+
+-- name: GetModFileVersionsByName :many
+SELECT
+    mfv.id,
+    mp.name   AS mod_page_name,
+    mf.label  AS file_label,
+    mfv.version_string
+FROM mod_file_versions mfv
+JOIN mod_files mf ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp  ON mp.id = mf.mod_page_id
+WHERE mp.game_install_id = ?
+  AND lower(mp.name) = lower(sqlc.arg(name))
+ORDER BY mf.label COLLATE NOCASE, mfv.id DESC;
+
+-- name: GetModFileVersionByID :one
+SELECT
+    mfv.id,
+    mp.name   AS mod_page_name,
+    mf.label  AS file_label,
+    mfv.version_string
+FROM mod_file_versions mfv
+JOIN mod_files mf ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp  ON mp.id = mf.mod_page_id
+WHERE mfv.id = ?
+  AND mp.game_install_id = ?;

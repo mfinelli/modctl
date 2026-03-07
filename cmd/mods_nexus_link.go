@@ -37,7 +37,7 @@ import (
 )
 
 var (
-	modsNexusLinkVersionID   int64
+	modsNexusLinkVersionID   string
 	modsNexusLinkNexusURL    string
 	modsNexusLinkLabel       string
 	modsNexusLinkFileVersion string
@@ -105,8 +105,12 @@ version for manual linking.`,
 			return err
 		}
 
-		if modsNexusLinkVersionID != 0 {
-			return runManualLink(ctx, q, client, gi.ID)
+		if modsNexusLinkVersionID != "" {
+			mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, modsNexusLinkVersionID)
+			if err != nil {
+				return err
+			}
+			return runManualLink(ctx, q, client, gi.ID, mfv.ID)
 		}
 		return runAutoLink(ctx, q, client, gi.ID)
 	},
@@ -122,8 +126,13 @@ func init() {
 			return completion.GameInstallSelectors(cmd, toComplete)
 		})
 
-	modsNexusLinkCmd.Flags().Int64Var(&modsNexusLinkVersionID, "version-id", 0,
+	modsNexusLinkCmd.Flags().StringVar(&modsNexusLinkVersionID, "version-id", "",
 		"mod file version ID to link (manual mode)")
+	modsNexusLinkCmd.RegisterFlagCompletionFunc("version-id",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return completion.ModFileVersionIDs(cmd, toComplete)
+		})
+
 	modsNexusLinkCmd.Flags().StringVar(&modsNexusLinkNexusURL, "nexus-url", "",
 		"nexus mod page URL (manual mode)")
 	modsNexusLinkCmd.Flags().StringVar(&modsNexusLinkLabel, "label", "",
@@ -144,6 +153,7 @@ func runManualLink(
 	q *dbq.Queries,
 	client *nexusclient.Client,
 	gameInstallID int64,
+	versionID int64,
 ) error {
 	// TODO: extract styles
 	subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
@@ -151,13 +161,13 @@ func runManualLink(
 
 	// Fetch current link state and verify game scope in one shot
 	row, err := q.GetModFileVersionLinkState(ctx, dbq.GetModFileVersionLinkStateParams{
-		ID:            modsNexusLinkVersionID,
+		ID:            versionID,
 		GameInstallID: gameInstallID,
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf(
 			"mod_file_version %d not found or does not belong to the active game install; use --game to specify a different game",
-			modsNexusLinkVersionID,
+			versionID,
 		)
 	}
 	if err != nil {
@@ -190,7 +200,7 @@ func runManualLink(
 	} else if gameDomain == "" || modID == 0 {
 		return fmt.Errorf(
 			"mod page for mod_file_version %d has no Nexus info; provide --nexus-url to specify the Nexus mod page",
-			modsNexusLinkVersionID,
+			versionID,
 		)
 	}
 
@@ -199,19 +209,19 @@ func runManualLink(
 		if row.NexusFileID.Int64 == modsNexusLinkFileID {
 			fmt.Println(subtleStyle.Render(fmt.Sprintf(
 				"  mod_file_version %d is already linked to nexus file_id %d (no changes made)",
-				modsNexusLinkVersionID, modsNexusLinkFileID,
+				versionID, modsNexusLinkFileID,
 			)))
 			return nil
 		}
 		if err := q.UpdateModFileVersionNexusFileID(ctx, dbq.UpdateModFileVersionNexusFileIDParams{
-			ID:          modsNexusLinkVersionID,
+			ID:          versionID,
 			NexusFileID: sql.NullInt64{Int64: modsNexusLinkFileID, Valid: true},
 		}); err != nil {
 			return fmt.Errorf("updating nexus file id: %w", err)
 		}
 		fmt.Println(subtleStyle.Render(fmt.Sprintf(
 			"  linked mod_file_version %d to nexus file_id %d",
-			modsNexusLinkVersionID, modsNexusLinkFileID,
+			versionID, modsNexusLinkFileID,
 		)))
 		return nil
 	}
@@ -238,7 +248,7 @@ func runManualLink(
 	if match == nil {
 		return fmt.Errorf(
 			"could not identify nexus file for mod_file_version %d; try providing more specific flags (--file-name, --label, --file-version, --file-id)",
-			modsNexusLinkVersionID,
+			versionID,
 		)
 	}
 
@@ -246,7 +256,7 @@ func runManualLink(
 	if row.NexusFileID.Int64 == int64(match.File.FileID) && row.Label == match.File.Name {
 		fmt.Println(subtleStyle.Render(fmt.Sprintf(
 			"  mod_file_version %d is already correctly linked (no changes made)",
-			modsNexusLinkVersionID,
+			versionID,
 		)))
 		return nil
 	}
@@ -257,7 +267,7 @@ func runManualLink(
 	)))
 
 	if err := q.UpdateModFileVersionNexusFileID(ctx, dbq.UpdateModFileVersionNexusFileIDParams{
-		ID:          modsNexusLinkVersionID,
+		ID:          versionID,
 		NexusFileID: sql.NullInt64{Int64: int64(match.File.FileID), Valid: true},
 	}); err != nil {
 		return fmt.Errorf("updating nexus file id: %w", err)

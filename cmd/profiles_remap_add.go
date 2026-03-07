@@ -59,15 +59,26 @@ Examples:
   modctl profiles remap add 42 dest_prefix Data/mymod
   modctl profiles remap add 42 include_glob "*.esp"
   modctl profiles remap add 42 exclude_glob "*.txt"`,
-	Args:         cobra.ExactArgs(3),
+	Args: cobra.ExactArgs(3),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		switch len(args) {
+		case 0:
+			return completion.ModFileVersionIDs(cmd, toComplete)
+		case 1:
+			return []string{
+				"strip_components",
+				"select_subdir",
+				"dest_prefix",
+				"include_glob",
+				"exclude_glob",
+			}, cobra.ShellCompDirectiveNoFileComp
+		default:
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-
-		versionID, err := strconv.ParseInt(args[0], 10, 64)
-		if err != nil || versionID <= 0 {
-			return fmt.Errorf("invalid mod_file_version_id %q (expected a positive integer)", args[0])
-		}
 
 		ruleType := args[1]
 		rawValue := args[2]
@@ -114,7 +125,12 @@ Examples:
 			return err
 		}
 
-		itemID, err := internal.ResolveProfileItemByVersion(ctx, &p, q, versionID)
+		mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		if err != nil {
+			return err
+		}
+
+		itemID, err := internal.ResolveProfileItemByVersion(ctx, &p, q, mfv.ID)
 		if err != nil {
 			return err
 		}

@@ -43,17 +43,18 @@ var profilesRemoveCmd = &cobra.Command{
 
 This permanently removes the version from the profile (opposite of "add").
 It does not change files on disk; changes take effect the next time you apply.`,
-	Args:         cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return completion.ModFileVersionIDs(cmd, toComplete)
+	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		versionID, err := strconv.ParseInt(args[0], 10, 64)
-		if err != nil || versionID <= 0 {
-			return fmt.Errorf("invalid mod_file_version_id %q (expected a positive integer)", args[0])
-		}
-
-		err = internal.EnsureDBExists()
+		err := internal.EnsureDBExists()
 		if err != nil {
 			return err
 		}
@@ -93,14 +94,19 @@ It does not change files on disk; changes take effect the next time you apply.`,
 			return err
 		}
 
+		mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		if err != nil {
+			return err
+		}
+
 		// Locate the profile item row
 		id, err := q.GetProfileItemIDByVersion(ctx, dbq.GetProfileItemIDByVersionParams{
 			ProfileID:        p.ID,
-			ModFileVersionID: versionID,
+			ModFileVersionID: mfv.ID,
 		})
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("version %d is not in profile %q", versionID, p.Name)
+				return fmt.Errorf("version %d is not in profile %q", mfv.ID, p.Name)
 			}
 			return fmt.Errorf("lookup profile item: %w", err)
 		}
@@ -120,7 +126,7 @@ It does not change files on disk; changes take effect the next time you apply.`,
 			return fmt.Errorf("commit: %w", err)
 		}
 
-		fmt.Printf("Removed version %d from profile %q\n", versionID, p.Name)
+		fmt.Printf("Removed version %d from profile %q\n", mfv.ID, p.Name)
 		return nil
 	},
 }

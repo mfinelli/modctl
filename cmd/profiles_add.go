@@ -50,17 +50,18 @@ override the target profile with --profile.
 
 If --priority is not provided, modctl assigns the next highest priority in the
 profile. Higher priority wins conflicts.`,
-	Args:         cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return completion.ModFileVersionIDs(cmd, toComplete)
+	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		versionID, err := strconv.ParseInt(args[0], 10, 64)
-		if err != nil || versionID <= 0 {
-			return fmt.Errorf("invalid mod_file_version_id %q (expected a positive integer)", args[0])
-		}
-
-		err = internal.EnsureDBExists()
+		err := internal.EnsureDBExists()
 		if err != nil {
 			return err
 		}
@@ -100,6 +101,11 @@ profile. Higher priority wins conflicts.`,
 			return err
 		}
 
+		mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		if err != nil {
+			return err
+		}
+
 		tx, err := db.BeginTx(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("error starting transaction: %w", err)
@@ -108,9 +114,9 @@ profile. Higher priority wins conflicts.`,
 		qtx := q.WithTx(tx)
 
 		// Validate mod_file_version exists (nicer than FK failure).
-		if _, err := qtx.ExistsModFileVersion(ctx, versionID); err != nil {
+		if _, err := qtx.ExistsModFileVersion(ctx, mfv.ID); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("mod file version %d not found", versionID)
+				return fmt.Errorf("mod file version %d not found", mfv.ID)
 			}
 			return fmt.Errorf("check mod file version: %w", err)
 		}
@@ -144,7 +150,7 @@ profile. Higher priority wins conflicts.`,
 
 		itemID, err := qtx.CreateProfileItem(ctx, dbq.CreateProfileItemParams{
 			ProfileID:        p.ID,
-			ModFileVersionID: versionID,
+			ModFileVersionID: mfv.ID,
 			Enabled:          enabledVal,
 			Priority:         priority,
 		})
@@ -160,14 +166,14 @@ profile. Higher priority wins conflicts.`,
 					// duplicate priority should have been caught above
 					// unless a race occurred.
 					if profilesAddPriority != 0 {
-						return fmt.Errorf("could not add version %d to profile %q (duplicate version or priority conflict)", versionID, p.Name)
+						return fmt.Errorf("could not add version %d to profile %q (duplicate version or priority conflict)", mfv.ID, p.Name)
 					}
-					return fmt.Errorf("version %d is already in profile %q", versionID, p.Name)
+					return fmt.Errorf("version %d is already in profile %q", mfv.ID, p.Name)
 				}
 				if se.Code == sqlite3.ErrConstraint && se.ExtendedCode == sqlite3.ErrConstraintForeignKey {
 					// Should be prevented by ExistsModFileVersion,
 					// but keep a friendly message anyway.
-					return fmt.Errorf("invalid reference while adding version %d to profile %q", versionID, p.Name)
+					return fmt.Errorf("invalid reference while adding version %d to profile %q", mfv.ID, p.Name)
 				}
 			}
 			return fmt.Errorf("add to profile: %w", err)
@@ -178,7 +184,7 @@ profile. Higher priority wins conflicts.`,
 		}
 
 		fmt.Printf("Added version %d to profile %q (item_id=%d, priority=%d, enabled=%t)\n",
-			versionID, p.Name, itemID, priority, enabledVal != 0)
+			mfv.ID, p.Name, itemID, priority, enabledVal != 0)
 
 		return nil
 	},

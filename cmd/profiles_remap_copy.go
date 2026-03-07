@@ -44,22 +44,18 @@ If the source has no remap rules this is a no-op.
 
 This is useful when upgrading a mod: copy the remap rules from the old
 version to the new version before removing the old version from the profile.`,
-	Args:         cobra.ExactArgs(2),
+	Args: cobra.ExactArgs(2),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) >= 2 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return completion.ModFileVersionIDs(cmd, toComplete)
+	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		srcVersionID, err := strconv.ParseInt(args[0], 10, 64)
-		if err != nil || srcVersionID <= 0 {
-			return fmt.Errorf("invalid src mod_file_version_id %q (expected a positive integer)", args[0])
-		}
-
-		dstVersionID, err := strconv.ParseInt(args[1], 10, 64)
-		if err != nil || dstVersionID <= 0 {
-			return fmt.Errorf("invalid dst mod_file_version_id %q (expected a positive integer)", args[1])
-		}
-
-		err = internal.EnsureDBExists()
+		err := internal.EnsureDBExists()
 		if err != nil {
 			return err
 		}
@@ -96,17 +92,27 @@ version to the new version before removing the old version from the profile.`,
 			return err
 		}
 
-		srcItemID, err := internal.ResolveProfileItemByVersion(ctx, &p, q, srcVersionID)
+		mfvSrc, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		if err != nil {
+			return err
+		}
+
+		mfvDst, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[1])
+		if err != nil {
+			return err
+		}
+
+		srcItemID, err := internal.ResolveProfileItemByVersion(ctx, &p, q, mfvSrc.ID)
 		if err != nil {
 			return fmt.Errorf("source: %w", err)
 		}
 
-		dstItemID, err := internal.ResolveProfileItemByVersion(ctx, &p, q, dstVersionID)
+		dstItemID, err := internal.ResolveProfileItemByVersion(ctx, &p, q, mfvDst.ID)
 		if err != nil {
 			return fmt.Errorf("destination: %w", err)
 		}
 
-		return internal.CopyRemapConfig(ctx, db, q, srcItemID, dstItemID, srcVersionID, dstVersionID, p.Name)
+		return internal.CopyRemapConfig(ctx, db, q, srcItemID, dstItemID, mfvSrc.ID, mfvDst.ID, p.Name)
 	},
 }
 

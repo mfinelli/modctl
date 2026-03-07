@@ -46,32 +46,16 @@ This changes ordering and rewrites priorities to a compact sequence starting
 at 1. Use this when you care about relative order, not specific priority numbers.
 
 Exactly one of --before or --after is required.`,
-	Args:         cobra.ExactArgs(0),
+	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-
-		moveID, err := strconv.ParseInt(args[0], 10, 64)
-		if err != nil || moveID <= 0 {
-			return fmt.Errorf("invalid mod_file_version_id %q (expected a positive integer)", args[0])
-		}
-
-		anchorID := profilesOrderMoveBefore
-		placeAfter := false
-		if profilesOrderMoveAfter != 0 {
-			anchorID = profilesOrderMoveAfter
-			placeAfter = true
-		}
-
-		if moveID == anchorID {
-			return fmt.Errorf("cannot move a version relative to itself")
-		}
 
 		if profilesOrderMoveAfter != 0 && profilesOrderMoveBefore != 0 {
 			return fmt.Errorf("exactly one of --before or --after is required")
 		}
 
-		err = internal.EnsureDBExists()
+		err := internal.EnsureDBExists()
 		if err != nil {
 			return err
 		}
@@ -111,6 +95,22 @@ Exactly one of --before or --after is required.`,
 			return err
 		}
 
+		mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		if err != nil {
+			return err
+		}
+
+		anchorID := profilesOrderMoveBefore
+		placeAfter := false
+		if profilesOrderMoveAfter != 0 {
+			anchorID = profilesOrderMoveAfter
+			placeAfter = true
+		}
+
+		if mfv.ID == anchorID {
+			return fmt.Errorf("cannot move a version relative to itself")
+		}
+
 		tx, err := db.BeginTx(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("error starting transaction: %w", err)
@@ -130,7 +130,7 @@ Exactly one of --before or --after is required.`,
 		moveIdx := -1
 		anchorIdx := -1
 		for i, it := range items {
-			if it.ModFileVersionID == moveID {
+			if it.ModFileVersionID == mfv.ID {
 				moveIdx = i
 			}
 			if it.ModFileVersionID == anchorID {
@@ -138,7 +138,7 @@ Exactly one of --before or --after is required.`,
 			}
 		}
 		if moveIdx == -1 {
-			return fmt.Errorf("version %d is not in profile %q", moveID, p.Name)
+			return fmt.Errorf("version %d is not in profile %q", mfv.ID, p.Name)
 		}
 		if anchorIdx == -1 {
 			return fmt.Errorf("anchor version %d is not in profile %q", anchorID, p.Name)
@@ -186,7 +186,7 @@ Exactly one of --before or --after is required.`,
 			}
 		}
 		if noop {
-			fmt.Printf("No change: version %d is already in the requested position in profile %q\n", moveID, p.Name)
+			fmt.Printf("No change: version %d is already in the requested position in profile %q\n", mfv.ID, p.Name)
 			return nil
 		}
 
@@ -200,9 +200,9 @@ Exactly one of --before or --after is required.`,
 		}
 
 		if placeAfter {
-			fmt.Printf("Moved version %d after %d in profile %q\n", moveID, anchorID, p.Name)
+			fmt.Printf("Moved version %d after %d in profile %q\n", mfv.ID, anchorID, p.Name)
 		} else {
-			fmt.Printf("Moved version %d before %d in profile %q\n", moveID, anchorID, p.Name)
+			fmt.Printf("Moved version %d before %d in profile %q\n", mfv.ID, anchorID, p.Name)
 		}
 
 		return nil
@@ -228,6 +228,14 @@ func init() {
 
 	profilesOrderMoveCmd.Flags().Int64VarP(&profilesOrderMoveAfter, "after", "a", 0,
 		"Move the mod after the specified mod")
+	profilesOrderMoveCmd.RegisterFlagCompletionFunc("after",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return completion.ModFileVersionIDs(cmd, toComplete)
+		})
 	profilesOrderMoveCmd.Flags().Int64VarP(&profilesOrderMoveBefore, "before", "b", 0,
 		"Move the mod before the specified mod")
+	profilesOrderMoveCmd.RegisterFlagCompletionFunc("before",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return completion.ModFileVersionIDs(cmd, toComplete)
+		})
 }

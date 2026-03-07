@@ -41,7 +41,13 @@ var profilesRemapListCmd = &cobra.Command{
 	Long: `List all remap rules for a mod version in a profile.
 
 Rules are shown in the order they will be applied during planning.`,
-	Args:         cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return completion.ModFileVersionIDs(cmd, toComplete)
+	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// TODO: extract elsewhere
@@ -50,12 +56,7 @@ Rules are shown in the order they will be applied during planning.`,
 
 		ctx := cmd.Context()
 
-		versionID, err := strconv.ParseInt(args[0], 10, 64)
-		if err != nil || versionID <= 0 {
-			return fmt.Errorf("invalid mod_file_version_id %q (expected a positive integer)", args[0])
-		}
-
-		err = internal.EnsureDBExists()
+		err := internal.EnsureDBExists()
 		if err != nil {
 			return err
 		}
@@ -92,7 +93,12 @@ Rules are shown in the order they will be applied during planning.`,
 			return err
 		}
 
-		itemID, err := internal.ResolveProfileItemByVersion(ctx, &p, q, versionID)
+		mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		if err != nil {
+			return err
+		}
+
+		itemID, err := internal.ResolveProfileItemByVersion(ctx, &p, q, mfv.ID)
 		if err != nil {
 			return err
 		}
@@ -103,11 +109,11 @@ Rules are shown in the order they will be applied during planning.`,
 		}
 
 		if len(rules) == 0 {
-			fmt.Println(subtleStyle.Render(fmt.Sprintf("  no remap rules for version %d in profile %q", versionID, p.Name)))
+			fmt.Println(subtleStyle.Render(fmt.Sprintf("  no remap rules for version %d in profile %q", mfv.ID, p.Name)))
 			return nil
 		}
 
-		fmt.Println(boldStyle.Render(fmt.Sprintf("Remap rules for version %d in profile %q:", versionID, p.Name)))
+		fmt.Println(boldStyle.Render(fmt.Sprintf("Remap rules for version %d in profile %q:", mfv.ID, p.Name)))
 		for _, rule := range rules {
 			fmt.Println(formatRemapRule(rule))
 		}

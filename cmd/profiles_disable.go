@@ -41,17 +41,18 @@ var profilesDisableCmd = &cobra.Command{
 
 This keeps the version in the profile but marks it as inactive. Disabled
 versions are ignored when computing the applied mod set.`,
-	Args:         cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return completion.ModFileVersionIDs(cmd, toComplete)
+	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		versionID, err := strconv.ParseInt(args[0], 10, 64)
-		if err != nil || versionID <= 0 {
-			return fmt.Errorf("invalid mod_file_version_id %q (expected a positive integer)", args[0])
-		}
-
-		err = internal.EnsureDBExists()
+		err := internal.EnsureDBExists()
 		if err != nil {
 			return err
 		}
@@ -91,7 +92,12 @@ versions are ignored when computing the applied mod set.`,
 			return err
 		}
 
-		return internal.SetProfileItemEnabled(ctx, &p, q, versionID, false)
+		mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		if err != nil {
+			return err
+		}
+
+		return internal.SetProfileItemEnabled(ctx, &p, q, mfv.ID, false)
 	},
 }
 

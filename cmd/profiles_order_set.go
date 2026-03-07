@@ -43,15 +43,16 @@ var profilesOrderSetCmd = &cobra.Command{
 	Long: `Set the numeric priority of a mod file version within a profile.
 
 Higher priority wins conflicts. Priorities must be unique within a profile.`,
-	Args:         cobra.ExactArgs(2),
+	Args: cobra.ExactArgs(2),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return completion.ModFileVersionIDs(cmd, toComplete)
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-
-		versionID, err := strconv.ParseInt(args[0], 10, 64)
-		if err != nil || versionID <= 0 {
-			return fmt.Errorf("invalid mod_file_version_id %q (expected a positive integer)", args[0])
-		}
 
 		newPrio, err := strconv.ParseInt(args[1], 10, 64)
 		if err != nil || newPrio <= 0 {
@@ -98,6 +99,11 @@ Higher priority wins conflicts. Priorities must be unique within a profile.`,
 			return err
 		}
 
+		mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		if err != nil {
+			return err
+		}
+
 		tx, err := db.BeginTx(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("error starting transaction: %w", err)
@@ -108,17 +114,17 @@ Higher priority wins conflicts. Priorities must be unique within a profile.`,
 		// Find the item and current priority.
 		item, err := qtx.GetProfileItemByVersionForOrder(ctx, dbq.GetProfileItemByVersionForOrderParams{
 			ProfileID:        p.ID,
-			ModFileVersionID: versionID,
+			ModFileVersionID: mfv.ID,
 		})
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("version %d is not in profile %q", versionID, p.Name)
+				return fmt.Errorf("version %d is not in profile %q", mfv.ID, p.Name)
 			}
 			return fmt.Errorf("lookup profile item: %w", err)
 		}
 
 		if item.Priority == newPrio {
-			fmt.Printf("Priority for version %d is already %d in profile %q\n", versionID, newPrio, p.Name)
+			fmt.Printf("Priority for version %d is already %d in profile %q\n", mfv.ID, newPrio, p.Name)
 			return nil
 		}
 
@@ -150,7 +156,7 @@ Higher priority wins conflicts. Priorities must be unique within a profile.`,
 			return fmt.Errorf("commit: %w", err)
 		}
 
-		fmt.Printf("Set priority for version %d to %d in profile %q\n", versionID, newPrio, p.Name)
+		fmt.Printf("Set priority for version %d to %d in profile %q\n", mfv.ID, newPrio, p.Name)
 
 		return nil
 	},

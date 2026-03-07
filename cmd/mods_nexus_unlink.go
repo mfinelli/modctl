@@ -35,9 +35,15 @@ import (
 var modsNexusUnlinkGame string
 
 var modsNexusUnlinkCmd = &cobra.Command{
-	Use:          "unlink",
-	Short:        "Remove the Nexus file ID link from a mod file version",
-	Args:         cobra.ExactArgs(1),
+	Use:   "unlink",
+	Short: "Remove the Nexus file ID link from a mod file version",
+	Args:  cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return completion.ModFileVersionIDs(cmd, toComplete)
+	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// TODO: extract styles
@@ -45,12 +51,7 @@ var modsNexusUnlinkCmd = &cobra.Command{
 
 		ctx := cmd.Context()
 
-		nexusUnlinkVersionID, err := strconv.ParseInt(args[0], 10, 64)
-		if err != nil {
-			return fmt.Errorf("invalid mod_file_version_id %q (expected a positive integer)", args[0])
-		}
-
-		err = internal.EnsureDBExists()
+		err := internal.EnsureDBExists()
 		if err != nil {
 			return err
 		}
@@ -85,15 +86,20 @@ var modsNexusUnlinkCmd = &cobra.Command{
 			return err
 		}
 
+		mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		if err != nil {
+			return err
+		}
+
 		// Check current state
 		nexusFileID, err := q.GetModFileVersionNexusFileID(ctx, dbq.GetModFileVersionNexusFileIDParams{
-			ID:            nexusUnlinkVersionID,
+			ID:            mfv.ID,
 			GameInstallID: gi.ID,
 		})
 		if errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf(
 				"mod_file_version %d not found or does not belong to the active game install; use --game to specify a different game",
-				nexusUnlinkVersionID,
+				mfv.ID,
 			)
 		}
 		if err != nil {
@@ -104,7 +110,7 @@ var modsNexusUnlinkCmd = &cobra.Command{
 		if !nexusFileID.Valid {
 			fmt.Println(subtleStyle.Render(fmt.Sprintf(
 				"  mod_file_version %d is already unlinked (no changes made)",
-				nexusUnlinkVersionID,
+				mfv.ID,
 			)))
 			return nil
 		}
@@ -112,7 +118,7 @@ var modsNexusUnlinkCmd = &cobra.Command{
 		oldFileID := nexusFileID.Int64
 
 		if err := q.UnlinkModFileVersionNexus(ctx, dbq.UnlinkModFileVersionNexusParams{
-			ID:            nexusUnlinkVersionID,
+			ID:            mfv.ID,
 			GameInstallID: gi.ID,
 		}); err != nil {
 			return fmt.Errorf("unlinking mod file version: %w", err)
@@ -120,7 +126,7 @@ var modsNexusUnlinkCmd = &cobra.Command{
 
 		fmt.Println(subtleStyle.Render(fmt.Sprintf(
 			"  unlinked mod_file_version %d (was linked to nexus file_id %d)",
-			nexusUnlinkVersionID, oldFileID,
+			mfv.ID, oldFileID,
 		)))
 
 		return nil

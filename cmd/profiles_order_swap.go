@@ -43,24 +43,18 @@ var profilesOrderSwapCmd = &cobra.Command{
 
 This is a safe way to reorder under the "unique priority per profile" rule,
 without having to choose unused priority numbers.`,
-	Args:         cobra.ExactArgs(2),
+	Args: cobra.ExactArgs(2),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) >= 2 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return completion.ModFileVersionIDs(cmd, toComplete)
+	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		aID, err := strconv.ParseInt(args[0], 10, 64)
-		if err != nil || aID <= 0 {
-			return fmt.Errorf("invalid mod_file_version_id %q (expected a positive integer)", args[0])
-		}
-		bID, err := strconv.ParseInt(args[1], 10, 64)
-		if err != nil || bID <= 0 {
-			return fmt.Errorf("invalid mod_file_version_id %q (expected a positive integer)", args[1])
-		}
-		if aID == bID {
-			return fmt.Errorf("swap requires two different mod file version ids")
-		}
-
-		err = internal.EnsureDBExists()
+		err := internal.EnsureDBExists()
 		if err != nil {
 			return err
 		}
@@ -100,6 +94,19 @@ without having to choose unused priority numbers.`,
 			return err
 		}
 
+		mfvA, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		if err != nil {
+			return err
+		}
+
+		mfvB, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[1])
+		if err != nil {
+			return err
+		}
+		if mfvA.ID == mfvB.ID {
+			return fmt.Errorf("swap requires two different mod file version ids")
+		}
+
 		tx, err := db.BeginTx(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("error starting transaction: %w", err)
@@ -110,24 +117,24 @@ without having to choose unused priority numbers.`,
 		// Look up both items in the profile.
 		a, err := qtx.GetProfileItemByVersionForOrder(ctx, dbq.GetProfileItemByVersionForOrderParams{
 			ProfileID:        p.ID,
-			ModFileVersionID: aID,
+			ModFileVersionID: mfvA.ID,
 		})
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("version %d is not in profile %q", aID, p.Name)
+				return fmt.Errorf("version %d is not in profile %q", mfvA.ID, p.Name)
 			}
-			return fmt.Errorf("lookup version %d: %w", aID, err)
+			return fmt.Errorf("lookup version %d: %w", mfvA.ID, err)
 		}
 
 		b, err := qtx.GetProfileItemByVersionForOrder(ctx, dbq.GetProfileItemByVersionForOrderParams{
 			ProfileID:        p.ID,
-			ModFileVersionID: bID,
+			ModFileVersionID: mfvB.ID,
 		})
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("version %d is not in profile %q", bID, p.Name)
+				return fmt.Errorf("version %d is not in profile %q", mfvB.ID, p.Name)
 			}
-			return fmt.Errorf("lookup version %d: %w", bID, err)
+			return fmt.Errorf("lookup version %d: %w", mfvB.ID, err)
 		}
 
 		if a.Priority == b.Priority {
@@ -171,7 +178,7 @@ without having to choose unused priority numbers.`,
 		}
 
 		fmt.Printf("Swapped priorities in profile %q: %d(%d) <-> %d(%d)\n",
-			p.Name, aID, b.Priority, bID, a.Priority)
+			p.Name, mfvA.ID, b.Priority, mfvB.ID, a.Priority)
 
 		return nil
 	},

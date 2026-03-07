@@ -40,15 +40,16 @@ var profilesRemapRemoveCmd = &cobra.Command{
 	Long: `Remove a remap rule at the given position for a mod version in a profile.
 
 Use 'remap list' to see current rules and their positions.`,
-	Args:         cobra.ExactArgs(2),
+	Args: cobra.ExactArgs(2),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return completion.ModFileVersionIDs(cmd, toComplete)
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-
-		versionID, err := strconv.ParseInt(args[0], 10, 64)
-		if err != nil || versionID <= 0 {
-			return fmt.Errorf("invalid mod_file_version_id %q (expected a positive integer)", args[0])
-		}
 
 		position, err := strconv.ParseInt(args[1], 10, 64)
 		if err != nil || position < 0 {
@@ -92,7 +93,12 @@ Use 'remap list' to see current rules and their positions.`,
 			return err
 		}
 
-		itemID, err := internal.ResolveProfileItemByVersion(ctx, &p, q, versionID)
+		mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		if err != nil {
+			return err
+		}
+
+		itemID, err := internal.ResolveProfileItemByVersion(ctx, &p, q, mfv.ID)
 		if err != nil {
 			return err
 		}
@@ -102,7 +108,7 @@ Use 'remap list' to see current rules and their positions.`,
 			return fmt.Errorf("get remap config: %w", err)
 		}
 		if !configID.Valid {
-			return fmt.Errorf("version %d in profile %q has no remap rules", versionID, p.Name)
+			return fmt.Errorf("version %d in profile %q has no remap rules", mfv.ID, p.Name)
 		}
 
 		if err := q.DeleteRemapRule(ctx, dbq.DeleteRemapRuleParams{
@@ -113,7 +119,7 @@ Use 'remap list' to see current rules and their positions.`,
 		}
 
 		fmt.Printf("Removed remap rule at position %d for version %d in profile %q\n",
-			position, versionID, p.Name)
+			position, mfv.ID, p.Name)
 
 		return nil
 	},
