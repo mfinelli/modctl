@@ -1317,3 +1317,114 @@ VALUES (?, ?, ?, ?, ?,
 -- name: ExportInsertModIncompatibility :exec
 INSERT INTO mod_incompatibilities (id, mod_page_id_a, mod_page_id_b, reason, source, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?);
+
+-- name: ImportGetGameInstallByStoreKey :one
+SELECT id FROM game_installs
+WHERE store_id = ?
+  AND store_game_id = ?
+  AND instance_id = ?;
+
+-- name: ImportCheckDBIsEmpty :one
+-- Returns true if the DB has no meaningful user data beyond auto-seeded rows.
+-- We consider the DB empty if the only store is 'steam' (auto-seeded) and
+-- there are no game installs.
+SELECT
+    (SELECT COUNT(*) FROM game_installs) = 0
+    AND
+    (SELECT COUNT(*) FROM stores WHERE id != 'steam') = 0
+AS is_empty;
+
+-- name: ImportDeleteGameInstall :exec
+DELETE FROM game_installs WHERE id = ?;
+
+-- name: ImportGetStoreByID :one
+SELECT id FROM stores WHERE id = ?;
+
+-- name: ImportInsertGameInstall :one
+INSERT INTO game_installs (
+    store_id, store_game_id, display_name, instance_id,
+    canonical_game_id, install_root, metadata,
+    last_seen_at, is_present,
+    applied_profile_id, applied_at, applied_operation_id,
+    created_at, updated_at
+) VALUES (
+    ?, ?, ?,
+    ?, ?, ?,
+    ?, ?, ?,
+    NULL, NULL, NULL,
+    ?, ?
+) RETURNING id;
+
+-- name: ImportInsertTarget :one
+INSERT INTO targets (game_install_id, name, root_path, origin, metadata, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+RETURNING id;
+
+-- name: ImportInsertModPage :one
+INSERT INTO mod_pages (game_install_id, name, source_kind, source_url, source_ref,
+                       nexus_game_domain, nexus_mod_id, notes, metadata, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+RETURNING id;
+
+-- name: ImportInsertModFile :one
+INSERT INTO mod_files (mod_page_id, label, is_primary, source_url, metadata, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+RETURNING id;
+
+-- name: ImportInsertModFileVersion :one
+INSERT INTO mod_file_versions (mod_file_id, archive_sha256, original_name,
+                                version_string, nexus_file_id, uploaded_at,
+                                inventory_scanned_at, upstream_notes, notes,
+                                metadata, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+RETURNING id;
+
+-- name: ImportInsertRemapConfig :one
+INSERT INTO remap_configs (created_at, updated_at)
+VALUES (?, ?)
+RETURNING id;
+
+-- name: ImportInsertRemapRule :exec
+INSERT INTO remap_rules (remap_config_id, position, rule_type, int_value,
+                         text_value, json_value, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: ImportInsertProfile :one
+INSERT INTO profiles (game_install_id, name, description, is_active, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?)
+RETURNING id;
+
+-- name: ImportInsertProfileItem :one
+INSERT INTO profile_items (profile_id, policy, mod_file_version_id,
+                            enabled, priority, remap_config_id, notes,
+                            created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+RETURNING id;
+
+-- name: ImportInsertProfilePathPolicy :one
+INSERT INTO profile_path_policies (profile_id, target_name, path_pattern,
+                                    policy, metadata, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+RETURNING id;
+
+-- name: ImportInsertBackup :one
+INSERT INTO backups (game_install_id, target_id, relpath, backup_blob_sha256,
+                     original_content_sha256, size_bytes, created_by_operation_id, created_at)
+VALUES (?, ?, ?, ?, ?, ?, NULL, ?)
+RETURNING id;
+
+-- name: ImportInsertModIncompatibility :exec
+INSERT INTO mod_incompatibilities (mod_page_id_a, mod_page_id_b, reason, source, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?);
+
+-- name: ImportInsertInventoryEntry :exec
+INSERT INTO archive_inventory_entries (archive_sha256, raw_path, entry_type,
+                                       size_bytes, link_target, content_sha256,
+                                       position, parse_error, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: ExportGetGameInstalls :many
+SELECT * FROM game_installs;
+
+-- name: ListAllModFileVersions :many
+SELECT * FROM mod_file_versions;
