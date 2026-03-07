@@ -1102,7 +1102,7 @@ ORDER BY created_at ASC;
 -- Backups are referenced by backups.backup_blob_sha256.
 SELECT b.sha256, b.kind, b.size_bytes, b.original_name, b.created_at
 FROM blobs b
-WHERE b.kind = sqlc.arg(kind)
+WHERE b.kind = ?
   AND CASE b.kind
     WHEN 'archive' THEN NOT EXISTS (
       SELECT TRUE FROM mod_file_versions mfv WHERE mfv.archive_sha256 = b.sha256
@@ -1117,7 +1117,7 @@ WHERE b.kind = sqlc.arg(kind)
   END;
 
 -- name: DeleteBlob :exec
-DELETE FROM blobs WHERE sha256 = sqlc.arg(sha256);
+DELETE FROM blobs WHERE sha256 = ?;
 
 -- name: GetBlobContext :many
 -- Returns identifying context for a blob: its original name and, for archive
@@ -1132,7 +1132,7 @@ FROM blobs b
 LEFT JOIN mod_file_versions mfv ON mfv.archive_sha256 = b.sha256
 LEFT JOIN mod_files mf          ON mf.id = mfv.mod_file_id
 LEFT JOIN mod_pages mp          ON mp.id = mf.mod_page_id
-WHERE b.sha256 = sqlc.arg(sha256);
+WHERE b.sha256 = ?;
 
 -- name: ListArchiveBlobsForGameInstall :many
 SELECT DISTINCT b.sha256, b.kind, b.size_bytes, b.original_name, b.created_at
@@ -1140,10 +1140,180 @@ FROM blobs b
 JOIN mod_file_versions mfv ON mfv.archive_sha256 = b.sha256
 JOIN mod_files mf ON mf.id = mfv.mod_file_id
 JOIN mod_pages mp ON mp.id = mf.mod_page_id
-WHERE mp.game_install_id = sqlc.arg(game_install_id);
+WHERE mp.game_install_id = ?;
 
 -- name: ListBackupBlobsForGameInstall :many
 SELECT DISTINCT b.sha256, b.kind, b.size_bytes, b.original_name, b.created_at
 FROM blobs b
 JOIN backups bk ON bk.backup_blob_sha256 = b.sha256
-WHERE bk.game_install_id = sqlc.arg(game_install_id);
+WHERE bk.game_install_id = ?;
+
+-- name: ExportGetArchiveBlobsForGameInstall :many
+SELECT DISTINCT b.sha256, b.kind, b.size_bytes, b.original_name, b.verified_at, b.created_at
+FROM blobs b
+JOIN mod_file_versions mfv ON mfv.archive_sha256 = b.sha256
+JOIN mod_files mf ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp ON mp.id = mf.mod_page_id
+WHERE mp.game_install_id = ?;
+
+-- name: ExportGetBackupBlobsForGameInstall :many
+SELECT DISTINCT b.sha256, b.kind, b.size_bytes, b.original_name, b.verified_at, b.created_at
+FROM blobs b
+JOIN backups bk ON bk.backup_blob_sha256 = b.sha256
+WHERE bk.game_install_id = ?;
+
+-- name: ExportGetModPagesForGameInstall :many
+SELECT * FROM mod_pages WHERE game_install_id = ?;
+
+-- name: ExportGetModFilesForGameInstall :many
+SELECT mf.id, mf.mod_page_id, mf.label, mf.is_primary, mf.source_url,
+       mf.metadata, mf.created_at, mf.updated_at
+FROM mod_files mf
+JOIN mod_pages mp ON mp.id = mf.mod_page_id
+WHERE mp.game_install_id = ?;
+
+-- name: ExportGetModFileVersionsForGameInstall :many
+SELECT mfv.id, mfv.mod_file_id, mfv.archive_sha256, mfv.original_name,
+       mfv.version_string, mfv.nexus_file_id, mfv.uploaded_at,
+       mfv.inventory_scanned_at, mfv.upstream_notes, mfv.notes,
+       mfv.metadata, mfv.created_at, mfv.updated_at
+FROM mod_file_versions mfv
+JOIN mod_files mf ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp ON mp.id = mf.mod_page_id
+WHERE mp.game_install_id = ?;
+
+-- name: ExportGetInventoryForGameInstall :many
+SELECT DISTINCT aie.id, aie.archive_sha256, aie.raw_path, aie.entry_type,
+       aie.size_bytes, aie.link_target, aie.content_sha256,
+       aie.position, aie.parse_error, aie.created_at
+FROM archive_inventory_entries aie
+JOIN mod_file_versions mfv ON mfv.archive_sha256 = aie.archive_sha256
+JOIN mod_files mf ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp ON mp.id = mf.mod_page_id
+WHERE mp.game_install_id = ?;
+
+-- name: ExportGetRemapConfigsForGameInstall :many
+SELECT DISTINCT rc.id, rc.created_at, rc.updated_at
+FROM remap_configs rc
+JOIN profile_items pi ON pi.remap_config_id = rc.id
+JOIN profiles p ON p.id = pi.profile_id
+WHERE p.game_install_id = ?;
+
+-- name: ExportGetRemapRulesForConfig :many
+SELECT id, remap_config_id, position, rule_type, int_value, text_value,
+       json_value, created_at, updated_at
+FROM remap_rules WHERE remap_config_id = ?;
+
+-- name: ExportGetProfileItemsForGameInstall :many
+SELECT pi.id, pi.profile_id, pi.policy, pi.mod_file_version_id,
+       pi.enabled, pi.priority, pi.remap_config_id, pi.notes,
+       pi.created_at, pi.updated_at
+FROM profile_items pi
+JOIN profiles p ON p.id = pi.profile_id
+WHERE p.game_install_id = ?;
+
+-- name: ExportGetProfilePathPoliciesForGameInstall :many
+SELECT ppp.id, ppp.profile_id, ppp.target_name, ppp.path_pattern,
+       ppp.policy, ppp.metadata, ppp.created_at, ppp.updated_at
+FROM profile_path_policies ppp
+JOIN profiles p ON p.id = ppp.profile_id
+WHERE p.game_install_id = ?;
+
+-- name: ExportGetBackupsForGameInstall :many
+SELECT * FROM backups WHERE game_install_id = ?;
+
+-- name: ExportGetModIncompatibilitiesForGameInstall :many
+SELECT mi.id, mi.mod_page_id_a, mi.mod_page_id_b, mi.reason, mi.source,
+       mi.created_at, mi.updated_at
+FROM mod_incompatibilities mi
+JOIN mod_pages mp ON mp.id = mi.mod_page_id_a
+WHERE mp.game_install_id = ?;
+
+-- name: ExportInsertStore :exec
+INSERT INTO stores (id, display_name, implementation, enabled, config, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+-- name: ExportInsertGameInstall :exec
+INSERT INTO game_installs (
+    id, store_id, store_game_id, display_name, instance_id,
+    canonical_game_id, install_root, metadata,
+    last_seen_at, is_present,
+    applied_profile_id, applied_at, applied_operation_id,
+    created_at, updated_at
+) VALUES (
+    ?, ?, ?, ?,
+    ?, ?, ?,
+    ?, ?, ?,
+    NULL, NULL, NULL,
+    ?, ?
+);
+
+-- name: ExportInsertTarget :exec
+INSERT INTO targets (id, game_install_id, name, root_path, origin, metadata, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: ExportInsertBlob :exec
+INSERT INTO blobs (sha256, kind, size_bytes, original_name, verified_at, created_at)
+VALUES (?, ?, ?, ?, ?, ?);
+
+-- name: ExportInsertModPage :exec
+INSERT INTO mod_pages (id, game_install_id, name, source_kind, source_url, source_ref,
+                       nexus_game_domain, nexus_mod_id, notes, metadata, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?);
+
+-- name: ExportInsertModFile :exec
+INSERT INTO mod_files (id, mod_page_id, label, is_primary, source_url, metadata, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: ExportInsertModFileVersion :exec
+INSERT INTO mod_file_versions (id, mod_file_id, archive_sha256, original_name,
+                                version_string, nexus_file_id, uploaded_at,
+                                inventory_scanned_at, upstream_notes, notes,
+                                metadata, created_at, updated_at)
+VALUES (?, ?, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?);
+
+-- name: ExportInsertInventoryEntry :exec
+INSERT INTO archive_inventory_entries (id, archive_sha256, raw_path, entry_type,
+                                       size_bytes, link_target, content_sha256,
+                                       position, parse_error, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: ExportInsertRemapConfig :exec
+INSERT INTO remap_configs (id, created_at, updated_at)
+VALUES (?, ?, ?);
+
+-- name: ExportInsertRemapRule :exec
+INSERT INTO remap_rules (id, remap_config_id, position, rule_type, int_value,
+                         text_value, json_value, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: ExportInsertProfile :exec
+INSERT INTO profiles (id, game_install_id, name, description, is_active, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+-- name: ExportInsertProfileItem :exec
+INSERT INTO profile_items (id, profile_id, policy, mod_file_version_id,
+                            enabled, priority, remap_config_id, notes,
+                            created_at, updated_at)
+VALUES (?, ?, ?, ?,
+        ?, ?, ?, ?,
+        ?, ?);
+
+-- name: ExportInsertProfilePathPolicy :exec
+INSERT INTO profile_path_policies (id, profile_id, target_name, path_pattern,
+                                    policy, metadata, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: ExportInsertBackup :exec
+INSERT INTO backups (id, game_install_id, target_id, relpath, backup_blob_sha256,
+                     original_content_sha256, size_bytes, created_by_operation_id, created_at)
+VALUES (?, ?, ?, ?, ?,
+        ?, ?, NULL, ?);
+
+-- name: ExportInsertModIncompatibility :exec
+INSERT INTO mod_incompatibilities (id, mod_page_id_a, mod_page_id_b, reason, source, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?);

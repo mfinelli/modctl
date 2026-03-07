@@ -945,7 +945,7 @@ Flags:
 - `--no-archives`: skip archive blob collection
 - `--no-backups`: skip backup blob collection
 - `--min-age <duration>`: skip blobs created more recently than this duration;
-  supports `h` (hours), `d` (days), `w` (weeks) — e.g. `7d`, `24h`, `2w`
+  supports `h` (hours), `d` (days), `w` (weeks) - e.g. `7d`, `24h`, `2w`
 - `--clean-missing`: remove database rows for blobs missing from disk
 - `--skip-orphans`: skip on-disk files with no database row (orphans are
   removed by default)

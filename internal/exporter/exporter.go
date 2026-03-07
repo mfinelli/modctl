@@ -31,6 +31,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
 )
 
@@ -75,12 +76,15 @@ type Manifest struct {
 }
 
 func currentSchemaVersion(ctx context.Context, db *sql.DB) (int64, error) {
-	var version int64
-	// TODO use the goose provider
-	err := db.QueryRowContext(ctx,
-		`SELECT MAX(version_id) FROM goose_db_version WHERE is_applied = 1`,
-	).Scan(&version)
-	return version, err
+	p, err := internal.GooseProvider(db)
+	if err != nil {
+		return 0, fmt.Errorf("get goose provider: %w", err)
+	}
+	current, _, err := p.GetVersions(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("get schema version: %w", err)
+	}
+	return current, nil
 }
 
 // TODO: we already have two other copies of this export it somewhere...
