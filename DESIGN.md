@@ -755,7 +755,16 @@ This preserves a clean v1 while allowing richer v2.
   Default output filename: `modctl-export-<date>.tar.zst` (full) or
   `modctl-export-<slug>-<date>.tar.zst` (game-scoped), where slug is the
   game display name lowercased and slugified, truncated to 100 characters.
-- `import`
+- `import <bundle>` - import a modctl export bundle. Accepts both full and
+  game-scoped bundles. For full bundles the database must be empty beyond
+  auto-seeded rows; use --force to wipe and restore. For game-scoped bundles
+  the game must not already exist; use --force to overwrite. Supports
+  --dry-run to preview without making changes. Use --skip-inventory to skip
+  scanning archives that have no inventory in the bundle (they can be
+  scanned later with 'mods scan-inventory'). Note: no profiles are applied
+  automatically after import - run 'profiles set-active' and 'apply' to
+  deploy mods. Requires temporary disk space roughly equal to the bundle
+  size.
 - `gc` - garbage collect unreferenced blobs from the blob store
 
 Key behavior:
@@ -1046,9 +1055,45 @@ Run `doctor` before exporting to identify missing blobs.
 If the export is interrupted (e.g. Ctrl+C or any error), the partial output
 file is deleted automatically.
 
-### Import (v1)
+### Import
 
-Import verifies `export_format_version` and `schema_version` compatibility,
-verifies `db_sha256`, extracts blobs into the appropriate store directories,
-and merges or restores the database. For game-scoped imports, ID conflicts
-with the destination database are resolved by remapping IDs to fresh values.
+Import validates the bundle before touching the destination database:
+1. Verifies `export_format_version` is supported (refuses if newer)
+2. Extracts and verifies `meta.sqlite` against `db_sha256` in the manifest
+3. Warns if `modctl_version` in the bundle is newer than the running binary
+4. Refuses if `schema_version` is newer than the current binary's schema
+
+Blob files are verified by hashing their content against their filename
+(which is their sha256) before ingestion. A mismatch causes import to abort.
+
+**Full import** copies `meta.sqlite` from the bundle directly into place as
+the new database, then runs migrations to bring it up to the current schema
+version if needed. The database must be empty (beyond auto-seeded store
+rows) unless `--force` is passed, in which case the existing database is
+wiped first.
+
+**Game-scoped import** inserts rows into the existing database with fresh
+IDs assigned by SQLite. A remapping table tracks old→new IDs for each table
+so foreign key references are correctly updated as rows are inserted in
+dependency order. The game must not already exist (matched by
+`store_id + store_game_id + instance_id`) unless `--force` is passed, in
+which case the existing game install and all its dependent rows are deleted
+first (cascading via FK). Orphaned blobs from the deleted install are left
+for `gc` to clean up.
+
+**Inventory scanning** is handled as follows:
+- If the bundle contains inventory entries (i.e. `inventory_scanned_at` is
+  non-null on the mod file version), they are imported directly
+- If the bundle does not contain inventory entries and `--skip-inventory` is
+  not passed, the archive is scanned immediately after import
+- If `--skip-inventory` is passed, unscanned archives are left for the user
+  to scan later with `mods scan-inventory`
+
+**ID remapping** (game-scoped only): all integer primary keys are reassigned
+by SQLite autoincrement on insert. The following tables require remapping:
+`game_installs`, `targets`, `mod_pages`, `mod_files`, `mod_file_versions`,
+`remap_configs`, `profiles`. `archive_inventory_entries` and `blobs` do not
+require remapping as they are keyed by content hash.
+
+No profiles are applied automatically after import. The user must run
+`modctl profiles set-active` and `modctl apply` to deploy mods.
