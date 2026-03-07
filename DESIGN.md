@@ -751,10 +751,12 @@ This preserves a clean v1 while allowing richer v2.
 - `export` - export modctl state to a portable bundle. Defaults to a full
   export of all games and blobs. Use `--game` to scope to a single game
   install. Supports `--output`/`-o` to override the output filename,
-  and `--skip-inventory` to omit archive inventory entries.
-  Default output filename: `modctl-export-<date>.tar.zst` (full) or
-  `modctl-export-<slug>-<date>.tar.zst` (game-scoped), where slug is the
-  game display name lowercased and slugified, truncated to 100 characters.
+  `--skip-inventory` to omit archive inventory entries, and `--no-verify`
+  to skip blob integrity verification before exporting (not recommended).
+  By default all blobs are hashed and verified against their stored sha256
+  before the bundle is written; `verified_at` is updated on each blob as
+  part of this process. Default output filename: `modctl-export-<date>.tar.zst`
+  (full) or `modctl-export-<slug>-<date>.tar.zst` (game-scoped).
 - `import <bundle>` - import a modctl export bundle. Accepts both full and
   game-scoped bundles. For full bundles the database must be empty beyond
   auto-seeded rows; use --force to wipe and restore. For game-scoped bundles
@@ -1039,11 +1041,19 @@ For game-scoped exports, a fresh SQLite database is created, migrations are
 run to bring it to the current schema, and only the relevant rows are
 inserted in foreign key dependency order.
 
-### Blob integrity
+### Blob verification
 
-Blobs are already content-addressed by sha256 so individual blob files do
-not need a separate integrity check - the filename is the hash. The
-`db_sha256` field in the manifest covers the database snapshot, which is
+Before writing the bundle, all blobs are hashed and compared against their
+stored sha256 (which is also their filename in the content-addressed store).
+If any mismatch is detected, export aborts with an error directing the user
+to run `doctor` to investigate. `verified_at` is updated on each blob that
+passes verification.
+
+Verification can be skipped with `--no-verify` for large collections where
+the user is confident in blob integrity, but this is not recommended. Use
+`doctor --recheck` to verify blobs independently of export.
+
+The `db_sha256` field in the manifest covers the database snapshot, which is
 verified on import.
 
 ### Partial exports

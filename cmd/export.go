@@ -39,6 +39,7 @@ var (
 	exportGame          string
 	exportOutput        string
 	exportSkipInventory bool
+	exportNoVerify      bool
 )
 
 var exportCmd = &cobra.Command{
@@ -90,6 +91,7 @@ Examples:
 		opts := exporter.Options{
 			ModctlVersion: rootCmd.Version,
 			SkipInventory: exportSkipInventory,
+			NoVerify:      exportNoVerify,
 		}
 
 		date := time.Now().Format("20060102")
@@ -165,4 +167,6 @@ func init() {
 		"Output file path (default: modctl-export-<date>.tar.zst)")
 	exportCmd.Flags().BoolVar(&exportSkipInventory, "skip-inventory", false,
 		"Omit archive inventory entries from the export")
+	exportCmd.Flags().BoolVar(&exportNoVerify, "no-verify", false,
+		"Skip blob integrity verification before exporting")
 }

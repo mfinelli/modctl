@@ -39,6 +39,27 @@ func Full(
 	bs blobstore.Store,
 	opts Options,
 ) error {
+	if !opts.NoVerify {
+		var toVerify []blobToVerify
+		archiveBlobs, err := q.ListBlobsByKind(ctx, string(blobstore.KindArchive))
+		if err != nil {
+			return fmt.Errorf("list archive blobs: %w", err)
+		}
+		for _, b := range archiveBlobs {
+			toVerify = append(toVerify, blobToVerify{b.Sha256, blobstore.KindArchive})
+		}
+		backupBlobs, err := q.ListBlobsByKind(ctx, string(blobstore.KindBackup))
+		if err != nil {
+			return fmt.Errorf("list backup blobs: %w", err)
+		}
+		for _, b := range backupBlobs {
+			toVerify = append(toVerify, blobToVerify{b.Sha256, blobstore.KindBackup})
+		}
+		if err := verifyBlobs(ctx, q, bs, toVerify); err != nil {
+			return fmt.Errorf("blob verification failed: %w", err)
+		}
+	}
+
 	out, err := os.Create(opts.OutputPath)
 	if err != nil {
 		return fmt.Errorf("create output file: %w", err)

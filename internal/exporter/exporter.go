@@ -31,6 +31,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
 )
@@ -46,6 +47,8 @@ type Options struct {
 	SkipInventory bool
 	// OutputPath is the destination file
 	OutputPath string
+	// NoVerify skips rehashing blobs before export
+	NoVerify bool
 }
 
 const (
@@ -211,4 +214,87 @@ func Slugify(s string) string {
 		result = strings.TrimRight(result, "-")
 	}
 	return result
+}
+
+type blobToVerify struct {
+	sha256 string
+	kind   blobstore.Kind
+}
+
+// verifyBlobs hashes all blobs of the given kinds against their on-disk files,
+// updates verified_at on success, and returns an error if any hash mismatches.
+// Progress is printed as a single updating line.
+func verifyBlobs(
+	ctx context.Context,
+	q *dbq.Queries,
+	bs blobstore.Store,
+	blobs []blobToVerify,
+) error {
+	total := len(blobs)
+	if total == 0 {
+		return nil
+	}
+
+	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	buf := make([]byte, 1024*1024)
+
+	fmt.Printf("  verifying blobs (0/%d)", total)
+
+	for i, b := range blobs {
+		select {
+		case <-ctx.Done():
+			fmt.Print("\n")
+			return ctx.Err()
+		default:
+		}
+
+		fmt.Printf("\r  verifying blobs (%d/%d)", i+1, total)
+
+		path, err := bs.PathFor(b.kind, b.sha256)
+		if err != nil {
+			fmt.Print("\n")
+			return fmt.Errorf("derive path for %s: %w", b.sha256, err)
+		}
+
+		f, err := os.Open(path)
+		if err != nil {
+			fmt.Print("\n")
+			if os.IsNotExist(err) {
+				return fmt.Errorf(
+					"blob %s... is missing from disk; run 'doctor' to check blob integrity",
+					b.sha256[:16],
+				)
+			}
+			return fmt.Errorf("open blob %s: %w", b.sha256[:16], err)
+		}
+
+		h := sha256.New()
+		_, cerr := blobstore.CopyWithContext(ctx, h, f, buf)
+		f.Close()
+		if cerr != nil {
+			fmt.Print("\n")
+			return fmt.Errorf("hash blob %s: %w", b.sha256[:16], cerr)
+		}
+
+		actual := hex.EncodeToString(h.Sum(nil))
+		if actual != b.sha256 {
+			fmt.Print("\n")
+			return fmt.Errorf(
+				"blob integrity check failed: expected %s got %s - run 'doctor' to investigate",
+				b.sha256, actual,
+			)
+		}
+
+		if err := q.TouchBlobVerifiedAt(ctx, dbq.TouchBlobVerifiedAtParams{
+			VerifiedAt: sql.NullString{String: now, Valid: true},
+			Sha256:     b.sha256,
+		}); err != nil {
+			fmt.Print("\n")
+			return fmt.Errorf("update verified_at %s: %w", b.sha256[:16], err)
+		}
+	}
+
+	fmt.Printf("\r%-60s\r", "")
+	fmt.Printf("  verified %d blob(s)\n", total)
+	return nil
 }
