@@ -1428,3 +1428,6 @@ SELECT * FROM game_installs;
 
 -- name: ListAllModFileVersions :many
 SELECT * FROM mod_file_versions;
+
+-- name: ExportUnmarkInventoried :exec
+UPDATE mod_file_versions SET inventory_scanned_at = NULL;

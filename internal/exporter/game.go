@@ -88,7 +88,7 @@ func Game(
 
 	// 1. Build the scoped SQLite database
 	scopedDBPath, dbSha256, archiveCount, backupCount, err := buildGameScopedDB(
-		ctx, db, q, gi, opts.SkipInventory,
+		ctx, q, gi, opts.SkipInventory,
 	)
 	if err != nil {
 		return fmt.Errorf("build game-scoped database: %w", err)
@@ -185,7 +185,6 @@ func Game(
 // the sha256 of the database, and blob counts.
 func buildGameScopedDB(
 	ctx context.Context,
-	db *sql.DB,
 	q *dbq.Queries,
 	gi dbq.GameInstall,
 	skipInventory bool,
@@ -251,6 +250,13 @@ func buildGameScopedDB(
 		if err := exportInventory(ctx, q, sq, gi.ID); err != nil {
 			os.Remove(tmpPath)
 			return "", "", 0, 0, fmt.Errorf("export inventory: %w", err)
+		}
+	} else {
+		// make sure the bundle doesn't mark blobs as inventoried
+		// we explicitly excluded the inventories!
+		if err := sq.ExportUnmarkInventoried(ctx); err != nil {
+			os.Remove(tmpPath)
+			return "", "", 0, 0, fmt.Errorf("mark uninventories: %w", err)
 		}
 	}
 
