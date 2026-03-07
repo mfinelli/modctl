@@ -1,0 +1,34 @@
+---
+name: Package
+on: push
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:jammy  # glibc floor
+    steps:
+      - run: apt-get update
+      - run: apt-get upgrade -y
+      - run: |
+          apt-get install -y \
+            ca-certificates \
+            build-essential \
+            gcc-aarch64-linux-gnu \
+            libarchive-tools \
+            unzip
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          cache: true
+          go-version-file: go.mod
+      - uses: sqlc-dev/setup-sqlc@v4
+        with:
+          sqlc-version: 1.30.0
+      - run: sqlc generate
+      - run: go mod vendor
+      - run: make
+        env:
+          CC: aarch64-linux-gnu-gcc
+          GOARCH: arm64
+      - run: ./modctl
