@@ -19,10 +19,7 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 
 	"github.com/charmbracelet/lipgloss"
@@ -46,15 +43,15 @@ Profiles are independent mod configurations for a single game.
 Use: ` + "`modctl profiles set-active <name>`" + ` to switch the active profile.
 
 The current active game is used unless --game is provided.`,
-	Args: cobra.ExactArgs(0),
+	Args:         cobra.ExactArgs(0),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// TODO: extract these somewhere else
 		headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
 		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		err := internal.EnsureDBExists()
 		if err != nil {

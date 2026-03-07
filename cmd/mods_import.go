@@ -29,7 +29,6 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -89,10 +88,10 @@ You can optionally attach Nexus metadata at import time using --nexus-url.
 
 If --rm is provided, the original input file is deleted only after the archive
 has been safely stored and the database has been updated successfully.`,
-	Args: cobra.ExactArgs(1),
+	Args:         cobra.ExactArgs(1),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		// TODO: extract these somewhere else
 		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))

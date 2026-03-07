@@ -19,10 +19,7 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 
 	"github.com/mfinelli/modctl/dbq"
@@ -47,10 +44,10 @@ var profilesOrderCompactCmd = &cobra.Command{
 By default, priorities are reassigned as 1, 2, 3, ... in the current order.
 Use --multiple to assign priorities as N, 2N, 3N, ... (for example, --multiple
 10).`,
-	Args: cobra.ExactArgs(0),
+	Args:         cobra.ExactArgs(0),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		step := int64(1)
 		if profilesOrderCompactMultiple > 0 {

@@ -19,10 +19,7 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 
 	"github.com/mfinelli/modctl/dbq"
@@ -49,9 +46,10 @@ This changes ordering and rewrites priorities to a compact sequence starting
 at 1. Use this when you care about relative order, not specific priority numbers.
 
 Exactly one of --before or --after is required.`,
+	Args:         cobra.ExactArgs(0),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		moveID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil || moveID <= 0 {

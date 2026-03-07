@@ -22,8 +22,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
@@ -69,8 +67,7 @@ Use --dry-run to preview what would be imported without making any changes.`,
 		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		bundlePath := args[0]
 

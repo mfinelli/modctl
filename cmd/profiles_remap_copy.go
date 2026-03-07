@@ -19,10 +19,7 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 
 	"github.com/mfinelli/modctl/dbq"
@@ -47,10 +44,10 @@ If the source has no remap rules this is a no-op.
 
 This is useful when upgrading a mod: copy the remap rules from the old
 version to the new version before removing the old version from the profile.`,
-	Args: cobra.ExactArgs(2),
+	Args:         cobra.ExactArgs(2),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		srcVersionID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil || srcVersionID <= 0 {

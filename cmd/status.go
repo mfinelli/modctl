@@ -19,12 +19,9 @@
 package cmd
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
 	"strings"
 	"time"
 
@@ -49,8 +46,7 @@ For detailed profile information including mod list and conflicts, use
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		if err := internal.EnsureDBExists(); err != nil {
 			return err

@@ -19,10 +19,7 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 
 	"github.com/mfinelli/modctl/dbq"
@@ -44,10 +41,10 @@ var profilesRemapClearCmd = &cobra.Command{
 
 This also removes the underlying remap configuration. Use this before
 recreating rules in a different order.`,
-	Args: cobra.ExactArgs(1),
+	Args:         cobra.ExactArgs(1),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		versionID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil || versionID <= 0 {

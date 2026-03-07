@@ -19,7 +19,6 @@
 package cmd
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -49,8 +48,9 @@ The store must already be configured.`,
 		}
 		return completion.StoreIDs(cmd, toComplete)
 	},
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := context.Background()
+		ctx := cmd.Context()
 
 		err := internal.EnsureDBExists()
 		if err != nil {

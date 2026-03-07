@@ -19,12 +19,9 @@
 package cmd
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
 	"sort"
 	"strconv"
 
@@ -55,14 +52,14 @@ versions.
 TODO:
 - Show latest version information from the Nexus API for Nexus-linked mods and
   compare it with imported versions.`,
-	Args: cobra.ExactArgs(0),
+	Args:         cobra.ExactArgs(0),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// TODO: extract these somewhere else
 		headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
 		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		err := internal.EnsureDBExists()
 		if err != nil {

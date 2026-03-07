@@ -19,10 +19,7 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 
 	"github.com/charmbracelet/lipgloss"
@@ -44,14 +41,14 @@ var profilesRemapListCmd = &cobra.Command{
 	Long: `List all remap rules for a mod version in a profile.
 
 Rules are shown in the order they will be applied during planning.`,
-	Args: cobra.ExactArgs(1),
+	Args:         cobra.ExactArgs(1),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// TODO: extract elsewhere
 		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 		boldStyle := lipgloss.NewStyle().Bold(true)
 
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		versionID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil || versionID <= 0 {

@@ -20,6 +20,7 @@ package main
 
 import (
 	"embed"
+	"os"
 
 	"github.com/mfinelli/modctl/cmd"
 	"github.com/mfinelli/modctl/internal"
@@ -35,5 +36,7 @@ func main() {
 	cmd.SampleTarGz = sampleTarGz
 	internal.Migrations = migrations
 
-	cmd.Execute()
+	if r := cmd.Execute(); r != 0 {
+		os.Exit(r)
+	}
 }

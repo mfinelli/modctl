@@ -19,12 +19,9 @@
 package cmd
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 
 	"github.com/mattn/go-sqlite3"
@@ -53,10 +50,10 @@ override the target profile with --profile.
 
 If --priority is not provided, modctl assigns the next highest priority in the
 profile. Higher priority wins conflicts.`,
-	Args: cobra.ExactArgs(1),
+	Args:         cobra.ExactArgs(1),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		versionID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil || versionID <= 0 {

@@ -19,12 +19,9 @@
 package cmd
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 
 	"github.com/charmbracelet/lipgloss"
@@ -52,13 +49,13 @@ profile - they are informational only.
 
 The reason is freeform and entirely up to you - it might be a note about
 known crashes, conflicting game mechanics, or anything else.`,
-	Args: cobra.ExactArgs(2),
+	Args:         cobra.ExactArgs(2),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// TODO extract this
 		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		idA, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {

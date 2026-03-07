@@ -23,8 +23,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 	"strings"
 	"time"
@@ -58,10 +56,10 @@ When the profile is currently applied, pending changes are detected by
 comparing the set of enabled mod versions against installed files. This
 check does not account for priority reordering between mods that conflict
 on the same path - run 'modctl apply --dry-run' for a precise diff.`,
-	Args: cobra.ExactArgs(0),
+	Args:         cobra.ExactArgs(0),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		err := internal.EnsureDBExists()
 		if err != nil {

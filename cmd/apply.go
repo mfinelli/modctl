@@ -19,12 +19,9 @@
 package cmd
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 	"strings"
 	"time"
@@ -73,8 +70,7 @@ Use --dry-run to preview the plan without making any changes.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		if err := internal.EnsureDBExists(); err != nil {
 			return err

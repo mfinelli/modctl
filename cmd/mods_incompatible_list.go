@@ -19,10 +19,7 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 	"strings"
 
@@ -43,10 +40,10 @@ var modsIncompatibleListCmd = &cobra.Command{
 
 Shows all pairs of mods that have been flagged as incompatible, regardless
 of which profiles they appear in.`,
-	Args: cobra.ExactArgs(0),
+	Args:         cobra.ExactArgs(0),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		err := internal.EnsureDBExists()
 		if err != nil {

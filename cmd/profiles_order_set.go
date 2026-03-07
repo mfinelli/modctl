@@ -19,12 +19,9 @@
 package cmd
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 
 	"github.com/mattn/go-sqlite3"
@@ -46,10 +43,10 @@ var profilesOrderSetCmd = &cobra.Command{
 	Long: `Set the numeric priority of a mod file version within a profile.
 
 Higher priority wins conflicts. Priorities must be unique within a profile.`,
-	Args: cobra.ExactArgs(2),
+	Args:         cobra.ExactArgs(2),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		versionID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil || versionID <= 0 {

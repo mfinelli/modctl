@@ -19,12 +19,9 @@
 package cmd
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 	"time"
 
@@ -55,15 +52,15 @@ by walking the Nexus file update chain. Results are displayed immediately and
 cached for use by 'profiles status'.
 
 Use --force to proceed even if the operation would exhaust your API quota.`,
-	Args: cobra.ExactArgs(0),
+	Args:         cobra.ExactArgs(0),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// TODO: extract styles
 		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 		nexusUpdateStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Bold(true)
 
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		apiKey := viper.GetString("nexus.apikey")
 		if apiKey == "" {

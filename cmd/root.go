@@ -19,10 +19,13 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/adrg/xdg"
 	"github.com/spf13/cobra"
@@ -69,11 +72,14 @@ You should have received a copy of the GNU General Public License (version
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
-		os.Exit(1)
+func Execute() int {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if err := rootCmd.ExecuteContext(ctx); err != nil {
+		return 1
 	}
+	return 0
 }
 
 func init() {

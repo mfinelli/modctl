@@ -19,7 +19,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/mfinelli/modctl/internal"
@@ -36,9 +35,10 @@ This command detects installed games, updates their install paths, and marks
 missing installs as not present.
 
 It is safe to run multiple times.`,
-	Args: cobra.ExactArgs(0),
+	Args:         cobra.ExactArgs(0),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := context.Background()
+		ctx := cmd.Context()
 
 		err := internal.EnsureDBExists()
 		if err != nil {

@@ -19,11 +19,8 @@
 package cmd
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 	"strings"
 	"time"
@@ -56,8 +53,7 @@ Use --limit to change the number of operations shown.`,
 		// TODO: extract
 		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		if err := internal.EnsureDBExists(); err != nil {
 			return err

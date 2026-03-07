@@ -19,10 +19,8 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"os/signal"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
@@ -65,8 +63,7 @@ Examples:
 		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		if err := internal.EnsureDBExists(); err != nil {
 			return err

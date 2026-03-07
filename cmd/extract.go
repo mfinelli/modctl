@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
 
@@ -79,8 +78,7 @@ Examples:
 		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 		errStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("1"))
 
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		bundlePath := args[0]
 

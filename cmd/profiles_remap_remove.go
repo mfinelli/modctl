@@ -19,10 +19,7 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 
 	"github.com/mfinelli/modctl/dbq"
@@ -43,10 +40,10 @@ var profilesRemapRemoveCmd = &cobra.Command{
 	Long: `Remove a remap rule at the given position for a mod version in a profile.
 
 Use 'remap list' to see current rules and their positions.`,
-	Args: cobra.ExactArgs(2),
+	Args:         cobra.ExactArgs(2),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		versionID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil || versionID <= 0 {

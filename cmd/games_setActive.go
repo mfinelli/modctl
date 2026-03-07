@@ -19,7 +19,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/mfinelli/modctl/dbq"
@@ -41,7 +40,8 @@ Accepts either a numeric install ID or a selector:
 
 If the instance is omitted and multiple installs exist, you must specify the
 desired instance explicitly.`,
-	Args: cobra.ExactArgs(1),
+	Args:         cobra.ExactArgs(1),
+	SilenceUsage: true,
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) != 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
@@ -49,7 +49,7 @@ desired instance explicitly.`,
 		return completion.GameInstallSelectors(cmd, toComplete)
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := context.Background()
+		ctx := cmd.Context()
 
 		err := internal.EnsureDBExists()
 		if err != nil {

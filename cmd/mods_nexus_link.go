@@ -23,8 +23,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 
 	"github.com/charmbracelet/lipgloss"
@@ -56,10 +54,10 @@ var modsNexusLinkCmd = &cobra.Command{
 Nexus file IDs. Without --version-id, runs automatically against all unlinked
 mod file versions for the active game. With --version-id, targets a specific
 version for manual linking.`,
-	Args: cobra.ExactArgs(0),
+	Args:         cobra.ExactArgs(0),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		apiKey := viper.GetString("nexus.apikey")
 		if apiKey == "" {

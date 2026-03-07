@@ -19,7 +19,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -44,7 +43,8 @@ You may specify either the numeric install ID or a selector such as:
 
 If multiple installs exist for the same game, an explicit instance must be
 provided.`,
-	Args: cobra.ExactArgs(1),
+	Args:         cobra.ExactArgs(1),
+	SilenceUsage: true,
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) != 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
@@ -52,7 +52,7 @@ provided.`,
 		return completion.GameInstallSelectors(cmd, toComplete)
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := context.Background()
+		ctx := cmd.Context()
 
 		err := internal.EnsureDBExists()
 		if err != nil {

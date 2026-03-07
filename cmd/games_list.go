@@ -19,7 +19,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/charmbracelet/lipgloss/table"
@@ -43,9 +42,10 @@ By default, only the active store is included. Use --store to filter by a
 specific store. Or use --all to include games from all stores.
 
 (TODO) The active game install (if any) is highlighted.`,
-	Args: cobra.ExactArgs(0),
+	Args:         cobra.ExactArgs(0),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := context.Background()
+		ctx := cmd.Context()
 
 		err := internal.EnsureDBExists()
 		if err != nil {

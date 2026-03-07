@@ -19,7 +19,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -38,9 +37,10 @@ var initCmd = &cobra.Command{
 Creates the required data directories (archives, backups, overrides, tmp) and
 initializes or upgrades the internal database. This command is safe to run
 multiple times and will not overwrite existing data.`,
-	Args: cobra.ExactArgs(0),
+	Args:         cobra.ExactArgs(0),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := context.Background()
+		ctx := cmd.Context()
 
 		err := os.MkdirAll(viper.GetString("archives_dir"), 0o0755)
 		if err != nil {

@@ -26,7 +26,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/signal"
 	"path/filepath"
 
 	"github.com/charmbracelet/lipgloss"
@@ -62,8 +61,7 @@ Exits non-zero if any integrity issues are found. Version warnings
 		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 		errStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("1"))
 
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		bundlePath := args[0]
 

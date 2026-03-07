@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
 	"time"
@@ -81,8 +80,7 @@ Use --dry-run to preview what would be removed without making any changes.`,
 		redStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
 		dryStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
 
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		if err := internal.EnsureDBExists(); err != nil {
 			return err

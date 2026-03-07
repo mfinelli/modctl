@@ -23,8 +23,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 	"strings"
 	"time"
@@ -50,10 +48,10 @@ Nexus link state, cached update info, and profile membership.
 
 Nexus data is read from the local cache only. Run 'mods nexus check-updates'
 to refresh cached data.`,
-	Args: cobra.ExactArgs(1),
+	Args:         cobra.ExactArgs(1),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		modPageID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {

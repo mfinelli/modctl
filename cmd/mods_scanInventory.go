@@ -19,10 +19,7 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/signal"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
@@ -45,15 +42,15 @@ without re-reading archives from disk.
 Scanning is performed automatically during 'mods import'. Use this command
 to populate inventory for archives that were skipped during import, or if a
 previous scan was interrupted.`,
-	Args: cobra.ExactArgs(0),
+	Args:         cobra.ExactArgs(0),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// TODO extract these somewhere else
 		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 		boldStyle := lipgloss.NewStyle().Bold(true)
 
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		err := internal.EnsureDBExists()
 		if err != nil {

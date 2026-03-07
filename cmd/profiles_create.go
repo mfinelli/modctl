@@ -19,12 +19,9 @@
 package cmd
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 
 	"github.com/mattn/go-sqlite3"
@@ -49,10 +46,10 @@ Profiles are named mod sets. Exactly one profile can be active per game install.
 New profiles start inactive; use ` + "`modctl profiles set-active`" + ` to activate one.
 
 Note: modctl automatically creates a "default" profile during game refresh.`,
-	Args: cobra.ExactArgs(1),
+	Args:         cobra.ExactArgs(1),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		name := args[0]
 

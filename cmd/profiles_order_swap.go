@@ -19,12 +19,9 @@
 package cmd
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 
 	"github.com/mfinelli/modctl/dbq"
@@ -46,10 +43,10 @@ var profilesOrderSwapCmd = &cobra.Command{
 
 This is a safe way to reorder under the "unique priority per profile" rule,
 without having to choose unused priority numbers.`,
-	Args: cobra.ExactArgs(2),
+	Args:         cobra.ExactArgs(2),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		aID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil || aID <= 0 {

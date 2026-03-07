@@ -19,12 +19,9 @@
 package cmd
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 
 	"github.com/charmbracelet/lipgloss"
@@ -38,15 +35,15 @@ import (
 var modsNexusUnlinkGame string
 
 var modsNexusUnlinkCmd = &cobra.Command{
-	Use:   "unlink",
-	Short: "Remove the Nexus file ID link from a mod file version",
-	Args:  cobra.ExactArgs(1),
+	Use:          "unlink",
+	Short:        "Remove the Nexus file ID link from a mod file version",
+	Args:         cobra.ExactArgs(1),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// TODO: extract styles
 		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		nexusUnlinkVersionID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {

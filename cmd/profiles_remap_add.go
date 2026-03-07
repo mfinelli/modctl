@@ -19,11 +19,8 @@
 package cmd
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 
 	"github.com/mfinelli/modctl/dbq"
@@ -62,10 +59,10 @@ Examples:
   modctl profiles remap add 42 dest_prefix Data/mymod
   modctl profiles remap add 42 include_glob "*.esp"
   modctl profiles remap add 42 exclude_glob "*.txt"`,
-	Args: cobra.ExactArgs(3),
+	Args:         cobra.ExactArgs(3),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		versionID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil || versionID <= 0 {

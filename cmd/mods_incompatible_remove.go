@@ -19,10 +19,7 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/signal"
 	"strconv"
 
 	"github.com/mfinelli/modctl/dbq"
@@ -40,10 +37,10 @@ var modsIncompatibleRemoveCmd = &cobra.Command{
 	Long: `Remove an incompatibility flag between two mods.
 
 The order of the two IDs does not matter.`,
-	Args: cobra.ExactArgs(2),
+	Args:         cobra.ExactArgs(2),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+		ctx := cmd.Context()
 
 		idA, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {
