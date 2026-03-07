@@ -52,6 +52,7 @@ You should have received a copy of the GNU General Public License (version
 3) along with this program. If not, see https://www.gnu.org/licenses/.`,
 	Version: "1.0.0",
 
+	CompletionOptions: cobra.CompletionOptions{HiddenDefaultCmd: true},
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		level := slog.LevelWarn
 		if verbose {
