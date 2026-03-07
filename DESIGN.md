@@ -775,6 +775,21 @@ This preserves a clean v1 while allowing richer v2.
   files and database rows are consistent with each other (no missing files,
   no orphaned files). Warns about version compatibility issues but does not
   error on them. Exits non-zero if any integrity issues are found.
+- `extract <bundle>` - extract mod archives from a modctl export bundle.
+  Without `--mod`, lists all mods in the bundle grouped by game and mod
+  page, including version strings and Nexus file IDs where available.
+  With `--mod <name>` (exact match), extracts the matching mod archive to
+  the output directory. Use `--file` and `--version` to narrow the
+  selection when multiple files or versions exist; if omitted and only one
+  option exists it is selected automatically. For full bundles, `--game`
+  is required when extracting; it has no effect on game-scoped bundles and
+  a warning is printed if passed. Extracted files are named using the
+  original filename if available, otherwise the archive format is detected
+  via bsdtar and the file is named `<sha256prefix>.<ext>`. Use
+  `--output-dir`/`-o` to specify the output directory (default: current
+  directory). Use `--overwrite` to replace existing files; by default
+  existing files are skipped with a warning. Nexus mod and file IDs are
+  printed after each extraction if available.
 
 Key behavior:
 - "intent changes" (enable/disable/order) are cheap
@@ -1136,3 +1151,56 @@ issues cause a non-zero exit.
 
 All blob issues are collected before reporting so the user gets a complete
 picture of the bundle's state in a single run.
+
+### Archive extraction
+
+The `extract` command extracts raw mod archive files from a bundle so they
+can be re-imported with `mods import` into a different installation, without
+performing a full restore.
+
+#### Listing
+
+Without `--mod`, the command lists all mods in the bundle grouped by game
+and mod page:
+
+    Mods in bundle (game: Cyberpunk 2077  steam:1091500):
+
+      Mod Page: Appearance Menu Mod
+        File: Main File
+          v1.0.0  abc123def456...  (nexus file_id=456)
+
+For full bundles each game is printed as a separate section. For
+game-scoped bundles there is only one section.
+
+#### Selection
+
+Mods are selected with `--mod <name>` (exact match against mod page name).
+`--file` and `--version` narrow the selection further. If either is omitted
+and only one option exists it is used automatically; if multiple options
+exist the command lists them and exits with an error.
+
+For full bundles, `--game` is required for extraction to avoid ambiguity
+when multiple games contain mods with the same name.
+
+#### Output filename
+
+Files are named using `original_name` from `mod_file_versions` if
+available. Otherwise the archive format is detected by running
+`bsdtar -tvvf` on the blob and parsing the summary trailer line
+(`Archive Format: ..., Compression: ...`), which is mapped to a file
+extension. The file is then named `<sha256prefix>.<ext>`. If format
+detection fails the sha256 prefix is used with no extension.
+
+#### Blob integrity
+
+The specific blob being extracted is hashed and verified against its
+sha256 before being copied to the output directory. This is a targeted
+check rather than a full bundle verification - use `verify` for a
+complete integrity check.
+
+#### Nexus information
+
+If the extracted version has a `nexus_file_id` and the mod page has
+`nexus_mod_id` and `nexus_game_domain` recorded, the Nexus URL and IDs
+are printed after extraction. The Nexus cache is not consulted since it
+is not included in bundles.
