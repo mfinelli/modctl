@@ -795,6 +795,8 @@ This preserves a clean v1 while allowing richer v2.
   directory). Use `--overwrite` to replace existing files; by default
   existing files are skipped with a warning. Nexus mod and file IDs are
   printed after each extraction if available.
+- `config get|set|list` - view and modify config values without hand-editing
+  the config file
 
 Key behavior:
 - "intent changes" (enable/disable/order) are cheap
@@ -902,7 +904,57 @@ Include in `testdata/`:
   of any apply/unapply command, refusing to proceed without `--force` or
   `--abort`
 
-## 17. Nexus Mods integration
+## 17. Configuration
+
+### File location
+
+The config file is a TOML file at `$XDG_CONFIG_HOME/modctl/config.toml` by
+default. Any command accepts `--config <path>` to use a different file. The
+file is optional: if it does not exist, all built-in defaults are used.
+
+### Keys and defaults
+
+| Key            | Default                                  | Description                              |
+|----------------|------------------------------------------|------------------------------------------|
+| `bsdtar`       | `bsdtar`                                 | bsdtar binary name or path               |
+| `database`     | `$XDG_DATA_HOME/modctl/modctl.db`        | Path to the SQLite database              |
+| `archives_dir` | `$XDG_DATA_HOME/modctl/archives`         | Blob store for mod archives              |
+| `backups_dir`  | `$XDG_DATA_HOME/modctl/backups`          | Blob store for pre-existing file backups |
+| `overrides_dir`| `$XDG_DATA_HOME/modctl/overrides`        | Blob store for user overrides            |
+| `locks_dir`    | `$XDG_STATE_HOME/modctl/locks`           | Per-game lockfiles                       |
+| `tmp_dir`      | `$XDG_RUNTIME_DIR/modctl`                | Staging directory for extraction         |
+| `nexus.apikey` | (none)                                   | Nexus Mods API key                       |
+
+Only `nexus.apikey` has no default. All other keys have sane defaults and
+most users will never need to change them. See section 5 for the rationale
+behind the `tmp_dir` default.
+
+### Security note
+
+The Nexus API key is stored in plain text in the config file. There is no
+keyring integration. The config file is created with mode `0600` (user
+read/write only).
+
+### config command
+
+The `config` command allows reading and writing config values without hand-
+editing the file. The file is created if it does not exist when `config set`
+is run.
+
+Note that `config set` rewrites the entire config file. Any comments or
+custom formatting added by hand will not be preserved.
+
+### Commands
+
+- `config list` - show all keys with their effective values; indicates whether
+  each value was explicitly set or is inheriting its default
+- `config get <key>` - show the effective value for a single key and whether
+  it is set or defaulting
+- `config set <key> <value>` - set a key in the config file, creating the file
+  if it does not exist; prints a plain-text storage notice when setting
+  `nexus.apikey`
+
+## 18. Nexus Mods integration
 
 ### Overview
 
@@ -978,7 +1030,7 @@ The API key is read from config (`nexus.apikey`). If not configured, Nexus
 linking is silently skipped at import time; commands that require it error
 with a helpful message.
 
-## 18. Garbage Collection
+## 19. Garbage Collection
 
 ### Purpose
 
@@ -1036,7 +1088,7 @@ Flags:
 - `--skip-orphans`: skip on-disk files with no database row (orphans are
   removed by default)
 
-## 19. Export and Import
+## 20. Export and Import
 
 ### Purpose
 
