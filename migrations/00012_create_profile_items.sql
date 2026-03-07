@@ -24,7 +24,7 @@ CREATE TABLE profile_items
   priority INTEGER NOT NULL DEFAULT 0,
 
   -- remap rules/configuration for this item
-  remap_config_id INTEGER REFERENCES remap_configs(id) ON UPDATE CASCADE ON DELETE SET NULL,
+  remap_config_id INTEGER REFERENCES remap_configs(id) ON UPDATE CASCADE ON DELETE CASCADE,
 
   -- optional notes per item
   notes TEXT,

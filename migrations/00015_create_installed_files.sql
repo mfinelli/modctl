@@ -22,7 +22,8 @@ CREATE TABLE installed_files
   -- who "owns" this file in the plan (the winner that supplied it)
   owner_mod_file_version_id INTEGER REFERENCES mod_file_versions(id) ON UPDATE CASCADE ON DELETE RESTRICT,
   owner_override_id INTEGER REFERENCES overrides(id) ON UPDATE CASCADE ON DELETE RESTRICT,
-  -- the profile that last applied this file
+  -- the profile that last applied this file ("last writer wins"; not exclusive
+  -- ownership -- the same mod file version may exist in multiple profiles)
   owner_profile_id INTEGER REFERENCES profiles(id) ON UPDATE CASCADE ON DELETE SET NULL,
   -- operation that last wrote this path
   last_operation_id INTEGER REFERENCES operations(id) ON UPDATE CASCADE ON DELETE SET NULL,

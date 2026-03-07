@@ -141,6 +141,11 @@ current install has been modified or deleted.
 at query time by the planner and surfaced by `status`. No additional schema
 column tracks this.
 
+The `installed_files` `owner_profile_id` is the profile that last applied this
+file, not an exclusive ownership claim. If the same mod file version appears in
+multiple profiles, owner_profile_id will reflect whichever profile most
+recently ran a successful apply.
+
 ### Profile
 
 A named set of enabled mod versions for a `GameInstall`, with:
