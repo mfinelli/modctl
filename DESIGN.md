@@ -768,6 +768,13 @@ This preserves a clean v1 while allowing richer v2.
   deploy mods. Requires temporary disk space roughly equal to the bundle
   size.
 - `gc` - garbage collect unreferenced blobs from the blob store
+- `verify <bundle>` - verify the integrity of a modctl export bundle without
+  importing it. Checks the database snapshot against the manifest sha256,
+  runs `quick_check` and `foreign_key_check` on the bundle database, verifies
+  every blob file hashes correctly against its filename, and checks that blob
+  files and database rows are consistent with each other (no missing files,
+  no orphaned files). Warns about version compatibility issues but does not
+  error on them. Exits non-zero if any integrity issues are found.
 
 Key behavior:
 - "intent changes" (enable/disable/order) are cheap
@@ -1107,3 +1114,25 @@ require remapping as they are keyed by content hash.
 
 No profiles are applied automatically after import. The user must run
 `modctl profiles set-active` and `modctl apply` to deploy mods.
+
+### Bundle verification
+
+The `verify` command performs a full integrity check on a bundle without
+importing it. It is useful for validating a bundle before importing, or for
+checking a stored backup for corruption.
+
+Checks performed:
+- `db_sha256` in the manifest matches the actual sha256 of `meta.sqlite`
+- `export_format_version` is supported (hard error if newer)
+- `PRAGMA quick_check` on the bundle database
+- `PRAGMA foreign_key_check` on the bundle database
+- Every blob file in the bundle hashes correctly against its filename
+- Every blob referenced in the bundle database has a corresponding file
+- Every blob file in the bundle has a corresponding database row
+
+Version warnings (`modctl_version` or `schema_version` newer than the
+running binary) are printed but do not affect the exit code. All other
+issues cause a non-zero exit.
+
+All blob issues are collected before reporting so the user gets a complete
+picture of the bundle's state in a single run.
