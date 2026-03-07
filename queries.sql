@@ -1473,3 +1473,33 @@ JOIN mod_files mf ON mf.id = mfv.mod_file_id
 JOIN mod_pages mp  ON mp.id = mf.mod_page_id
 WHERE mfv.id = ?
   AND mp.game_install_id = ?;
+
+-- name: CompleteModPagesByGameInstall :many
+SELECT
+    mp.id,
+    mp.name,
+    mp.source_kind
+FROM mod_pages mp
+WHERE mp.game_install_id = ?
+  AND (lower(mp.name) LIKE lower(sqlc.arg(prefix)) ESCAPE '\')
+ORDER BY mp.name COLLATE NOCASE
+LIMIT 20;
+
+-- name: GetModPagesByName :many
+SELECT
+    mp.id,
+    mp.name,
+    mp.source_kind
+FROM mod_pages mp
+WHERE mp.game_install_id = ?
+  AND lower(mp.name) = lower(sqlc.arg(name))
+ORDER BY mp.id;
+
+-- name: GetModPageByIDForGame :one
+SELECT
+    mp.id,
+    mp.name,
+    mp.source_kind
+FROM mod_pages mp
+WHERE mp.id = ?
+  AND mp.game_install_id = ?;

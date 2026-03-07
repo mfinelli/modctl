@@ -37,24 +37,18 @@ var modsIncompatibleRemoveCmd = &cobra.Command{
 	Long: `Remove an incompatibility flag between two mods.
 
 The order of the two IDs does not matter.`,
-	Args:         cobra.ExactArgs(2),
+	Args: cobra.ExactArgs(2),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) >= 2 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return completion.ModPageIDs(cmd, toComplete)
+	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		idA, err := strconv.ParseInt(args[0], 10, 64)
-		if err != nil {
-			return fmt.Errorf("invalid mod-page-id-a %q: must be a numeric ID", args[0])
-		}
-		idB, err := strconv.ParseInt(args[1], 10, 64)
-		if err != nil {
-			return fmt.Errorf("invalid mod-page-id-b %q: must be a numeric ID", args[1])
-		}
-		if idA == idB {
-			return fmt.Errorf("mod-page-id-a and mod-page-id-b must be different")
-		}
-
-		err = internal.EnsureDBExists()
+		err := internal.EnsureDBExists()
 		if err != nil {
 			return err
 		}
@@ -89,31 +83,45 @@ The order of the two IDs does not matter.`,
 			return err
 		}
 
-		// Verify both mod pages exist and belong to the current game install
-		pageA, err := q.GetModPage(ctx, idA)
+		mpA, err := internal.ResolveModPageArg(ctx, q, gi, args[0])
 		if err != nil {
-			return fmt.Errorf("mod page %d not found", idA)
+			return err
 		}
-		pageB, err := q.GetModPage(ctx, idB)
+
+		mpB, err := internal.ResolveModPageArg(ctx, q, gi, args[1])
 		if err != nil {
-			return fmt.Errorf("mod page %d not found", idB)
+			return err
+		}
+
+		if mpA.ID == mpB.ID {
+			return fmt.Errorf("mod-page-id-a and mod-page-id-b must be different")
+		}
+
+		// Verify both mod pages exist and belong to the current game install
+		pageA, err := q.GetModPage(ctx, mpA.ID)
+		if err != nil {
+			return fmt.Errorf("mod page %d not found", mpA.ID)
+		}
+		pageB, err := q.GetModPage(ctx, mpB.ID)
+		if err != nil {
+			return fmt.Errorf("mod page %d not found", mpB.ID)
 		}
 		if pageA.GameInstallID != gi.ID || pageB.GameInstallID != gi.ID {
 			return fmt.Errorf("both mod pages must belong to the current game install")
 		}
 
 		n, err := q.RemoveModIncompatibility(ctx, dbq.RemoveModIncompatibilityParams{
-			ModPageIDA: idA,
-			ModPageIDB: idB,
+			ModPageIDA: mpA.ID,
+			ModPageIDB: mpB.ID,
 		})
 		if err != nil {
 			return fmt.Errorf("removing incompatibility: %w", err)
 		}
 		if n == 0 {
-			return fmt.Errorf("no incompatibility flag found between mod pages %d and %d", idA, idB)
+			return fmt.Errorf("no incompatibility flag found between mod pages %d and %d", mpA.ID, mpB.ID)
 		}
 
-		fmt.Printf("Removed incompatibility flag between mod pages %d and %d\n", idA, idB)
+		fmt.Printf("Removed incompatibility flag between mod pages %d and %d\n", mpA.ID, mpB.ID)
 		return nil
 	},
 }

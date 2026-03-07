@@ -48,17 +48,18 @@ Nexus link state, cached update info, and profile membership.
 
 Nexus data is read from the local cache only. Run 'mods nexus check-updates'
 to refresh cached data.`,
-	Args:         cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return completion.ModPageIDs(cmd, toComplete)
+	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		modPageID, err := strconv.ParseInt(args[0], 10, 64)
-		if err != nil {
-			return fmt.Errorf("invalid mod page id %q: %w", args[0], err)
-		}
-
-		err = internal.EnsureDBExists()
+		err := internal.EnsureDBExists()
 		if err != nil {
 			return err
 		}
@@ -93,7 +94,12 @@ to refresh cached data.`,
 			return err
 		}
 
-		return runModsInfo(ctx, q, modPageID, gi.ID)
+		mp, err := internal.ResolveModPageArg(ctx, q, gi, args[0])
+		if err != nil {
+			return err
+		}
+
+		return runModsInfo(ctx, q, mp.ID, gi.ID)
 	},
 }
 
