@@ -1,0 +1,12 @@
+Package: modctl
+Version: PKGVER
+Section: utils
+Priority: optional
+Architecture: PKGARCH
+Homepage: https://modctl.org
+Maintainer: Mario Finelli <mario@modctl.org>
+Depends: libc6 (>= MINGLIBC)
+Description: command line mod manager
+ modctl installs mods by extracting archives directly into game directories
+ while tracking every installed file. It supports per-profile priority
+ ordering, conflict detection, and safe rollback via automatic backups.

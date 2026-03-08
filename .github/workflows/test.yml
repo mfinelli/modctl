@@ -13,6 +13,7 @@ jobs:
       - run: |
           apt-get install -y \
             ca-certificates \
+            binutils-aarch64-linux-gnu \
             build-essential \
             gcc-aarch64-linux-gnu \
             libarchive-tools \
@@ -26,9 +27,11 @@ jobs:
         with:
           sqlc-version: 1.30.0
       - run: sqlc generate
+      - run: go install github.com/google/go-licenses/v2@latest
+      - run: ./builddeb.bash
       - run: go mod vendor
-      - run: make
-        env:
-          CC: aarch64-linux-gnu-gcc
-          GOARCH: arm64
-      - run: ./modctl
+      - uses: actions/upload-artifact@v6
+        with:
+          name: deb
+          path: "pkg/*.deb"
+          retention-days: 1
