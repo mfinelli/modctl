@@ -60,6 +60,7 @@ install -vDm0755 modctl "pkg/modctl_${pkgver}_arm64/usr/bin/modctl"
 
 for arch in amd64 arm64; do
   dpkg-deb --build --root-owner-group "pkg/modctl_${pkgver}_${arch}"
+  debsigs --sign=origin -k 26B2C9C5 "pkg/modctl_${pkgver}_${arch}.deb"
 done
 
 exit 0

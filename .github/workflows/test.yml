@@ -15,11 +15,16 @@ jobs:
             ca-certificates \
             binutils-aarch64-linux-gnu \
             build-essential \
+            debsigs \
             file \
             gcc-aarch64-linux-gnu \
             libarchive-tools \
             rpm \
             unzip
+      - uses: crazy-max/ghaction-import-gpg@v7
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:

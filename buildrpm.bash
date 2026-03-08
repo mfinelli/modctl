@@ -22,6 +22,11 @@ rpmbuild --define "_topdir $(pwd)/pkg/rpmbuild" \
   --target x86_64 \
   -bb pkg/rpmbuild/SPECS/modctl.spec
 
+rpm --addsign \
+  --define "_gpg_name pkg@modctl.org" \
+  --define "__gpg /usr/bin/gpg" \
+  "pkg/rpmbuild/RPMS/x86_64/modctl-${pkgver}-1.x86_64.rpm"
+
 rm pkg/rpmbuild/SOURCES/modctl
 rm modctl
 export CC=aarch64-linux-gnu-gcc
@@ -37,3 +42,8 @@ rpmbuild --define "_topdir $(pwd)/pkg/rpmbuild" \
   --define "_build_arch aarch64" \
   --target aarch64 \
   -bb pkg/rpmbuild/SPECS/modctl.spec
+
+rpm --addsign \
+  --define "_gpg_name pkg@modctl.org" \
+  --define "__gpg /usr/bin/gpg" \
+  "pkg/rpmbuild/RPMS/aarch64/modctl-${pkgver}-1.aarch64.rpm"
