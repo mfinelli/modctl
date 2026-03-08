@@ -15,8 +15,10 @@ jobs:
             ca-certificates \
             binutils-aarch64-linux-gnu \
             build-essential \
+            file \
             gcc-aarch64-linux-gnu \
             libarchive-tools \
+            rpm \
             unzip
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
@@ -29,9 +31,15 @@ jobs:
       - run: sqlc generate
       - run: go install github.com/google/go-licenses/v2@latest
       - run: ./builddeb.bash
+      - run: ./buildrpm.bash
       - run: go mod vendor
       - uses: actions/upload-artifact@v6
         with:
           name: deb
-          path: "pkg/*.deb"
+          path: pkg/*.deb
+          retention-days: 1
+      - uses: actions/upload-artifact@v6
+        with:
+          name: rpm
+          path: pkg/rpmbuild/RPMS/**/*.rpm
           retention-days: 1
