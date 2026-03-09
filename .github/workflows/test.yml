@@ -12,9 +12,11 @@ jobs:
       - run: apt-get upgrade -y
       - run: |
           apt-get install -y \
+            apt-utils \
             ca-certificates \
             binutils-aarch64-linux-gnu \
             build-essential \
+            createrepo-c \
             debsigs \
             file \
             gcc-aarch64-linux-gnu \
@@ -35,8 +37,9 @@ jobs:
           sqlc-version: 1.30.0
       - run: sqlc generate
       - run: go install github.com/google/go-licenses/v2@latest
-      - run: ./builddeb.bash
-      - run: ./buildrpm.bash
+      - run: ./pkg/builddeb.bash
+      - run: ./pkg/buildrpm.bash
+      - run: ./pkg/publish.bash
       - run: go mod vendor
       - uses: actions/upload-artifact@v6
         with:
