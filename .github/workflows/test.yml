@@ -21,6 +21,7 @@ jobs:
             file \
             gcc-aarch64-linux-gnu \
             libarchive-tools \
+            rclone \
             rpm \
             tree \
             unzip
@@ -41,6 +42,8 @@ jobs:
       - run: ./pkg/builddeb.bash
       - run: ./pkg/buildrpm.bash
       - run: ./pkg/publish.bash
+        env:
+          RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
       - run: go mod vendor
       - uses: actions/upload-artifact@v6
         with:

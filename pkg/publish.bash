@@ -20,11 +20,16 @@ for f in "$AMD64_DEB" "$ARM64_DEB" "$AMD64_RPM" "$ARM64_RPM"; do
     fi
 done
 
+echo "$RCLONE_CONFIG" > pkg/rclone.conf
+
+echo "Pulling current repo state from R2..."
 WORKDIR="$(mktemp -d)"
+mkdir -p "$WORKDIR/repo"
+rclone sync --config pkg/rclone.conf r2:modctl-pkgs "$WORKDIR/repo"
 
 echo "Exporting public key..."
-gpg --armor --export pkg@modctl.org > "$WORKDIR/pubkey.asc"
-gpg --export pkg@modctl.org > "$WORKDIR/pubkey.gpg"
+gpg --armor --export pkg@modctl.org > "$WORKDIR/repo/pubkey.asc"
+gpg --export pkg@modctl.org > "$WORKDIR/repo/pubkey.gpg"
 
 echo "Building APT repository..."
 APT_ROOT="$WORKDIR/repo/apt"
@@ -96,3 +101,7 @@ for arch in x86_64 aarch64; do
 done
 
 tree "$WORKDIR"
+
+rclone sync --config pkg/rclone.conf "$WORKDIR/repo" r2:modctl-pkgs
+
+exit 0
