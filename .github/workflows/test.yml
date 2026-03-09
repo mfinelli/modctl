@@ -22,6 +22,7 @@ jobs:
             gcc-aarch64-linux-gnu \
             libarchive-tools \
             rpm \
+            tree \
             unzip
       - uses: crazy-max/ghaction-import-gpg@v7
         with:
