@@ -187,3 +187,63 @@ jobs:
             pkg/arch/*-x86_64.pkg.tar.zst
             pkg/arch/*-x86_64.pkg.tar.zst.sig
           retention-days: 1
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [main, docker, publish, publisharch]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          cache: true
+          go-version-file: go.mod
+      - uses: sqlc-dev/setup-sqlc@v4
+        with:
+          sqlc-version: 1.30.0
+      - uses: crazy-max/ghaction-import-gpg@v7
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+      - run: sudo apt-get update
+      - run: sudo apt-get upgrade -y
+      - run: sudo apt-get install -y libarchive-tools
+      - run: go install github.com/google/go-licenses/v2@latest
+      - run: |
+          gh=https://github.com/yshavit/mdq
+          artifact=mdq-linux-x64.tar.gz
+          mkdir -p ~/bin
+          wget ${gh}/releases/download/v0.9.0/${artifact}
+          bsdtar xf $artifact -C ~/bin
+          rm -rf $artifact
+      - run: >-
+          echo "version=$(grep -P "^\tVersion:" cmd/root.go | awk -F\"
+          '{print $2}')" >> $GITHUB_OUTPUT
+        id: version
+      - run: |
+          {
+            echo 'entry<<EOF'
+            mdq "# ^v${{ steps.version.outputs.version }}" CHANGELOG.md | \
+              perl -0777 -pe 's/^(.*?)\n//s; s/^\s*\n+//; s/\n+\s*$//' | \
+              awk '{ print }'
+            echo EOF
+          } >> $GITHUB_OUTPUT
+        id: changelog
+      - run: ./pkg/release.bash
+      - uses: actions/upload-artifact@v6
+        with:
+          name: release
+          path: |
+            *.tar.zst
+            *.tar.zst.asc
+            *.sha256
+          retention-days: 1
+      - uses: ncipollo/release-action@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          artifacts: "modctl*.tar.zst,modctl*.tar.zst.asc,*.sha256"
+          body: ${{ steps.changelog.outputs.entry }}
+          makeLatest: true
