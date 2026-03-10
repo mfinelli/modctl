@@ -96,6 +96,7 @@ jobs:
       - run: go install github.com/google/go-licenses/v2@latest
       - run: useradd -m builder
       - run: ./pkg/buildarch.bash
+      - run: ./pkg/publisharch.bash
       - uses: actions/upload-artifact@v6
         with:
           name: arch
