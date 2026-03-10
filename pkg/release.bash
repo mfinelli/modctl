@@ -14,40 +14,41 @@ go-licenses save ./... --ignore github.com/mfinelli/modctl --save_path \
     licenses
 find licenses -type f -exec chmod 0644 {} \;
 
-mkdir "modctl_${GITHUB_REF_NAME}"
-git archive HEAD | tar -x -C "modctl_${GITHUB_REF_NAME}"
-cd "modctl_${GITHUB_REF_NAME}"
+bname="modctl_${GITHUB_REF_NAME//\//-}"
+
+mkdir "${bname}"
+git archive HEAD | tar -x -C "${bname}"
+cd "${bname}"
 sqlc generate
 cd ..
-cp -r vendor "modctl_${GITHUB_REF_NAME}"
-tar --owner=0 --group=0 -cavf "modctl_${GITHUB_REF_NAME}.tar.zst" "modctl_${GITHUB_REF_NAME}"
-gpg -u pkg@modctl.org -ba "modctl_${GITHUB_REF_NAME}.tar.zst"
-rm -rf "modctl_${GITHUB_REF_NAME}"
+cp -r vendor "${bname}"
+tar --owner=0 --group=0 -cavf "${bname}.tar.zst" "${bname}"
+gpg -u pkg@modctl.org -ba "${bname}.tar.zst"
 
 make
 ./modctl completion bash > modctl.bash
 ./modctl completion fish > modctl.fish
 ./modctl completion zsh > modctl.zsh
 
-mkdir "modctl_${GITHUB_REF_NAME}_amd64"
-mkdir "modctl_${GITHUB_REF_NAME}_arm64"
+mkdir "${bname}_amd64"
+mkdir "${bname}_arm64"
 
-mv modctl "modctl_${GITHUB_REF_NAME}_amd64"
+mv modctl "${bname}_amd64"
 export CC=aarch64-linux-gnu-gcc
 export GOARCH=arm64
 make modctl
-mv modctl "modctl_${GITHUB_REF_NAME}_arm64"
+mv modctl "${bname}_arm64"
 
 for arch in amd64 arm64; do
-  cp LICENSE "modctl_${GITHUB_REF_NAME}_${arch}"
-  cp -r licenses "modctl_${GITHUB_REF_NAME}_${arch}"
-  cp modctl.bash "modctl_${GITHUB_REF_NAME}_${arch}"
-  cp modctl.fish "modctl_${GITHUB_REF_NAME}_${arch}"
-  cp modctl.zsh "modctl_${GITHUB_REF_NAME}_${arch}"
-  tar --owner=0 --group=0 -cavf "modctl_${GITHUB_REF_NAME}_${arch}.tar.zst" "modctl_${GITHUB_REF_NAME}_${arch}"
-  gpg -u pkg@modctl.org -ba "modctl_${GITHUB_REF_NAME}_${arch}.tar.zst"
+  cp LICENSE "${bname}_${arch}"
+  cp -r licenses "${bname}_${arch}"
+  cp modctl.bash "${bname}_${arch}"
+  cp modctl.fish "${bname}_${arch}"
+  cp modctl.zsh "${bname}_${arch}"
+  tar --owner=0 --group=0 -cavf "${bname}_${arch}.tar.zst" "${bname}_${arch}"
+  gpg -u pkg@modctl.org -ba "${bname}_${arch}.tar.zst"
 done
 
-sha256sum -b ./*.tar.zst > "modctl_${GITHUB_REF_NAME}.sha256"
+sha256sum -b ./*.tar.zst > "${bname}.sha256"
 
 exit 0
