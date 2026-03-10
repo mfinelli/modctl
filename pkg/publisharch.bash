@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+set -e
+
+if [[ $# -ne 0 ]]; then
+  echo >&2 "usage: $(basename "$0")"
+  exit 1
+fi
+
 ARM64_PKG=$(find pkg/arch -name "*-aarch64.pkg.tar.zst" | head -1)
 ARM64_SIG=$(find pkg/arch -name "*-aarch64.pkg.tar.zst.sig" | head -1)
 AMD64_PKG=$(find pkg/arch -name "*-x86_64.pkg.tar.zst" | head -1)
@@ -28,15 +35,17 @@ mkdir -p "$WORKDIR/repo/arch"
 # up the ubuntu minimum to noble) and so we need to make sure that we can
 # handle it already today
 
-# if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
   echo "Pulling current repo state from R2..."
   rclone sync --config pkg/rclone.conf r2:modctl-pkgs/arch "$WORKDIR/repo/arch"
-# fi
+fi
 
 mkdir -p "$WORKDIR/repo/arch/aarch64"
 mkdir -p "$WORKDIR/repo/arch/x86_64"
-repo-add --key pkg@modctl.org --sign "$WORKDIR/repo/arch/x86_64/modctl.db.tar.gz" "$AMD64_PKG"
-repo-add --key pkg@modctl.org --sign "$WORKDIR/repo/arch/aarch64/modctl.db.tar.gz" "$ARM64_PKG"
+repo-add --key pkg@modctl.org --sign \
+  "$WORKDIR/repo/arch/x86_64/modctl.db.tar.gz" "$AMD64_PKG"
+repo-add --key pkg@modctl.org --sign \
+  "$WORKDIR/repo/arch/aarch64/modctl.db.tar.gz" "$ARM64_PKG"
 
 cp "$AMD64_PKG" "$WORKDIR/repo/arch/x86_64/"
 cp "$AMD64_SIG" "$WORKDIR/repo/arch/x86_64/"
@@ -53,7 +62,9 @@ done
 
 tree "$WORKDIR"
 
-# if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
   echo "Pushing updated repo to R2..."
   rclone sync --config pkg/rclone.conf "$WORKDIR/repo/arch" r2:modctl-pkgs/arch
-# fi
+fi
+
+exit 0

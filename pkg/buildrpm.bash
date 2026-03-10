@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+set -e
+
+if [[ $# -ne 0 ]]; then
+  echo >&2 "usage: $(basename "$0")"
+  exit 1
+fi
+
 mkdir -p pkg/rpmbuild/{SPECS,SOURCES,BUILD,RPMS,SRPMS}
 pkgver="$(grep -P "^\tVersion:" cmd/root.go | awk -F\" '{print $2}')"
 
@@ -47,3 +54,5 @@ rpm --addsign \
   --define "_gpg_name pkg@modctl.org" \
   --define "__gpg /usr/bin/gpg" \
   "pkg/rpmbuild/RPMS/aarch64/modctl-${pkgver}-1.aarch64.rpm"
+
+exit 0

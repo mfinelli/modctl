@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+set -e
+
+if [[ $# -ne 0 ]]; then
+  echo >&2 "usage: $(basename "$0")"
+  exit 1
+fi
+
 pkgver="$(grep -P "^\tVersion:" cmd/root.go | awk -F\" '{print $2}')"
 
 mkdir pkg/arch
@@ -46,4 +53,4 @@ mv modctl pkg/arch
       {} \;
 )
 
-tree pkg
+exit 0

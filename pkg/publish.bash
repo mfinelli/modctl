@@ -2,6 +2,11 @@
 
 set -e
 
+if [[ $# -ne 0 ]]; then
+  echo >&2 "usage: $(basename "$0")"
+  exit 1
+fi
+
 AMD64_DEB=$(find pkg -name "*_amd64.deb" | head -1)
 ARM64_DEB=$(find pkg -name "*_arm64.deb" | head -1)
 AMD64_RPM=$(find pkg -name "*.x86_64.rpm" | head -1)
