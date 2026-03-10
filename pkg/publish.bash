@@ -22,10 +22,13 @@ done
 
 echo "$RCLONE_CONFIG" > pkg/rclone.conf
 
-echo "Pulling current repo state from R2..."
 WORKDIR="$(mktemp -d)"
 mkdir -p "$WORKDIR/repo"
-rclone sync --config pkg/rclone.conf r2:modctl-pkgs "$WORKDIR/repo"
+
+if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+  echo "Pulling current repo state from R2..."
+  rclone sync --config pkg/rclone.conf r2:modctl-pkgs "$WORKDIR/repo"
+fi
 
 echo "Exporting public key..."
 gpg --armor --export pkg@modctl.org > "$WORKDIR/repo/pubkey.asc"
@@ -102,6 +105,9 @@ done
 
 tree "$WORKDIR"
 
-rclone sync --config pkg/rclone.conf "$WORKDIR/repo" r2:modctl-pkgs
+if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+  echo "Pushing updated repo to R2..."
+  rclone sync --config pkg/rclone.conf "$WORKDIR/repo" r2:modctl-pkgs
+fi
 
 exit 0
