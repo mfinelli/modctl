@@ -97,6 +97,8 @@ jobs:
       - run: useradd -m builder
       - run: ./pkg/buildarch.bash
       - run: ./pkg/publisharch.bash
+        env:
+          RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
       - uses: actions/upload-artifact@v6
         with:
           name: arch
