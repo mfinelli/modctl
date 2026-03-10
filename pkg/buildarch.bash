@@ -25,6 +25,7 @@ make
 ./modctl completion fish > pkg/arch/modctl.fish
 ./modctl completion zsh > pkg/arch/modctl.zsh
 cp LICENSE pkg/arch
+cp CHANGELOG.md pkg/arch
 mv modctl pkg/arch
 
 (

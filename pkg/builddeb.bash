@@ -22,7 +22,6 @@ for arch in amd64 arm64; do
   find "${dir}/usr/share/doc/modctl/licenses" -type f -exec chmod 0644 {} \;
 done
 
-
 make
 ./modctl completion bash > modctl.bash
 ./modctl completion fish > modctl.fish
@@ -40,6 +39,8 @@ for arch in amd64 arm64; do
     "${dir}/usr/share/fish/vendor_completions.d/modctl.fish"
   install -vDm0644 modctl.zsh \
     "${dir}/usr/share/zsh/vendor-completions/_modctl"
+  install -vDm0644 CHANGELOG.md \
+    "${dir}/usr/share/doc/modctl/CHANGELOG.md"
 done
 
 sed -e "s/MINGLIBC/$minlibc/" -e "s/PKGARCH/amd64/" -e "s/PKGVER/$pkgver/" \
