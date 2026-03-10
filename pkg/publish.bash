@@ -51,6 +51,7 @@ mkdir -p "$APT_DISTS/binary-arm64"
 rm -f "$APT_POOL"/*.deb
 cp "$AMD64_DEB" "$APT_POOL/"
 cp "$ARM64_DEB" "$APT_POOL/"
+cp pkg/modctl.sources "$APT_ROOT/"
 
 # Generate Packages files filtered by architecture
 echo "Generating APT Packages files..."
