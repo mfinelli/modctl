@@ -1,7 +1,7 @@
 [modctl]
 name=modctl repository
-baseurl=https://pkgs.modctl.org/rpm/$basearch
+baseurl=https://pkg.modctl.org/rpm/$basearch
 enabled=1
 gpgcheck=1
 repo_gpgcheck=1
-gpgkey=https://pkgs.modctl.org/pubkey.asc
+gpgkey=https://pkg.modctl.org/pubkey.asc

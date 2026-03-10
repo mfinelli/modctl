@@ -1,5 +1,5 @@
 Types: deb
-URIs: https://pkgs.modctl.org/apt
+URIs: https://pkg.modctl.org/apt
 Suites: stable
 Components: main
 Signed-By: /usr/share/keyrings/modctl-archive-keyring.gpg

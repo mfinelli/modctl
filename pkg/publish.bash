@@ -35,6 +35,9 @@ if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
   rclone sync --config pkg/rclone.conf r2:modctl-pkgs "$WORKDIR/repo"
 fi
 
+echo "Copying installation instructions file..."
+cp pkg/index.html "$WORKDIR/repo/index.html"
+
 echo "Exporting public key..."
 gpg --armor --export pkg@modctl.org > "$WORKDIR/repo/pubkey.asc"
 gpg --export pkg@modctl.org > "$WORKDIR/repo/pubkey.gpg"

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>modctl - Installation</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #0f1117;
+            color: #e2e8f0;
+            min-height: 100vh;
+            padding: 3rem 1rem;
+        }
+
+        .container {
+            max-width: 760px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #f8fafc;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            color: #94a3b8;
+            font-size: 1rem;
+        }
+
+        .distro {
+            margin-bottom: 2.5rem;
+        }
+
+        .distro h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #f8fafc;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #1e293b;
+        }
+
+        .step {
+            margin-bottom: 0.75rem;
+        }
+
+        .step-label {
+            font-size: 0.75rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.35rem;
+        }
+
+        .code-block {
+            position: relative;
+            background: #1e293b;
+            border: 1px solid #2d3f55;
+            border-radius: 6px;
+            padding: 0.75rem 2.75rem 0.75rem 1rem;
+        }
+
+        .code-block pre {
+            font-family: ui-monospace, "SF Mono", "Cascadia Code", "Fira Code", Consolas, "Liberation Mono", monospace;
+            font-size: 0.85rem;
+            color: #e2e8f0;
+            white-space: pre;
+            overflow-x: auto;
+            line-height: 1.6;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: transparent;
+            border: 1px solid #334155;
+            border-radius: 4px;
+            color: #64748b;
+            cursor: pointer;
+            padding: 0.2rem 0.4rem;
+            font-size: 0.7rem;
+            transition: all 0.15s;
+        }
+
+        .copy-btn:hover {
+            border-color: #64748b;
+            color: #94a3b8;
+        }
+
+        .copy-btn.copied {
+            border-color: #22c55e;
+            color: #22c55e;
+        }
+
+        .note {
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+
+        footer {
+            margin-top: 3rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #1e293b;
+            font-size: 0.8rem;
+            color: #475569;
+        }
+
+        footer a {
+            color: #3b82f6;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>modctl</h1>
+        <p>Install instructions for Linux package managers</p>
+    </header>
+
+    <!-- Debian / Ubuntu -->
+    <div class="distro">
+        <h2>Debian / Ubuntu</h2>
+
+        <div class="step">
+            <div class="step-label">1. Import signing key</div>
+            <div class="code-block">
+                <pre>sudo curl -fsSo /usr/share/keyrings/modctl-archive-keyring.gpg https://pkg.modctl.org/pubkey.gpg</pre>
+                <button class="copy-btn" onclick="copy(this)">copy</button>
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-label">2. Add repository</div>
+            <div class="code-block">
+                <pre>sudo curl -fsSo /etc/apt/sources.list.d/modctl.sources https://pkg.modctl.org/apt/modctl.sources</pre>
+                <button class="copy-btn" onclick="copy(this)">copy</button>
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-label">3. Install</div>
+            <div class="code-block">
+                <pre>sudo apt update &amp;&amp; sudo apt install modctl</pre>
+                <button class="copy-btn" onclick="copy(this)">copy</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fedora / RHEL / Rocky / Alma -->
+    <div class="distro">
+        <h2>Fedora / RHEL / Rocky Linux / AlmaLinux</h2>
+
+        <div class="step">
+            <div class="step-label">1. Import signing key</div>
+            <div class="code-block">
+                <pre>sudo rpm --import https://pkg.modctl.org/pubkey.asc</pre>
+                <button class="copy-btn" onclick="copy(this)">copy</button>
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-label">2. Add repository</div>
+            <div class="code-block">
+                <pre>sudo curl -fsSo /etc/yum.repos.d/modctl.repo https://pkg.modctl.org/rpm/modctl.repo</pre>
+                <button class="copy-btn" onclick="copy(this)">copy</button>
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-label">3. Install</div>
+            <div class="code-block">
+                <pre>sudo dnf install modctl</pre>
+                <button class="copy-btn" onclick="copy(this)">copy</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Arch Linux -->
+    <div class="distro">
+        <h2>Arch Linux</h2>
+
+        <div class="step">
+            <div class="step-label">1. Import signing key</div>
+            <div class="code-block">
+                <pre>curl -fsS https://pkg.modctl.org/pubkey.asc | sudo pacman-key -a -</pre>
+                <button class="copy-btn" onclick="copy(this)">copy</button>
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-label">2. Locally sign signing key</div>
+            <div class="code-block">
+                <pre>sudo pacman-key --lsign-key 2AF87031171950F11C460B5AEF5F1F6026B2C9C5</pre>
+                <button class="copy-btn" onclick="copy(this)">copy</button>
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-label">3. Add repository - append to <code>/etc/pacman.conf</code> before <code>[core]</code></div>
+            <div class="code-block">
+                <pre>[modctl]
+Server = https://pkg.modctl.org/arch/$arch
+SigLevel = Required DatabaseOptional</pre>
+                <button class="copy-btn" onclick="copy(this)">copy</button>
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-label">4. Install</div>
+            <div class="code-block">
+                <pre>sudo pacman -Sy modctl</pre>
+                <button class="copy-btn" onclick="copy(this)">copy</button>
+            </div>
+        </div>
+
+        <p class="note">
+            The signing key must be locally signed with <code>--lsign-key</code> because it is not in the Arch Linux keyring.
+        </p>
+    </div>
+
+    <footer>
+        <p>
+            Packages are available for x86_64 and aarch64.
+            For other installation methods and release archives see the
+            <a href="https://github.com/mfinelli/modctl/releases">GitHub releases page</a>.
+        </p>
+    </footer>
+</div>
+
+<script>
+    function copy(btn) {
+        const pre = btn.previousElementSibling;
+        navigator.clipboard.writeText(pre.innerText).then(() => {
+            btn.textContent = "copied";
+            btn.classList.add("copied");
+            setTimeout(() => {
+                btn.textContent = "copy";
+                btn.classList.remove("copied");
+            }, 1500);
+        });
+    }
+</script>
+</body>
+</html>
