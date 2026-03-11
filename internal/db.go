@@ -29,6 +29,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
+	"github.com/pressly/goose/v3/database"
 	"github.com/spf13/viper"
 )
 
@@ -53,7 +54,13 @@ func GooseProvider(db *sql.DB) (*goose.Provider, error) {
 		return nil, fmt.Errorf("error preparing migrations fs: %w", err)
 	}
 
-	return goose.NewProvider(goose.DialectSQLite3, db, fsys)
+	base, err := database.NewStore(database.DialectSQLite3, "schema_migrations")
+	if err != nil {
+		return nil, err
+	}
+	return goose.NewProvider(goose.DialectCustom, db, fsys,
+		goose.WithStore(&sqliteStore{Store: base}),
+	)
 }
 
 func MigrateDB(ctx context.Context, db *sql.DB) error {
@@ -94,4 +101,25 @@ func EnsureDBExists() error {
 	}
 
 	return nil
+}
+
+// A custom goose store to let us override the schema migrations table to use
+// more idiomatic sqlite
+type sqliteStore struct {
+	database.Store // embed and delegate everything
+}
+
+func (s *sqliteStore) CreateVersionTable(ctx context.Context, db database.DBTxConn) error {
+	_, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
+        id         INTEGER PRIMARY KEY,
+        version_id INTEGER NOT NULL,
+        is_applied INTEGER NOT NULL CHECK (is_applied IN (TRUE, FALSE)),
+        tstamp     TEXT NOT NULL DEFAULT (datetime('now'))
+    ) STRICT;`)
+	if err != nil {
+		return err
+	}
+	_, err = db.ExecContext(ctx,
+		`INSERT INTO schema_migrations (version_id, is_applied) VALUES (0, TRUE);`)
+	return err
 }
