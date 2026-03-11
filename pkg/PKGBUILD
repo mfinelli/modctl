@@ -1,0 +1,26 @@
+pkgname=modctl
+pkgver=PKGVER
+pkgrel=1
+pkgdesc="command line mod manager"
+arch=(aarch64 x86_64)
+url=https://modctl.org
+license=(GPL-3.0-or-later)
+depends=(libarchive glibc)
+source=(file://modctl
+        file://modctl.bash
+        file://modctl.fish
+        file://modctl.zsh
+        file://licenses.tar
+        file://CHANGELOG.md
+        file://LICENSE)
+md5sums=(SKIP SKIP SKIP SKIP SKIP SKIP SKIP)
+
+package() {
+  install -Dm0755 "$srcdir/modctl" "$pkgdir/usr/bin/modctl"
+  install -Dm0644 "$srcdir/LICENSE" "$pkgdir/usr/share/licenses/modctl/LICENSE"
+  install -Dm0644 "$srcdir/CHANGELOG.md" "$pkgdir/usr/share/doc/modctl/CHANGELOG.md"
+  cp -r "$srcdir/licenses" "$pkgdir/usr/share/licenses/modctl/vendor"
+  install -Dm0644 "$srcdir/modctl.bash" "$pkgdir/usr/share/bash-completions/completions/modctl"
+  install -Dm0644 "$srcdir/modctl.fish" "$pkgdir/usr/share/fish/vendor_completions.d/modctl.fish"
+  install -Dm0644 "$srcdir/modctl.zsh" "$pkgdir/usr/share/zsh/site-functions/_modctl"
+}
