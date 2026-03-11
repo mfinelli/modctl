@@ -1,6 +1,7 @@
 Name: modctl
 Version: PKGVER
 Release: 1
+Requires: bsdtar
 Summary: command line mod manager
 License: GPL-3.0-or-later
 

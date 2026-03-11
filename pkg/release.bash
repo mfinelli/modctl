@@ -40,6 +40,7 @@ make modctl
 mv modctl "${bname}_arm64"
 
 for arch in amd64 arm64; do
+  cp CHANGELOG.md "${bname}_${arch}"
   cp LICENSE "${bname}_${arch}"
   cp -r licenses "${bname}_${arch}"
   cp modctl.bash "${bname}_${arch}"

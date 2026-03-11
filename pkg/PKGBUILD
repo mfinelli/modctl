@@ -5,7 +5,7 @@ pkgdesc="command line mod manager"
 arch=(aarch64 x86_64)
 url=https://modctl.org
 license=(GPL-3.0-or-later)
-depends=(glibc)
+depends=(libarchive glibc)
 source=(file://modctl
         file://modctl.bash
         file://modctl.fish
