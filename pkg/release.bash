@@ -22,7 +22,7 @@ cd "${bname}"
 sqlc generate
 cd ..
 cp -r vendor "${bname}"
-tar --owner=0 --group=0 -cavf "${bname}.tar.zst" "${bname}"
+tar --owner=0 --group=0 --sort=name -cavf "${bname}.tar.zst" "${bname}"
 gpg -u pkg@modctl.org -ba "${bname}.tar.zst"
 
 make
@@ -45,7 +45,8 @@ for arch in amd64 arm64; do
   cp modctl.bash "${bname}_${arch}"
   cp modctl.fish "${bname}_${arch}"
   cp modctl.zsh "${bname}_${arch}"
-  tar --owner=0 --group=0 -cavf "${bname}_${arch}.tar.zst" "${bname}_${arch}"
+  tar --owner=0 --group=0 --sort=name -cavf "${bname}_${arch}.tar.zst" \
+    "${bname}_${arch}"
   gpg -u pkg@modctl.org -ba "${bname}_${arch}.tar.zst"
 done
 
