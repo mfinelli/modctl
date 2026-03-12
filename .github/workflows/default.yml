@@ -240,10 +240,11 @@ jobs:
             *.tar.zst
             *.tar.zst.asc
             *.sha256
+            *.sha256.asc
           retention-days: 1
       - uses: ncipollo/release-action@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          artifacts: "modctl*.tar.zst,modctl*.tar.zst.asc,*.sha256"
+          artifacts: modctl*.tar.zst,modctl*.tar.zst.asc,*.sha256,*.sha256.asc
           body: ${{ steps.changelog.outputs.entry }}
           makeLatest: true

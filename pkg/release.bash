@@ -52,5 +52,6 @@ for arch in amd64 arm64; do
 done
 
 sha256sum -b ./*.tar.zst > "${bname}.sha256"
+gpg -u pkg@modctl.org -ba "${bname}.sha256"
 
 exit 0
