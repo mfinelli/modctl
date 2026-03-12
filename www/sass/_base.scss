@@ -87,3 +87,37 @@ pre {
 
   &:focus { top: 1rem; }
 }
+
+// Tables
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+
+  th, td {
+    padding: 0.6rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  th {
+    font-family: $font-mono;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    border-bottom: 2px solid var(--border);
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  // Subtle stripe on alternating rows
+  tbody tr:nth-child(even) {
+    background-color: var(--surface);
+  }
+
+  code {
+    font-size: 0.85em;
+  }
+}

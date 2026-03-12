@@ -87,29 +87,53 @@
       </nav>
     </header>
 
-    <main id="main-content">
-      {% block doc_content %}
-        {% if page %}
-          {{ page.content | safe }}
-        {% elif section %}
-          {{ section.content | safe }}
-        {% endif %}
-      {% endblock doc_content %}
-    </main>
+    <div class="docs-body">
+      <main id="main-content">
+        {% block doc_content %}
+          {% if page %}
+            {{ page.content | safe }}
+          {% elif section %}
+            {{ section.content | safe }}
+          {% endif %}
+        {% endblock doc_content %}
 
-    <!-- Prev / next page navigation -->
-    <nav class="docs-pagination" aria-label="Page navigation">
-      {% if page.lower %}
-      <a href="{{ page.lower.permalink | safe }}" class="pagination-prev">
-        &larr; {{ page.lower.title }}
-      </a>
+        <!-- Prev / next page navigation -->
+        <nav class="docs-pagination" aria-label="Page navigation">
+          {% if page.lower %}
+          <a href="{{ page.lower.permalink | safe }}" class="pagination-prev">
+            &larr; {{ page.lower.title }}
+          </a>
+          {% endif %}
+          {% if page.higher %}
+          <a href="{{ page.higher.permalink | safe }}" class="pagination-next">
+            {{ page.higher.title }} &rarr;
+          </a>
+          {% endif %}
+        </nav>
+      </main>
+
+      {% if page is defined and page.toc %}
+      <nav class="docs-toc" aria-label="On this page">
+        <span class="docs-toc-title">On this page</span>
+        <ul>
+          {% for h1 in page.toc %}
+          <li>
+            <a href="{{ h1.permalink | safe }}">{{ h1.title }}</a>
+            {% if h1.children %}
+            <ul>
+              {% for h2 in h1.children %}
+              <li>
+                <a href="{{ h2.permalink | safe }}">{{ h2.title }}</a>
+              </li>
+              {% endfor %}
+            </ul>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      </nav>
       {% endif %}
-      {% if page.higher %}
-      <a href="{{ page.higher.permalink | safe }}" class="pagination-next">
-        {{ page.higher.title }} &rarr;
-      </a>
-      {% endif %}
-    </nav>
+    </div>
   </div>
 
 </div>

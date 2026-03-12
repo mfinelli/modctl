@@ -99,6 +99,13 @@
   margin-left: $sidebar-width;
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.docs-body {
+  display: flex;
+  flex: 1;
 }
 
 .docs-header {
@@ -196,6 +203,10 @@
   #main-content {
     padding: 2.5rem 2rem;
 
+    flex: 1;
+    min-width: 0;
+    padding: 2.5rem 2rem;
+
     h1, h2, h3 { margin-top: 2rem; }
     h1:first-child { margin-top: 0; }
 
@@ -222,6 +233,54 @@
     h1:hover .zola-anchor::after,
     h2:hover .zola-anchor::after,
     h3:hover .zola-anchor::after { color: var(--muted); }
+  }
+}
+
+// TOC
+.docs-toc {
+  width: 200px;
+  flex-shrink: 0;
+  padding: 2.5rem 1rem 2.5rem 0;
+  position: sticky;
+  top: 57px; // height of docs-header
+  align-self: flex-start;
+  max-height: calc(100vh - 57px);
+  overflow-y: auto;
+
+  @media (max-width: 1100px) { display: none; }
+}
+
+.docs-toc-title {
+  display: block;
+  font-family: $font-mono;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 0.75rem;
+}
+
+.docs-toc ul {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+
+  ul {
+    margin-left: 0.75rem;
+    margin-top: 0.1rem;
+  }
+}
+
+.docs-toc a {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  padding: 0.2rem 0;
+  transition: color $transition;
+
+  &:hover {
+    color: var(--accent);
+    text-decoration: none;
   }
 }
 
