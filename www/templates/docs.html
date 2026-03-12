@@ -37,20 +37,39 @@
         {{ page.title }}
       </a>
       {% endfor %}
+
+      {% for subsection_path in docs.subsections %}
+    {% set subsection = get_section(path=subsection_path) %}
+    <div class="sidebar-section">
+      <span class="sidebar-section-title">{{ subsection.title }}</span>
+      {% for page in subsection.pages %}
+      <a href="{{ page.permalink | safe }}"
+         class="sidebar-link sidebar-link-nested {% if page.permalink == current_url %}active{% endif %}">
+        {{ page.title }}
+      </a>
+      {% endfor %}
+    </div>
+  {% endfor %}
     </nav>
   </aside>
 
   <!-- Main content -->
   <div class="docs-content">
     <header class="docs-header">
-      <div class="docs-search">
-        <input type="search"
-               id="search-input"
-               placeholder="Search docs…"
-               aria-label="Search documentation">
-        <div id="search-results" aria-live="polite"><div class="search-results__items"></div></div>
-      </div>
-    </header>
+  <div class="docs-search">
+    <input type="search"
+           id="search-input"
+           placeholder="Search docs…"
+           aria-label="Search documentation">
+    <div id="search-results"></div>
+  </div>
+  <nav class="docs-header-nav">
+    <a href="{{ get_url(path='news') | safe }}">News</a>
+  </nav>
+  <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+    <span id="theme-icon">◐</span>
+  </button>
+</header>
 
     <main id="main-content">
       {% block doc_content %}

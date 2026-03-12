@@ -53,6 +53,8 @@
 }
 
 .sidebar-link {
+  display: block;
+  width: 100%;
   font-size: 0.875rem;
   color: var(--text);
   padding: 0.35rem 1rem;
@@ -72,6 +74,24 @@
     background-color: var(--accent-tint);
     font-weight: 500;
   }
+}
+
+.sidebar-section {
+  margin-top: 0.75rem;
+}
+
+.sidebar-section-title {
+  display: block;
+  font-family: $font-mono;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  padding: 0.35rem 1rem;
+}
+
+.sidebar-link-nested {
+  padding-left: 1.75rem;
 }
 
 // Docs content area
@@ -94,6 +114,17 @@
   z-index: 10;
 }
 
+.docs-header-nav {
+  display: flex;
+  gap: 1.5rem;
+
+  a {
+    font-size: 0.9rem;
+    color: var(--text);
+    &:hover { color: var(--accent); text-decoration: none; }
+  }
+}
+
 .docs-search {
   position: relative;
 
@@ -109,6 +140,7 @@
     transition: border-color $transition, width $transition;
 
     &::placeholder { color: var(--muted); }
+
     &:focus {
       outline: none;
       border-color: var(--accent);
@@ -123,10 +155,14 @@
   right: 0;
   width: 320px;
   background-color: var(--surface);
-  border: 1px solid var(--border);
   border-radius: $radius;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   z-index: 20;
+
+  // Only show border when there is content
+  &:not(:empty) {
+    border: 1px solid var(--border);
+  }
 
   .search-results-list {
     padding: 0.5rem 0;
@@ -156,7 +192,6 @@
 .docs-content {
   #main-content {
     padding: 2.5rem 2rem;
-    max-width: 740px;
 
     h1, h2, h3 { margin-top: 2rem; }
     h1:first-child { margin-top: 0; }
@@ -179,9 +214,10 @@
   display: flex;
   justify-content: space-between;
   padding: 2rem;
+  margin-left: 3rem;
+  margin-right: 3rem;
   border-top: 1px solid var(--border);
   font-size: 0.875rem;
-  max-width: 740px;
 
   a { color: var(--muted); &:hover { color: var(--accent); } }
   .pagination-next { margin-left: auto; }

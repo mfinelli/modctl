@@ -8,7 +8,7 @@
 }
 
 // Base nav
-header nav {
+header:not(.docs-header) nav {
   display: flex;
   align-items: center;
   gap: 1.5rem;
@@ -53,16 +53,15 @@ footer {
 // Theme toggle
 .theme-toggle {
   background: none;
-  border: 1px solid var(--border);
+  border: none;
   border-radius: $radius;
   padding: 0.3rem 0.6rem;
   cursor: pointer;
   font-size: 0.85rem;
   color: var(--muted);
-  transition: border-color $transition, color $transition;
+  transition: color $transition;
 
   &:hover {
-    border-color: var(--accent);
     color: var(--accent);
   }
 }
