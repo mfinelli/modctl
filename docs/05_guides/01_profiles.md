@@ -185,4 +185,5 @@ its files remain installed until the next apply or unapply.
 
 For more detail on what happens when two mods compete for the same file, see
 [Conflict resolution](../conflicts). For help adjusting how a mod's files are
-mapped into the game directory, see [Remap rules](../remap).
+mapped into the game directory (for example stripping leading path segments or
+installing files into a subfolder) see [Remap rules](../remap).

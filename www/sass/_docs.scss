@@ -233,6 +233,28 @@
     h1:hover .zola-anchor::after,
     h2:hover .zola-anchor::after,
     h3:hover .zola-anchor::after { color: var(--muted); }
+
+    ul, ol {
+      margin-bottom: 1rem;
+      padding-left: 1.5rem;
+
+      li {
+        margin-bottom: 0.35rem;
+        line-height: 1.6;
+      }
+
+      // Nested lists
+      ul, ol {
+        margin-top: 0.35rem;
+        margin-bottom: 0;
+      }
+    }
+
+    ul { list-style: disc; }
+    ol { list-style: decimal; }
+
+    ul ul { list-style: circle; }
+    ul ul ul { list-style: square; }
   }
 }
 
