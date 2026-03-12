@@ -1,0 +1,122 @@
+@use 'variables' as *;
+
+// Hero
+.hero {
+  border-bottom: 1px solid var(--border);
+  padding: 5rem 1.5rem;
+
+  &-inner {
+    max-width: $container-max;
+    margin-inline: auto;
+  }
+
+  h1 {
+    font-family: $font-mono;
+    font-size: clamp(1.6rem, 4vw, 2.5rem);
+    font-weight: 700;
+    margin-bottom: 1.25rem;
+    line-height: 1.2;
+
+    // "modctl" in the heading gets accent colour
+    strong { color: var(--accent); font-weight: inherit; }
+  }
+
+  &-sub {
+    font-size: 1.1rem;
+    color: var(--muted);
+    max-width: 600px;
+    margin-bottom: 2rem;
+    line-height: 1.7;
+  }
+}
+
+// Buttons
+.btn {
+  display: inline-block;
+  font-family: $font-mono;
+  font-size: 0.9rem;
+  padding: 0.6rem 1.4rem;
+  border-radius: $radius;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: background-color $transition, color $transition,
+              border-color $transition;
+
+  &-primary {
+    background-color: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+
+    &:hover {
+      background-color: var(--accent-hover);
+      border-color: var(--accent-hover);
+      text-decoration: none;
+      color: var(--bg);
+    }
+  }
+}
+
+// Problem
+.problem {
+  padding: 4rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+
+  h2 { margin-bottom: 1rem; }
+
+  p {
+    max-width: 640px;
+    color: var(--muted);
+
+    & + p { margin-top: 0; }
+  }
+}
+
+// Features
+.features {
+  padding: 4rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+
+  h2 { margin-bottom: 2.5rem; }
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 2rem;
+}
+
+.feature {
+  h3 {
+    font-family: $font-mono;
+    font-size: 1rem;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+
+    &::before { content: '> '; opacity: 0.5; }
+  }
+
+  p { color: var(--muted); font-size: 0.95rem; margin-bottom: 0; }
+}
+
+// How it works
+.how-it-works {
+  padding: 4rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background-color: var(--surface);
+
+  h2 { margin-bottom: 1rem; }
+
+  p {
+    max-width: 640px;
+    color: var(--muted);
+  }
+}
+
+// CTA
+.cta {
+  padding: 4rem 1.5rem;
+  text-align: center;
+
+  h2 { margin-bottom: 0.75rem; }
+  p  { color: var(--muted); margin-bottom: 1.5rem; }
+}

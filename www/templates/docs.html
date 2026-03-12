@@ -16,7 +16,7 @@
   <!-- Sidebar -->
   <aside class="docs-sidebar">
     <div class="sidebar-header">
-      <a href="{{ config.base_url | safe }}" class="sidebar-logo">
+      <a href="{{ config.base_url | safe }}" class="sidebar-logo font-sixtyfour">
         &gt;_modctl
       </a>
       <div class="sidebar-meta">
@@ -83,4 +83,5 @@
 {% block scripts %}
 <script src="{{ get_url(path='elasticlunr.min.js') | safe }}"></script>
 <script src="{{ get_url(path='search.js', cachebust=true) | safe }}"></script>
+<script src="{{ get_url(path='theme.js', cachebust=true) | safe }}"></script>
 {% endblock scripts %}

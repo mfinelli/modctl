@@ -1,0 +1,42 @@
+@use 'variables' as *;
+
+:root {
+  --bg:       #{$light-bg};
+  --surface:  #{$light-surface};
+  --border:   #{$light-border};
+  --text:     #{$light-text};
+  --muted:    #{$light-muted};
+  --accent:   #{$green-vivid};
+  --accent-hover: #{$green-dim};
+  --accent-tint:  #{$green-tint};
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:       #{$dark-bg};
+    --surface:  #{$dark-surface};
+    --border:   #{$dark-border};
+    --text:     #{$dark-text};
+    --muted:    #{$dark-muted};
+    --accent-tint: #{$green-subtle};
+  }
+}
+
+// JS toggle overrides system preference
+:root[data-theme="light"] {
+  --bg:       #{$light-bg};
+  --surface:  #{$light-surface};
+  --border:   #{$light-border};
+  --text:     #{$light-text};
+  --muted:    #{$light-muted};
+  --accent-tint: #{$green-tint};
+}
+
+:root[data-theme="dark"] {
+  --bg:       #{$dark-bg};
+  --surface:  #{$dark-surface};
+  --border:   #{$dark-border};
+  --text:     #{$dark-text};
+  --muted:    #{$dark-muted};
+  --accent-tint: #{$green-subtle};
+}

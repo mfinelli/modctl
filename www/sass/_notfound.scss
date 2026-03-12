@@ -1,0 +1,20 @@
+@use 'variables' as *;
+
+.error-layout {
+  padding-block: 6rem;
+  text-align: center;
+
+  h1 {
+    font-family: $font-mono;
+    font-size: 6rem;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 1rem;
+  }
+
+  p {
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+  }
+}

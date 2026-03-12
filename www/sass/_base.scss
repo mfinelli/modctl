@@ -1,0 +1,83 @@
+@use 'variables' as *;
+
+html {
+  font-family: $font-sans;
+  font-size: 16px;
+  line-height: 1.6;
+  background-color: var(--bg);
+  color: var(--text);
+  transition: background-color $transition, color $transition;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+// Links
+a {
+  color: var(--accent);
+  text-decoration: none;
+
+  &:hover { color: var(--accent-hover); text-decoration: underline; }
+}
+
+// Headings
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.25;
+  font-weight: 600;
+  margin-bottom: 0.5em;
+}
+
+h1 { font-size: 2rem; }
+h2 { font-size: 1.5rem; }
+h3 { font-size: 1.25rem; }
+
+// Prose
+p { margin-bottom: 1rem; }
+
+// Code
+code, kbd, samp {
+  font-family: $font-mono;
+  font-size: 0.875em;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: $radius;
+  padding: 0.15em 0.4em;
+}
+
+pre {
+  font-family: $font-mono;
+  font-size: 0.875rem;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: $radius;
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+
+  // Reset inline code styles inside a block
+  code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: inherit;
+  }
+}
+
+// Skip link
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 1rem;
+  background: var(--accent);
+  color: var(--bg);
+  padding: 0.5rem 1rem;
+  border-radius: $radius;
+  font-weight: 600;
+  z-index: 9999;
+
+  &:focus { top: 1rem; }
+}

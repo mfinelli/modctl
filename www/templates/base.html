@@ -4,6 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+    <script>
+      (function() {
+        var theme = localStorage.getItem('theme');
+        if (theme) {
+          document.documentElement.setAttribute('data-theme', theme);
+        }
+      }());
+    </script>
+
     <title>
         {%- block title %}
             {%- if page.title %}{{ page.title }} | {{ config.title }}
@@ -12,6 +21,8 @@
             {%- endif %}
         {%- endblock title %}
     </title>
+
+    <link rel="stylesheet" href="{{ get_url(path="main.css", cachebust=true) | safe }}">
 </head>
 <body>
     <a href="#main-content" class="skip-link">Skip to content</a>
@@ -26,6 +37,9 @@
                 <li><a href="{{ get_url(path='docs') | safe }}">Docs</a></li>
                 <li><a href="{{ get_url(path='news') | safe }}">News</a></li>
             </ul>
+            <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+              <span id="theme-icon">◐</span>
+            </button>
         </nav>
         {% block lang_switcher %}{% endblock lang_switcher %}
         {%- endblock header %}
@@ -48,6 +62,8 @@
         {%- endblock footer %}
     </footer>
 
-    {%- block scripts %}{% endblock scripts %}
+    {%- block scripts %}
+    <script src="{{ get_url(path='theme.js', cachebust=true) | safe }}"></script>
+    {% endblock scripts %}
 </body>
 </html>

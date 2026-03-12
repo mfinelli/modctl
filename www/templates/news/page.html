@@ -1,20 +1,7 @@
 {% extends "base.html" %}
 
-{% block header %}{% endblock header %}
-
 {% block content %}
 <div class="news-layout">
-
-  <header class="news-header">
-    <a href="{{ config.base_url | safe }}" class="news-logo">
-      {{ config.title }}
-    </a>
-    <nav>
-      <a href="{{ get_url(path='news') | safe }}">News</a>
-      <a href="{{ get_url(path='docs') | safe }}">Docs</a>
-    </nav>
-  </header>
-
   <main id="main-content" class="news-main container">
     <article class="news-post">
 

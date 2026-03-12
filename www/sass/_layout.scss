@@ -1,0 +1,68 @@
+@use 'variables' as *;
+
+.container {
+  width: 100%;
+  max-width: $container-max;
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+}
+
+// Base nav
+header nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+
+  .site-title {
+    font-family: $font-mono;
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--accent);
+    margin-right: auto;
+
+    &:hover { text-decoration: none; color: var(--accent-hover); }
+  }
+
+  ul {
+    display: flex;
+    gap: 1.5rem;
+
+    a {
+      color: var(--text);
+      font-size: 0.9rem;
+
+      &:hover { color: var(--accent); text-decoration: none; }
+    }
+  }
+}
+
+// Footer
+footer {
+  margin-top: auto;
+  padding: 1.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
+
+  a { color: var(--muted); &:hover { color: var(--accent); } }
+}
+
+// Theme toggle
+.theme-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: $radius;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--muted);
+  transition: border-color $transition, color $transition;
+
+  &:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+}
