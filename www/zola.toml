@@ -1,11 +1,12 @@
-# The URL the site will be built for
 base_url = "https://modctl.org"
+title = "modctl"
+description = "A package manager for your mods"
 
-# Whether to automatically compile all Sass files in the sass directory
 compile_sass = true
-
-# Whether to build a search index to be used later on by a JavaScript library
 build_search_index = true
+
+[search]
+index_format = "elasticlunr_json"
 
 [markdown]
 
@@ -13,4 +14,5 @@ build_search_index = true
 theme = "catppuccin-mocha"
 
 [extra]
-# Put all your custom variables here
+current_version = "v0.1.0"
+release_url = "https://github.com/mfinelli/modctl/releases/tag/v0.1.0"

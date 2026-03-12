@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block header %}{% endblock header %}
+
+{% block lang_switcher %}
+  {% if page is defined %}
+    {% for translation in page.translations %}
+      <a href="{{ translation.permalink | safe }}">{{ translation.lang }}</a>
+    {% endfor %}
+  {% endif %}
+{% endblock lang_switcher %}
+
+{% block content %}
+<div class="docs-layout">
+
+  <!-- Sidebar -->
+  <aside class="docs-sidebar">
+    <div class="sidebar-header">
+      <a href="{{ config.base_url | safe }}" class="sidebar-logo">
+        &gt;_modctl
+      </a>
+      <div class="sidebar-meta">
+        <a href="{{ config.extra.release_url | safe }}"
+           class="sidebar-version"
+           target="_blank"
+           rel="noopener noreferrer">
+          {{ config.extra.current_version }}
+        </a>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav" aria-label="Documentation">
+      {% set docs = get_section(path="docs/_index.md") %}
+      {% for page in docs.pages %}
+      <a href="{{ page.permalink | safe }}"
+         class="sidebar-link {% if page.permalink == current_url %}active{% endif %}">
+        {{ page.title }}
+      </a>
+      {% endfor %}
+    </nav>
+  </aside>
+
+  <!-- Main content -->
+  <div class="docs-content">
+    <header class="docs-header">
+      <div class="docs-search">
+        <input type="search"
+               id="search-input"
+               placeholder="Search docs…"
+               aria-label="Search documentation">
+        <div id="search-results" aria-live="polite"><div class="search-results__items"></div></div>
+      </div>
+    </header>
+
+    <main id="main-content">
+      {% block doc_content %}
+        {% if page %}
+          {{ page.content | safe }}
+        {% elif section %}
+          {{ section.content | safe }}
+        {% endif %}
+      {% endblock doc_content %}
+    </main>
+
+    <!-- Prev / next page navigation -->
+    <nav class="docs-pagination" aria-label="Page navigation">
+      {% if page.lower %}
+      <a href="{{ page.lower.permalink | safe }}" class="pagination-prev">
+        &larr; {{ page.lower.title }}
+      </a>
+      {% endif %}
+      {% if page.higher %}
+      <a href="{{ page.higher.permalink | safe }}" class="pagination-next">
+        {{ page.higher.title }} &rarr;
+      </a>
+      {% endif %}
+    </nav>
+  </div>
+
+</div>
+{% endblock content %}
+
+{% block scripts %}
+<script src="{{ get_url(path='elasticlunr.min.js') | safe }}"></script>
+<script src="{{ get_url(path='search.js', cachebust=true) | safe }}"></script>
+{% endblock scripts %}

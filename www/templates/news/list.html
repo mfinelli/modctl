@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="news-layout">
+
+  <header class="news-header">
+    <a href="{{ config.base_url | safe }}" class="news-logo">
+      {{ config.title }}
+    </a>
+    <nav>
+      <a href="{{ get_url(path='docs') | safe }}">Docs</a>
+    </nav>
+  </header>
+
+  <main id="main-content" class="news-main container">
+    <h1>News</h1>
+
+    {% if section.pages %}
+      <ul class="news-list">
+        {% for page in section.pages %}
+        <li class="news-list-item">
+          <a href="{{ page.permalink | safe }}" class="news-title">
+            {{ page.title }}
+          </a>
+          <time datetime="{{ page.date | date(format='%Y-%m-%d') }}" class="news-date">
+            {{ page.date | date(format="%B %d, %Y") }}
+          </time>
+          {% if page.summary %}
+          <p class="news-summary">{{ page.summary | safe }}</p>
+          {% elif page.description %}
+          <p class="news-summary">{{ page.description }}</p>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>No posts yet.</p>
+    {% endif %}
+  </main>
+</div>
+{% endblock content %}

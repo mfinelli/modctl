@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block header %}{% endblock header %}
+
+{% block content %}
+<div class="news-layout">
+
+  <header class="news-header">
+    <a href="{{ config.base_url | safe }}" class="news-logo">
+      {{ config.title }}
+    </a>
+    <nav>
+      <a href="{{ get_url(path='news') | safe }}">News</a>
+      <a href="{{ get_url(path='docs') | safe }}">Docs</a>
+    </nav>
+  </header>
+
+  <main id="main-content" class="news-main container">
+    <article class="news-post">
+
+      <header class="post-header">
+        <h1>{{ page.title }}</h1>
+        <time datetime="{{ page.date | date(format='%Y-%m-%d') }}" class="news-date">
+          {{ page.date | date(format="%B %d, %Y") }}
+        </time>
+      </header>
+
+      <div class="post-content">
+        {{ page.content | safe }}
+      </div>
+
+      <nav class="news-pagination" aria-label="Post navigation">
+        {% if page.lower %}
+        <a href="{{ page.lower.permalink | safe }}" class="pagination-prev">
+          &larr; {{ page.lower.title }}
+        </a>
+        {% endif %}
+        {% if page.higher %}
+        <a href="{{ page.higher.permalink | safe }}" class="pagination-next">
+          {{ page.higher.title }} &rarr;
+        </a>
+        {% endif %}
+      </nav>
+
+    </article>
+  </main>
+</div>
+{% endblock content %}
