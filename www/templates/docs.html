@@ -114,8 +114,10 @@
 
       {% if page is defined and page.toc %}
       <nav class="docs-toc" aria-label="On this page">
-        <span class="docs-toc-title">On this page</span>
-        <ul>
+        <button class="docs-toc-title" id="toc-toggle" aria-expanded="true" aria-controls="toc-list">
+          On this page
+        </button>
+        <ul id="toc-list" class="is-open">
           {% for h1 in page.toc %}
           <li>
             <a href="{{ h1.permalink | safe }}">{{ h1.title }}</a>
@@ -144,4 +146,5 @@
 <script src="{{ get_url(path='nav.js', cachebust=true) | safe }}"></script>
 <script src="{{ get_url(path='search.js', cachebust=true) | safe }}"></script>
 <script src="{{ get_url(path='theme.js', cachebust=true) | safe }}"></script>
+<script src="{{ get_url(path='toc.js', cachebust=true) | safe }}"></script>
 {% endblock scripts %}
