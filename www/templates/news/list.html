@@ -14,7 +14,7 @@
             {{ page.title }}
           </a>
           <time datetime="{{ page.date | date(format='%Y-%m-%d') }}" class="news-date">
-            {{ page.date | date(format="%B %d, %Y") }}
+            {{ page.date | date(format="%d %B %Y") }}
           </time>
           {% if page.summary %}
           <p class="news-summary">{{ page.summary | safe }}</p>
