@@ -1,0 +1,30 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@fontsource-variable/sixtyfour':
+        specifier: ^5.2.8
+        version: 5.2.8
+      elasticlunr:
+        specifier: ^0.9.5
+        version: 0.9.5
+
+packages:
+
+  '@fontsource-variable/sixtyfour@5.2.8':
+    resolution: {integrity: sha512-rxyTJIkniNApwc+SGRvAwxXWzMCRM09eCbq64lPZzH0hQ4jsm4fHrjs7cEm/gNHNWJc2VQ13Ynr5lBE310IHtg==}
+
+  elasticlunr@0.9.5:
+    resolution: {integrity: sha512-5YM9LFQgVYfuLNEoqMqVWIBuF2UNCA+xu/jz1TyryLN/wmBcQSb+GNAwvLKvEpGESwgGN8XA1nbLAt6rKlyHYQ==}
+
+snapshots:
+
+  '@fontsource-variable/sixtyfour@5.2.8': {}
+
+  elasticlunr@0.9.5: {}
