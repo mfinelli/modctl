@@ -1,3 +1,4 @@
-/content/docs/*
 !/content/docs/_index.md
+/content/docs/*
+/out.json
 /public

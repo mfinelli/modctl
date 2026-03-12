@@ -44,6 +44,8 @@ jobs:
           tool: zola@0.22.1
       - run: pnpm install --frozen-lockfile
       - run: just zola-build
+        env:
+          SIXTYFOUR_PATH: /usr/share/fonts/truetype/sixtyfour/C-64-Regular.ttf
       - uses: actions/upload-artifact@v6
         with:
           name: web

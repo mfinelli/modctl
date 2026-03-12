@@ -24,6 +24,13 @@
 
     <link rel="stylesheet" href="{{ get_url(path="main.css", cachebust=true) | safe }}">
     <link rel="alternate" type="application/atom+xml" title="{{ config.title }} News" href="{{ get_url(path='atom.xml') | safe }}">
+
+    <link rel="icon" type="image/png" href="{{ get_url(path="favicon-96x96.png") | safe }}" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="{{ get_url(path="favicon.svg") | safe }}" />
+    <link rel="shortcut icon" href="{{ get_url(path="favicon.ico") | safe }}" />
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ get_url(path="apple-touch-icon.png") | safe }}" />
+    <meta name="apple-mobile-web-app-title" content="modctl" />
+    <link rel="manifest" href="{{ get_url(path="site.webmanifest") | safe }}" />
 </head>
 <body>
     <a href="#main-content" class="skip-link">Skip to content</a>

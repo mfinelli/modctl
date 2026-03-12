@@ -6,5 +6,8 @@
   "dependencies": {
     "@fontsource-variable/sixtyfour": "^5.2.8",
     "elasticlunr": "^0.9.5"
+  },
+  "devDependencies": {
+    "realfavicon": "^0.6.3"
   }
 }

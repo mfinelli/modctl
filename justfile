@@ -9,23 +9,33 @@ copy-assets:
   cp node_modules/@fontsource-variable/sixtyfour/LICENSE www/static/LICENSE-sixtyfour.txt
 
 convert-woff-to-ttf:
-  fontforge -lang=ff -c 'Open($1); Generate($2); Close();' \
-    node_modules/@fontsource-variable/sixtyfour/files/sixtyfour-latin-bled-normal.woff2 \
-    www/sixtyfour.ttf
+  if [ ! -f www/sixtyfour.ttf ]; then \
+    fontforge -lang=ff -c 'Open($1); Generate($2); Close();' \
+      node_modules/@fontsource-variable/sixtyfour/files/sixtyfour-latin-bled-normal.woff2 \
+      www/sixtyfour.ttf \
+  ;fi
 
 regenerate-favicon: convert-woff-to-ttf
-  magick -gravity center -fill black -size 512x512 -background none \
-      -font www/sixtyfour.ttf caption:">m" png:- | \
-      magick - -trim +repage -gravity center -background none -extent 512x512 \
-      www/favicon.png
+  if [ ! -f www/favicon.png ]; then \
+    magick -gravity center -fill black -size 512x512 -background none \
+        -font "${SIXTYFOUR_PATH}" caption:">M" png:- | \
+        magick - -trim +repage -gravity center -background none -extent 512x512 \
+        www/favicon.png \
+  ;fi
 
 copy-content:
   ./www/syncdocs.bash
 
+generate-favicon-bundle: regenerate-favicon
+  if [ ! -f www/static/favicon.ico ]; then \
+    pnpm exec realfavicon generate www/favicon.png www/favicon.json \
+      www/out.json www/static \
+  ;fi
+
 [working-directory: 'www']
-zola-build: regenerate-favicon copy-assets copy-content
+zola-build: generate-favicon-bundle copy-assets copy-content
   zola build --minify
 
 [working-directory: 'www']
-zola-serve: regenerate-favicon copy-assets copy-content
+zola-serve: generate-favicon-bundle copy-assets copy-content
   zola serve
