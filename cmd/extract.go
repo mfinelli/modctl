@@ -65,7 +65,7 @@ the archive format is detected and the file is named by its sha256 prefix.
 
 Examples:
   modctl extract ./backup.tar.zst
-  modctl extract ./backup.tar.zst --game steam:1091500 --mod "Unofficial Skyrim Patch"
+  modctl extract ./backup.tar.zst --game steam:489830 --mod "Unofficial Skyrim Patch"
   modctl extract ./backup.tar.zst --mod "Cyber Engine Tweaks" --file "Main File" --version "1.2.3"
   modctl extract ./game-export.tar.zst --mod "Appearance Menu Mod" --output-dir ~/mods/`,
 	Args:         cobra.ExactArgs(1),
