@@ -8,6 +8,7 @@
     "elasticlunr": "^0.9.5"
   },
   "devDependencies": {
-    "realfavicon": "^0.6.3"
+    "realfavicon": "^0.6.3",
+    "wrangler": "^4.70.0"
   }
 }

@@ -2,4 +2,5 @@
 minimumReleaseAge: 10080  # 7 days
 
 onlyBuiltDependencies:
+  - esbuild
   - sharp
