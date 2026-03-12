@@ -5,6 +5,9 @@
 
   <main id="main-content" class="news-main container">
     <h1>News</h1>
+    <a href="{{ get_url(path='atom.xml') | safe }}" class="feed-link">
+      Atom Feed
+    </a>
 
     {% if section.pages %}
       <ul class="news-list">

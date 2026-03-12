@@ -43,6 +43,20 @@
   margin-bottom: 0;
 }
 
+.feed-link {
+  display: inline-block;
+  font-family: $font-mono;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+
+  &:hover { color: var(--accent); }
+
+  &::before {
+    content: '⊕ ';
+  }
+}
+
 // Individual post
 .news-post {
   .post-header {

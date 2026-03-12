@@ -23,6 +23,7 @@
     </title>
 
     <link rel="stylesheet" href="{{ get_url(path="main.css", cachebust=true) | safe }}">
+    <link rel="alternate" type="application/atom+xml" title="{{ config.title }} News" href="{{ get_url(path='atom.xml') | safe }}">
 </head>
 <body>
     <a href="#main-content" class="skip-link">Skip to content</a>
