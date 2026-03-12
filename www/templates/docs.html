@@ -14,7 +14,7 @@
 <div class="docs-layout">
 
   <!-- Sidebar -->
-  <aside class="docs-sidebar">
+  <aside class="docs-sidebar" id="nav-menu">
     <div class="sidebar-header">
       <a href="{{ config.base_url | safe }}" class="sidebar-logo font-sixtyfour">
         &gt;_modctl
@@ -52,24 +52,40 @@
   {% endfor %}
     </nav>
   </aside>
+  <div class="docs-overlay" id="docs-overlay"></div>
 
   <!-- Main content -->
   <div class="docs-content">
     <header class="docs-header">
-  <div class="docs-search">
-    <input type="search"
-           id="search-input"
-           placeholder="Search docs…"
-           aria-label="Search documentation">
-    <div id="search-results"></div>
-  </div>
-  <nav class="docs-header-nav">
-    <a href="{{ get_url(path='news') | safe }}">News</a>
-  </nav>
-  <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
-    <span id="theme-icon">◐</span>
-  </button>
-</header>
+      <button class="nav-toggle docs-nav-toggle" id="nav-toggle"
+              aria-label="Toggle navigation"
+              aria-expanded="false"
+              aria-controls="nav-menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+
+      <a href="{{ config.base_url | safe }}" class="sidebar-logo docs-header-logo">
+        {{ config.title }}
+      </a>
+
+      <div class="docs-search">
+        <input type="search"
+               id="search-input"
+               placeholder="Search docs…"
+               aria-label="Search documentation">
+        <div id="search-results"></div>
+      </div>
+
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+        <span id="theme-icon">◐</span>
+      </button>
+
+      <nav class="docs-header-nav">
+        <a href="{{ get_url(path='news') | safe }}">News</a>
+      </nav>
+    </header>
 
     <main id="main-content">
       {% block doc_content %}
@@ -101,6 +117,7 @@
 
 {% block scripts %}
 <script src="{{ get_url(path='elasticlunr.min.js') | safe }}"></script>
+<script src="{{ get_url(path='nav.js', cachebust=true) | safe }}"></script>
 <script src="{{ get_url(path='search.js', cachebust=true) | safe }}"></script>
 <script src="{{ get_url(path='theme.js', cachebust=true) | safe }}"></script>
 {% endblock scripts %}

@@ -112,6 +112,9 @@
   align-items: center;
   gap: 1rem;
   z-index: 10;
+
+  .docs-nav-toggle { display: none; }
+  .docs-header-logo { display: none; margin-right: auto; }
 }
 
 .docs-header-nav {
@@ -221,4 +224,55 @@
 
   a { color: var(--muted); &:hover { color: var(--accent); } }
   .pagination-next { margin-left: auto; }
+}
+
+// Docs overlay (for mobile)
+.docs-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 19;
+}
+
+@media (max-width: 860px) {
+  .docs-header {
+    padding: 0.75rem 1rem;
+
+    .docs-nav-toggle {
+      display: flex;
+      order: -1;
+      margin-right: 0;
+    }
+
+    .docs-header-logo {
+      display: block;
+    }
+
+    .docs-search {
+      margin-left: auto;
+
+      #search-input { width: 160px; }
+      #search-input:focus { width: 200px; }
+    }
+  }
+
+  .docs-sidebar {
+    transform: translateX(-100%);
+    transition: transform $transition;
+    z-index: 20;
+
+    &.is-open {
+      transform: translateX(0);
+    }
+  }
+
+  .docs-content {
+    margin-left: 0;
+  }
+
+  // Show overlay when sidebar is open
+  .docs-sidebar.is-open ~ .docs-overlay {
+    display: block;
+  }
 }

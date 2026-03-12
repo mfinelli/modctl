@@ -33,13 +33,21 @@
             <a href="{{ config.base_url | safe }}" class="site-title">
                 {{ config.title }}
             </a>
-            <ul>
-                <li><a href="{{ get_url(path='docs') | safe }}">Docs</a></li>
-                <li><a href="{{ get_url(path='news') | safe }}">News</a></li>
-            </ul>
             <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
               <span id="theme-icon">◐</span>
             </button>
+            <button class="nav-toggle" id="nav-toggle"
+                aria-label="Toggle navigation"
+                aria-expanded="false"
+                aria-controls="nav-menu">
+              <span></span>
+              <span></span>
+              <span></span>
+            </button>
+            <ul id="nav-menu">
+                <li><a href="{{ get_url(path='docs') | safe }}">Docs</a></li>
+                <li><a href="{{ get_url(path='news') | safe }}">News</a></li>
+            </ul>
         </nav>
         {% block lang_switcher %}{% endblock lang_switcher %}
         {%- endblock header %}
@@ -63,6 +71,7 @@
     </footer>
 
     {%- block scripts %}
+    <script src="{{ get_url(path='nav.js', cachebust=true) | safe }}"></script>
     <script src="{{ get_url(path='theme.js', cachebust=true) | safe }}"></script>
     {% endblock scripts %}
 </body>

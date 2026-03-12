@@ -1,4 +1,5 @@
 *
 !.gitignore
+!nav.js
 !search.js
 !theme.js
