@@ -200,15 +200,28 @@
     h1:first-child { margin-top: 0; }
 
     .zola-anchor {
-      opacity: 0;
-      margin-left: 0.4rem;
-      font-size: 0.85em;
-      transition: opacity $transition;
+      display: inline-block;
+      margin-left: 0.6rem;
+      font-size: 0.75em;
+      color: transparent;
+      transition: color $transition;
+      text-decoration: none;
+      user-select: none;
+      font-size: 0;
+
+      &::after {
+        content: '¶';
+        font-size: 1rem;
+        color: transparent;
+        transition: color $transition;
+      }
+
+      &:hover::after { color: var(--accent) !important; }
     }
 
-    h1:hover .zola-anchor,
-    h2:hover .zola-anchor,
-    h3:hover .zola-anchor { opacity: 1; }
+    h1:hover .zola-anchor::after,
+    h2:hover .zola-anchor::after,
+    h3:hover .zola-anchor::after { color: var(--muted); }
   }
 }
 

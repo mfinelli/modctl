@@ -15,6 +15,12 @@ body {
   flex-direction: column;
 }
 
+hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin-block: 2.5rem;
+}
+
 // Links
 a {
   color: var(--accent);
