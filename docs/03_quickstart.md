@@ -53,7 +53,7 @@ You can switch the active game at any time by running this command again.
 Download a mod archive from Nexus Mods or wherever you get your mods, then
 import it into modctl:
 ```bash
-modctl mods import ~/Downloads/AppearanceMenuMod-790-2-6-2-1728496438.7z
+modctl mods import ~/Downloads/Appearance\ Menu\ Mod-790-2-12-5-1749642728.zip
 ```
 
 modctl copies the archive into its local store, scans its contents, and records
