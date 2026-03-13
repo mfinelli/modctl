@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-inner">
+    <h1>modctl: A package manager for your mods.</h1>
+    <p class="hero-sub">
+      Install, update, and remove mods the same way you manage everything
+      else on Linux: with a tool that tracks every file, handles conflicts,
+      and never leaves a mess behind.
+    </p>
+    <a href="{{ get_url(path='docs/installation') | safe }}" class="btn btn-primary">
+      Get Started
+    </a>
+  </div>
+</section>
+
+<!-- Problem -->
+<section class="problem">
+  <div class="container">
+    <h2>Your mods deserve a real home on Linux.</h2>
+    <p>
+      Gaming on Linux has come a long way. Your favorite titles run great,
+      Steam handles the hard parts, and Proton keeps getting better.
+      But if you want to mod those games, you're still expected to run
+      Windows tools through Wine and hope for the best.
+    </p>
+    <p>
+      modctl is the missing piece: a mod manager that treats Linux as a
+      first-class platform, not an afterthought.
+    </p>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="features">
+  <div class="container">
+    <h2>Everything you expect from a mod manager.</h2>
+
+    <div class="feature-grid">
+      <div class="feature">
+        <h3>Profiles &amp; priority ordering</h3>
+        <p>
+          Create multiple mod profiles for the same game and switch between
+          them freely. When two mods touch the same file, the load order
+          decides the winner - no surprises.
+        </p>
+      </div>
+
+      <div class="feature">
+        <h3>Safe installs &amp; rollback</h3>
+        <p>
+          Before modctl touches a file your game owns, it makes a backup.
+          Uninstall a mod or switch profiles and your game returns exactly
+          to the state it was in before. No manual cleanup, no broken installs.
+        </p>
+      </div>
+
+      <div class="feature">
+        <h3>Nexus update checking</h3>
+        <p>
+          Link your mods to their Nexus Mods pages and modctl will tell you
+          when updates are available. You still stay in control of what gets
+          updated and when.
+        </p>
+      </div>
+
+      <div class="feature">
+        <h3>Export &amp; import</h3>
+        <p>
+        Pack your entire mod setup (or even just a single game) into a portable
+        file. Move to a new machine or share a configuration with a friend
+        without starting from scratch.
+        </p>
+      </div>
+
+      <div class="feature">
+        <h3>Steam game discovery</h3>
+        <p>
+          modctl finds your Steam library automatically. No digging through
+          file paths or looking up app IDs. Point it at a game and get
+          straight to modding.
+        </p>
+      </div>
+
+      <div class="feature">
+        <h3>Conflict detection</h3>
+        <p>
+          See exactly which mods are competing for the same files before
+          anything is applied. Adjust priorities, resolve conflicts, and
+          apply with confidence.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="how-it-works">
+  <div class="container">
+    <h2>Simple by design.</h2>
+    <p>
+      modctl works the way modding actually works under the hood: it extracts
+      mod archives into your game directory and keeps a precise record of every
+      file it touches. That record is what makes safe uninstalls, conflict
+      detection, and profile switching possible - no virtual filesystem, no
+      hidden magic, just your game directory in a known, reproducible state.
+    </p>
+    <p>
+      Archives are stored locally. Your mod setup is entirely yours, offline
+      and under your control.
+    </p>
+  </div>
+</section>
+
+<!-- Install CTA -->
+<section class="cta">
+  <div class="container">
+    <h2>Ready to get started?</h2>
+    <p>
+      Packages are available for Debian/Ubuntu, Fedora/RHEL, and Arch Linux.
+    </p>
+    <a href="{{ get_url(path='docs/installation') | safe }}" class="btn btn-primary">
+      Read the install guide
+    </a>
+  </div>
+</section>
+
+{% endblock content %}

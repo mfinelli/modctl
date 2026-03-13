@@ -1,0 +1,15 @@
+{
+  "name": "modctl",
+  "description": "command line mod manager",
+  "author": "Mario Finelli",
+  "license": "GPL-3.0-or-later",
+  "private": true,
+  "dependencies": {
+    "@fontsource-variable/sixtyfour": "^5.2.8",
+    "elasticlunr": "^0.9.5"
+  },
+  "devDependencies": {
+    "realfavicon": "^0.6.3",
+    "wrangler": "^4.70.0"
+  }
+}

@@ -1,0 +1,67 @@
+---
+name: Zola
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/zola.yml
+      - docs/**/*
+      - docs-i18n/**/*
+      - www/**/*
+      - justfile
+      - package.json
+      - pnpm-lock.yaml
+  pull_request:
+    branches: [master]
+    paths:
+      - .github/workflows/zola.yml
+      - docs/**/*
+      - docs-i18n/**/*
+      - www/**/*
+      - justfile
+      - package.json
+      - pnpm-lock.yaml
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y fontforge fonts-sixtyfour
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+      - uses: actions/setup-node@v6
+        with:
+          cache: pnpm
+          node-version: lts/*
+      - uses: mfinelli/setup-imagemagick@v7
+      - uses: extractions/setup-just@v3
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: zola@0.22.1
+      - run: pnpm install --frozen-lockfile
+      - run: just zola-build
+        env:
+          SIXTYFOUR_PATH: /usr/share/fonts/truetype/sixtyfour/C-64-Regular.ttf
+      - uses: actions/upload-artifact@v6
+        with:
+          name: web
+          path: www/public/**/*
+          retention-days: 1
+      - run: pnpm exec wrangler pages deploy public --project-name modctl
+        if: github.event_name != 'pull_request'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        working-directory: www
+      - uses: mfinelli/cloudflare-pages-cleanup@v1
+        if: github.event_name != 'pull_request'
+        with:
+          cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          project: modctl
+          min-to-keep: 3
+          max-to-keep: 3

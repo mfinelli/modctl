@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <script>
+      (function() {
+        var theme = localStorage.getItem('theme');
+        if (theme) {
+          document.documentElement.setAttribute('data-theme', theme);
+        }
+      }());
+    </script>
+
+    <title>
+        {%- block title %}
+            {%- if page.title %}{{ page.title }} | {{ config.title }}
+            {%- elif section.title %}{{ section.title }} | {{ config.title }}
+            {%- else %}{{ config.title }}
+            {%- endif %}
+        {%- endblock title %}
+    </title>
+
+    <link rel="stylesheet" href="{{ get_url(path="main.css", cachebust=true) | safe }}">
+    <link rel="alternate" type="application/atom+xml" title="{{ config.title }} News" href="{{ get_url(path='atom.xml') | safe }}">
+
+    <link rel="icon" type="image/png" href="{{ get_url(path="favicon-96x96.png") | safe }}" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="{{ get_url(path="favicon.svg") | safe }}" />
+    <link rel="shortcut icon" href="{{ get_url(path="favicon.ico") | safe }}" />
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ get_url(path="apple-touch-icon.png") | safe }}" />
+    <meta name="apple-mobile-web-app-title" content="modctl" />
+    <link rel="manifest" href="{{ get_url(path="site.webmanifest") | safe }}" />
+</head>
+<body>
+    <a href="#main-content" class="skip-link">Skip to content</a>
+
+    <header>
+        {%- block header %}
+        <nav>
+            <a href="{{ config.base_url | safe }}" class="site-title">
+                {{ config.title }}
+            </a>
+            <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+              <span id="theme-icon">◐</span>
+            </button>
+            <button class="nav-toggle" id="nav-toggle"
+                aria-label="Toggle navigation"
+                aria-expanded="false"
+                aria-controls="nav-menu">
+              <span></span>
+              <span></span>
+              <span></span>
+            </button>
+            <ul id="nav-menu">
+                <li><a href="{{ get_url(path='docs') | safe }}">Docs</a></li>
+                <li><a href="{{ get_url(path='news') | safe }}">News</a></li>
+            </ul>
+        </nav>
+        {% block lang_switcher %}{% endblock lang_switcher %}
+        {%- endblock header %}
+    </header>
+
+    <main id="main-content">
+        {%- block content %}{% endblock content %}
+    </main>
+
+    <footer>
+        {%- block footer %}
+        <p>
+            <code>modctl</code>
+            &copy; {{ now() | date(format="%Y") }} Mario Finelli
+            &mdash; Licensed under the
+            <a href="https://www.gnu.org/licenses/gpl-3.0.html">GPL-3.0-or-later</a>
+            &mdash;
+            <a href="https://github.com/mfinelli/modctl">GitHub</a>
+        </p>
+        {%- endblock footer %}
+    </footer>
+
+    {%- block scripts %}
+    <script src="{{ get_url(path='nav.js', cachebust=true) | safe }}"></script>
+    <script src="{{ get_url(path='theme.js', cachebust=true) | safe }}"></script>
+    <script src="{{ get_url(path='toc.js', cachebust=true) | safe }}"></script>
+    {% endblock scripts %}
+</body>
+</html>

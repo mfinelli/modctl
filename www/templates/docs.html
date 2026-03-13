@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block header %}{% endblock header %}
+
+{% block lang_switcher %}
+  {% if page is defined %}
+    {% for translation in page.translations %}
+      <a href="{{ translation.permalink | safe }}">{{ translation.lang }}</a>
+    {% endfor %}
+  {% endif %}
+{% endblock lang_switcher %}
+
+{% block content %}
+<div class="docs-layout">
+
+  <!-- Sidebar -->
+  <aside class="docs-sidebar" id="nav-menu">
+    <div class="sidebar-header">
+      <a href="{{ config.base_url | safe }}" class="sidebar-logo font-sixtyfour">
+        &gt;_modctl
+      </a>
+      <div class="sidebar-meta">
+        <a href="{{ config.extra.release_url | safe }}"
+           class="sidebar-version"
+           target="_blank"
+           rel="noopener noreferrer">
+          {{ config.extra.current_version }}
+        </a>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav" aria-label="Documentation">
+      {% set docs = get_section(path="docs/_index.md") %}
+      {% for page in docs.pages %}
+      <a href="{{ page.permalink | safe }}"
+         class="sidebar-link {% if page.permalink == current_url %}active{% endif %}">
+        {{ page.title }}
+      </a>
+      {% endfor %}
+
+      {% for subsection_path in docs.subsections %}
+    {% set subsection = get_section(path=subsection_path) %}
+    <div class="sidebar-section">
+      <span class="sidebar-section-title">{{ subsection.title }}</span>
+      {% for page in subsection.pages %}
+      <a href="{{ page.permalink | safe }}"
+         class="sidebar-link sidebar-link-nested {% if page.permalink == current_url %}active{% endif %}">
+        {{ page.title }}
+      </a>
+      {% endfor %}
+    </div>
+  {% endfor %}
+    </nav>
+  </aside>
+  <div class="docs-overlay" id="docs-overlay"></div>
+
+  <!-- Main content -->
+  <div class="docs-content">
+    <header class="docs-header">
+      <button class="nav-toggle docs-nav-toggle" id="nav-toggle"
+              aria-label="Toggle navigation"
+              aria-expanded="false"
+              aria-controls="nav-menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+
+      <a href="{{ config.base_url | safe }}" class="sidebar-logo docs-header-logo">
+        {{ config.title }}
+      </a>
+
+      <div class="docs-search">
+        <input type="search"
+               id="search-input"
+               placeholder="Search docs…"
+               aria-label="Search documentation">
+        <div id="search-results"></div>
+      </div>
+
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+        <span id="theme-icon">◐</span>
+      </button>
+
+      <nav class="docs-header-nav">
+        <a href="{{ get_url(path='news') | safe }}">News</a>
+      </nav>
+    </header>
+
+    <div class="docs-body">
+      <main id="main-content">
+        {% block doc_content %}
+          {% if page %}
+            {{ page.content | safe }}
+          {% elif section %}
+            {{ section.content | safe }}
+          {% endif %}
+        {% endblock doc_content %}
+
+        <!-- Prev / next page navigation -->
+        <nav class="docs-pagination" aria-label="Page navigation">
+          {% if page.lower %}
+          <a href="{{ page.lower.permalink | safe }}" class="pagination-prev">
+            &larr; {{ page.lower.title }}
+          </a>
+          {% endif %}
+          {% if page.higher %}
+          <a href="{{ page.higher.permalink | safe }}" class="pagination-next">
+            {{ page.higher.title }} &rarr;
+          </a>
+          {% endif %}
+        </nav>
+      </main>
+
+      {% if page is defined and page.toc %}
+      <nav class="docs-toc" aria-label="On this page">
+        <button class="docs-toc-title" id="toc-toggle" aria-expanded="true" aria-controls="toc-list">
+          On this page
+        </button>
+        <ul id="toc-list" class="is-open">
+          {% for h1 in page.toc %}
+          <li>
+            <a href="{{ h1.permalink | safe }}">{{ h1.title }}</a>
+            {% if h1.children %}
+            <ul>
+              {% for h2 in h1.children %}
+              <li>
+                <a href="{{ h2.permalink | safe }}">{{ h2.title }}</a>
+              </li>
+              {% endfor %}
+            </ul>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      </nav>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock content %}
+
+{% block scripts %}
+<script src="{{ get_url(path='elasticlunr.min.js') | safe }}"></script>
+<script src="{{ get_url(path='nav.js', cachebust=true) | safe }}"></script>
+<script src="{{ get_url(path='search.js', cachebust=true) | safe }}"></script>
+<script src="{{ get_url(path='theme.js', cachebust=true) | safe }}"></script>
+<script src="{{ get_url(path='toc.js', cachebust=true) | safe }}"></script>
+{% endblock scripts %}

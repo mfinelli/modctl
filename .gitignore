@@ -3,4 +3,7 @@
 /hello.txt
 /internal/nexusclient/dbc/*
 /modctl
+/node_modules
 /sample.tar.gz
+/www/favicon.png
+/www/sixtyfour.ttf

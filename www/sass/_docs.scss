@@ -1,0 +1,441 @@
+@use 'variables' as *;
+
+.docs-layout {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+}
+
+// Sidebar
+.docs-sidebar {
+  width: $sidebar-width;
+  min-height: 100vh;
+  background-color: var(--surface);
+  border-right: 1px solid var(--border);
+  position: fixed;
+  top: 0;
+  left: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 2rem;
+}
+
+.sidebar-header {
+  padding: 1.25rem 1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.sidebar-logo {
+  font-family: $font-mono;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--accent);
+
+  &:hover { text-decoration: none; color: var(--accent-hover); }
+}
+
+.sidebar-version {
+  font-family: $font-mono;
+  font-size: 0.75rem;
+  color: var(--muted);
+
+  &:hover { color: var(--accent); }
+}
+
+.sidebar-nav {
+  padding: 1rem 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-link {
+  display: block;
+  width: 100%;
+  font-size: 0.875rem;
+  color: var(--text);
+  padding: 0.35rem 1rem;
+  border-left: 2px solid transparent;
+  transition: color $transition, border-color $transition,
+              background-color $transition;
+
+  &:hover {
+    color: var(--accent);
+    background-color: var(--accent-tint);
+    text-decoration: none;
+  }
+
+  &.active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    background-color: var(--accent-tint);
+    font-weight: 500;
+  }
+}
+
+.sidebar-section {
+  margin-top: 0.75rem;
+}
+
+.sidebar-section-title {
+  display: block;
+  font-family: $font-mono;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  padding: 0.35rem 1rem;
+}
+
+.sidebar-link-nested {
+  padding-left: 1.75rem;
+}
+
+// Docs content area
+.docs-content {
+  margin-left: $sidebar-width;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.docs-body {
+  display: flex;
+  flex: 1;
+}
+
+.docs-header {
+  position: sticky;
+  top: 0;
+  background-color: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 2rem;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 1rem;
+  z-index: 10;
+
+  .docs-nav-toggle { display: none; }
+  .docs-header-logo { display: none; margin-right: auto; }
+}
+
+.docs-header-nav {
+  display: flex;
+  gap: 1.5rem;
+
+  a {
+    font-size: 0.9rem;
+    color: var(--text);
+    &:hover { color: var(--accent); text-decoration: none; }
+  }
+}
+
+.docs-search {
+  position: relative;
+
+  #search-input {
+    font-family: $font-mono;
+    font-size: 0.85rem;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: $radius;
+    padding: 0.4rem 0.75rem;
+    width: 220px;
+    color: var(--text);
+    transition: border-color $transition, width $transition;
+
+    &::placeholder { color: var(--muted); }
+
+    &:focus {
+      outline: none;
+      border-color: var(--accent);
+      width: 280px;
+    }
+  }
+}
+
+#search-results {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  width: 320px;
+  background-color: var(--surface);
+  border-radius: $radius;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 20;
+
+  // Only show border when there is content
+  &:not(:empty) {
+    border: 1px solid var(--border);
+  }
+
+  .search-results-list {
+    padding: 0.5rem 0;
+
+    li a {
+      display: block;
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      color: var(--text);
+
+      &:hover {
+        background-color: var(--accent-tint);
+        color: var(--accent);
+        text-decoration: none;
+      }
+    }
+  }
+
+  .search-empty {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    color: var(--muted);
+  }
+}
+
+// Docs page prose
+.docs-content {
+  #main-content {
+    padding: 2.5rem 2rem;
+
+    flex: 1;
+    min-width: 0;
+    padding: 2.5rem 2rem;
+
+    h1, h2, h3 { margin-top: 2rem; }
+    h1:first-child { margin-top: 0; }
+
+    .zola-anchor {
+      display: inline-block;
+      margin-left: 0.6rem;
+      font-size: 0.75em;
+      color: transparent;
+      transition: color $transition;
+      text-decoration: none;
+      user-select: none;
+      font-size: 0;
+
+      &::after {
+        content: '¶';
+        font-size: 1rem;
+        color: transparent;
+        transition: color $transition;
+      }
+
+      &:hover::after { color: var(--accent) !important; }
+    }
+
+    h1:hover .zola-anchor::after,
+    h2:hover .zola-anchor::after,
+    h3:hover .zola-anchor::after { color: var(--muted); }
+
+    ul, ol {
+      margin-bottom: 1rem;
+      padding-left: 1.5rem;
+
+      li {
+        margin-bottom: 0.35rem;
+        line-height: 1.6;
+      }
+
+      // Nested lists
+      ul, ol {
+        margin-top: 0.35rem;
+        margin-bottom: 0;
+      }
+    }
+
+    ul { list-style: disc; }
+    ol { list-style: decimal; }
+
+    ul ul { list-style: circle; }
+    ul ul ul { list-style: square; }
+  }
+}
+
+// TOC
+.docs-toc {
+  width: 200px;
+  flex-shrink: 0;
+  padding: 2.5rem 1rem 2.5rem 0;
+  position: sticky;
+  top: 57px;
+  align-self: flex-start;
+  max-height: calc(100vh - 57px);
+  overflow-y: auto;
+}
+
+.docs-toc-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: $font-mono;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 0.75rem;
+  padding: 0;
+
+  // Chevron indicator
+  &::after {
+    content: '›';
+    font-size: 1rem;
+    transition: transform $transition;
+    line-height: 1;
+  }
+
+  &[aria-expanded="true"]::after {
+    transform: rotate(90deg);
+  }
+}
+
+#toc-list {
+  display: none;
+  flex-direction: column;
+  gap: 0.1rem;
+
+  &.is-open { display: flex; }
+
+  ul {
+    margin-left: 0.75rem;
+    margin-top: 0.1rem;
+  }
+}
+
+.docs-toc a {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  padding: 0.2rem 0;
+  transition: color $transition;
+
+  &:hover {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  &.active {
+    color: var(--accent);
+    font-weight: 500;
+  }
+}
+
+// TOC Desktop: always visible, no toggle chrome
+@media (min-width: 1101px) {
+  .docs-toc {
+    display: block;
+  }
+
+  .docs-toc-title {
+    cursor: default;
+    pointer-events: none;
+
+    &::after { display: none; }
+  }
+
+  #toc-list {
+    display: flex !important;
+  }
+}
+
+// TOC Mobile: full width above content
+@media (max-width: 1100px) {
+  .docs-body {
+    flex-direction: column;
+  }
+
+  .docs-toc {
+    order: -1; // move above #main-content
+    width: 100%;
+    position: static;
+    max-height: none;
+    padding: 1rem 2rem 0;
+    border-bottom: 1px solid var(--border);
+    overflow: visible;
+  }
+
+  .docs-toc-title {
+    padding: 0.5rem 0;
+    margin-bottom: 0;
+  }
+
+  #toc-list {
+    padding-bottom: 1rem;
+  }
+}
+
+// Pagination
+.docs-pagination {
+  display: flex;
+  justify-content: space-between;
+  padding: 2rem;
+  margin-top: 1.5rem;
+  margin-left: 3rem;
+  margin-right: 3rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.875rem;
+
+  a { color: var(--muted); &:hover { color: var(--accent); } }
+  .pagination-next { margin-left: auto; }
+}
+
+// Docs overlay (for mobile)
+.docs-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 19;
+}
+
+@media (max-width: 860px) {
+  .docs-header {
+    padding: 0.75rem 1rem;
+
+    .docs-nav-toggle {
+      display: flex;
+      order: -1;
+      margin-right: 0;
+    }
+
+    .docs-header-logo {
+      display: block;
+    }
+
+    .docs-search {
+      margin-left: auto;
+
+      #search-input { width: 160px; }
+      #search-input:focus { width: 200px; }
+    }
+  }
+
+  .docs-sidebar {
+    transform: translateX(-100%);
+    transition: transform $transition;
+    z-index: 20;
+
+    &.is-open {
+      transform: translateX(0);
+    }
+  }
+
+  .docs-content {
+    margin-left: 0;
+  }
+
+  // Show overlay when sidebar is open
+  .docs-sidebar.is-open ~ .docs-overlay {
+    display: block;
+  }
+}

@@ -1,0 +1,41 @@
+[private]
+default:
+    @just --list
+
+copy-assets:
+  cp node_modules/elasticlunr/release/elasticlunr.min.js www/static
+  cp node_modules/elasticlunr/LICENSE www/static/LICENSE-elasticlunr.txt
+  cp node_modules/@fontsource-variable/sixtyfour/files/sixtyfour-latin-bled-normal.woff2 www/static
+  cp node_modules/@fontsource-variable/sixtyfour/LICENSE www/static/LICENSE-sixtyfour.txt
+
+convert-woff-to-ttf:
+  if [ ! -f www/sixtyfour.ttf ]; then \
+    fontforge -lang=ff -c 'Open($1); Generate($2); Close();' \
+      node_modules/@fontsource-variable/sixtyfour/files/sixtyfour-latin-bled-normal.woff2 \
+      www/sixtyfour.ttf \
+  ;fi
+
+regenerate-favicon: convert-woff-to-ttf
+  if [ ! -f www/favicon.png ]; then \
+    magick -gravity center -fill black -size 512x512 -background none \
+        -font "${SIXTYFOUR_PATH}" caption:">M" png:- | \
+        magick - -trim +repage -gravity center -background none -extent 512x512 \
+        www/favicon.png \
+  ;fi
+
+copy-content:
+  ./www/syncdocs.bash
+
+generate-favicon-bundle: regenerate-favicon
+  if [ ! -f www/static/favicon.ico ]; then \
+    pnpm exec realfavicon generate www/favicon.png www/favicon.json \
+      www/out.json www/static \
+  ;fi
+
+[working-directory: 'www']
+zola-build: generate-favicon-bundle copy-assets copy-content
+  zola build --minify
+
+[working-directory: 'www']
+zola-serve: generate-favicon-bundle copy-assets copy-content
+  zola serve

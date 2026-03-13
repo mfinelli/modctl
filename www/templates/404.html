@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block title %}Page Not Found | {{ config.title }}{% endblock title %}
+
+{% block content %}
+<div class="error-layout container">
+  <h1>404</h1>
+  <p>This page doesn't exist or has been moved.</p>
+  <a href="{{ get_url(path='docs') | safe }}">Browse the documentation</a>
+</div>
+{% endblock content %}

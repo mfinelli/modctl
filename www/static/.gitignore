@@ -1,0 +1,6 @@
+*
+!.gitignore
+!nav.js
+!search.js
+!theme.js
+!toc.js

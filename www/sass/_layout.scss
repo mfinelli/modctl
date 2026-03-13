@@ -1,0 +1,138 @@
+@use 'variables' as *;
+
+.container {
+  width: 100%;
+  max-width: $container-max;
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+}
+
+// Base nav
+header:not(.docs-header) nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+
+  .site-title {
+    font-family: $font-mono;
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--accent);
+    margin-right: auto;
+
+    &:hover { text-decoration: none; color: var(--accent-hover); }
+  }
+
+  ul {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+
+    a {
+      color: var(--text);
+      font-size: 0.9rem;
+
+      &:hover { color: var(--accent); text-decoration: none; }
+    }
+  }
+}
+
+// Hamburger menu
+.nav-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  width: 32px;
+  height: 32px;
+
+  span {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background-color: var(--text);
+    border-radius: 2px;
+    transition: transform $transition, opacity $transition;
+  }
+
+  &[aria-expanded="true"] {
+    span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    span:nth-child(2) { opacity: 0; }
+    span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+  }
+}
+
+// Mobile nav
+@media (max-width: 640px) {
+  header:not(.docs-header) nav {
+    flex-wrap: wrap;
+
+    .site-title { flex: 1; }
+
+    .nav-toggle {
+      display: flex;
+      order: 2;
+    }
+
+    // Move theme toggle next to logo, before hamburger
+    .theme-toggle {
+      order: 1;
+      margin-right: 0;
+    }
+
+    ul {
+      display: none;
+      width: 100%;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0;
+      padding: 0.5rem 0;
+      border-top: 1px solid var(--border);
+      order: 3;
+
+      &.is-open { display: flex; }
+
+      li { width: 100%; }
+
+      a {
+        display: block;
+        padding: 0.6rem 0;
+        width: 100%;
+      }
+    }
+  }
+}
+
+// Footer
+footer {
+  margin-top: auto;
+  padding: 1.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
+
+  a { color: var(--muted); &:hover { color: var(--accent); } }
+}
+
+// Theme toggle
+.theme-toggle {
+  background: none;
+  border: none;
+  border-radius: $radius;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--muted);
+  transition: color $transition;
+
+  &:hover {
+    color: var(--accent);
+  }
+}
