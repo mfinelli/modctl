@@ -30,9 +30,11 @@ make
 ./modctl completion bash > pkg/arch/modctl.bash
 ./modctl completion fish > pkg/arch/modctl.fish
 ./modctl completion zsh > pkg/arch/modctl.zsh
+make modctl.1
 cp LICENSE pkg/arch
 cp CHANGELOG.md pkg/arch
 mv modctl pkg/arch
+mv modctl.1 pkg/arch
 
 (
   set -e

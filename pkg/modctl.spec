@@ -26,12 +26,14 @@ cp -r %{_sourcedir}/licenses/. %{buildroot}/usr/share/licenses/%{name}/vendor/
 install -vDm0644 %{_sourcedir}/modctl.bash %{buildroot}/usr/share/bash-completion/completions/modctl
 install -vDm0644 %{_sourcedir}/modctl.fish %{buildroot}/usr/share/fish/vendor_completions.d/modctl.fish
 install -vDm0644 %{_sourcedir}/modctl.zsh %{buildroot}/usr/share/zsh/site-functions/_modctl
+install -vDm0644 %{_sourcedir}/modctl.1 %{buildroot}/usr/share/man/man1/modctl.1
 
 %files
 /usr/bin/modctl
 /usr/share/bash-completion/completions/modctl
 /usr/share/fish/vendor_completions.d/modctl.fish
 /usr/share/zsh/site-functions/_modctl
-/usr/share/doc/%{name}/
+%doc /usr/share/doc/%{name}/
+%doc /usr/share/man/man1/modctl.1.gz
 %license /usr/share/licenses/%{name}/LICENSE
 %license /usr/share/licenses/%{name}/vendor/

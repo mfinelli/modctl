@@ -20,6 +20,8 @@ find pkg/rpmbuild/SOURCES/licenses -type f -exec chmod 0644 {} \;
 ./pkg/copydocs.bash pkg/rpmbuild/SOURCES/docs
 
 cp modctl.bash modctl.fish modctl.zsh pkg/rpmbuild/SOURCES
+make modctl.1
+cp modctl.1 pkg/rpmbuild/SOURCES
 
 make
 cp modctl pkg/rpmbuild/SOURCES

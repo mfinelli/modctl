@@ -30,6 +30,7 @@ make
 ./modctl completion bash > modctl.bash
 ./modctl completion fish > modctl.fish
 ./modctl completion zsh > modctl.zsh
+make modctl.1
 
 mkdir "${bname}_amd64"
 mkdir "${bname}_arm64"
@@ -49,6 +50,7 @@ for arch in amd64 arm64; do
   cp modctl.bash "${bname}_${arch}"
   cp modctl.fish "${bname}_${arch}"
   cp modctl.zsh "${bname}_${arch}"
+  cp modctl.1 "${bname}_${arch}"
   tar --owner=0 --group=0 --sort=name -cavf "${bname}_${arch}.tar.zst" \
     "${bname}_${arch}"
   gpg -u pkg@modctl.org -ba "${bname}_${arch}.tar.zst"

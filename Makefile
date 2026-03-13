@@ -9,6 +9,9 @@ SOURCES := $(wildcard *.go cmd/*.go internal/*.go \
 	   internal/planner/*.go internal/remap/*.go internal/state/*.go \
 	   migrations/*.sql)
 
+VERSION ?= $(shell grep -P "^\tVersion:" cmd/root.go | awk -F\" '{print $$2}')
+TODAY ?= $(shell date +%Y-%m-%d)
+
 all: modctl
 
 clean:
@@ -44,5 +47,9 @@ dbq/db.go: sqlc.yaml queries.sql $(wildcard migrations/*.sql)
 internal/nexusclient/dbc/db.go: sqlc.yaml internal/nexusclient/queries.sql \
 	internal/nexusclient/schema.sql
 	$(SQLC) generate
+
+modctl.1: modctl.1.scd
+	sed -e "s/__VERSION__/$(VERSION)/" -e "s/__DATE__/$(TODAY)/" \
+		$< | scdoc > $@
 
 .PHONY: all clean
