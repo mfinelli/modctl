@@ -725,14 +725,14 @@ This preserves a clean v1 while allowing richer v2.
 - `doctor` performs environment checks including bsdtar presence, store health,
   and blob verification (presence + size check). A `--rehash` flag is reserved
   for future full content integrity verification via sha256 rehash.
-- `stores list` (supported integrations)
-- `games list|refresh|info`
+- `stores list|set-active` (supported integrations)
+- `games list|refresh|info|set-active`
 - `mods import|list|info|remove`
 - `mods scan-inventory`
 - `mods incompatible add|remove|list`
 - `nexus link` (attach mod_id/file_id metadata)
 - `profiles
-  create|list|delete|set-active|apply|diff|add|remove|enable|disable|order|status`
+  create|list|rename|delete|set-active|apply|diff|add|remove|enable|disable|order|status`
   - Items are added to a profile enabled by default. The schema default is `FALSE`
     but the CLI overrides this at insert time. Use `--disabled` to explicitly add
     an item without enabling it.
@@ -797,6 +797,8 @@ This preserves a clean v1 while allowing richer v2.
   printed after each extraction if available.
 - `config get|set|list` - view and modify config values without hand-editing
   the config file
+- `operations list|show` - show specific actions that we took during
+  apply/unapply
 
 Key behavior:
 - "intent changes" (enable/disable/order) are cheap
