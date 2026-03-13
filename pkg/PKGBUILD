@@ -11,15 +11,18 @@ source=(file://modctl
         file://modctl.fish
         file://modctl.zsh
         file://licenses.tar
+        file://docs.tar
         file://CHANGELOG.md
         file://LICENSE)
-md5sums=(SKIP SKIP SKIP SKIP SKIP SKIP SKIP)
+md5sums=(SKIP SKIP SKIP SKIP SKIP SKIP SKIP SKIP)
 
 package() {
   install -Dm0755 "$srcdir/modctl" "$pkgdir/usr/bin/modctl"
   install -Dm0644 "$srcdir/LICENSE" "$pkgdir/usr/share/licenses/modctl/LICENSE"
+  install -Dm0644 "$srcdir/CHANGELOG.md" "$pkgdir/usr/share/doc/modctl/README.md"
   install -Dm0644 "$srcdir/CHANGELOG.md" "$pkgdir/usr/share/doc/modctl/CHANGELOG.md"
   cp -r "$srcdir/licenses" "$pkgdir/usr/share/licenses/modctl/vendor"
+  cp -r "$srcdir/docs/." "$pkgdir/usr/share/doc/modctl"
   install -Dm0644 "$srcdir/modctl.bash" "$pkgdir/usr/share/bash-completions/completions/modctl"
   install -Dm0644 "$srcdir/modctl.fish" "$pkgdir/usr/share/fish/vendor_completions.d/modctl.fish"
   install -Dm0644 "$srcdir/modctl.zsh" "$pkgdir/usr/share/zsh/site-functions/_modctl"

@@ -20,6 +20,8 @@ for arch in amd64 arm64; do
   go-licenses save ./... --ignore github.com/mfinelli/modctl --save_path \
     "${dir}/usr/share/doc/modctl/licenses"
   find "${dir}/usr/share/doc/modctl/licenses" -type f -exec chmod 0644 {} \;
+
+  ./pkg/copydocs.bash "${dir}/usr/share/doc/modctl"
 done
 
 make
@@ -39,6 +41,8 @@ for arch in amd64 arm64; do
     "${dir}/usr/share/fish/vendor_completions.d/modctl.fish"
   install -vDm0644 modctl.zsh \
     "${dir}/usr/share/zsh/vendor-completions/_modctl"
+  install -vDm0644 README.md \
+    "${dir}/usr/share/doc/modctl/README.md"
   install -vDm0644 CHANGELOG.md \
     "${dir}/usr/share/doc/modctl/CHANGELOG.md"
 done

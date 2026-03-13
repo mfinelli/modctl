@@ -14,10 +14,16 @@ sed -e "s/PKGVER/$pkgver/" pkg/PKGBUILD > pkg/arch/PKGBUILD
 go-licenses save ./... --ignore github.com/mfinelli/modctl --save_path \
   pkg/licenses
 find pkg/licenses -type f -exec chmod 0644 {} \;
+./pkg/copydocs.bash pkg/docs
 
 (
   cd pkg || exit 1
   tar cvf arch/licenses.tar licenses
+)
+
+(
+  cd pkg || exit 1
+  tar cvf arch/docs.tar docs
 )
 
 make
