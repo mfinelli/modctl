@@ -12,12 +12,32 @@ SOURCES := $(wildcard *.go cmd/*.go internal/*.go \
 VERSION ?= $(shell grep -P "^\tVersion:" cmd/root.go | awk -F\" '{print $$2}')
 TODAY ?= $(shell date +%Y-%m-%d)
 
+# Detect target architecture
+# respect GOARCH if set, fall back to host arch
+TARGET_ARCH ?= $(shell uname -m)
+ifdef GOARCH
+	ifeq ($(GOARCH),arm64)
+		TARGET_ARCH = aarch64
+	endif
+	ifeq ($(GOARCH),amd64)
+		TARGET_ARCH = x86_64
+	endif
+endif
+
 # hardening flags adapted from archlinux makepkg.conf
-CGO_CFLAGS ?= -O2 -fno-plt -fexceptions -Wp,-D_FORTIFY_SOURCE=3 -Wformat \
-	      -Werror=format-security -fstack-clash-protection -fcf-protection \
-	      -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
 LDFLAGS ?= -Wl,-O1 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now \
 	   -Wl,-z,pack-relative-relocs
+
+# base flags for all architectures
+CGO_CFLAGS_BASE ?= -O2 -fno-plt -fexceptions -Wp,-U_FORTIFY_SOURCE,-D_FORTIFY_SOURCE=3 \
+		   -Wformat -Werror=format-security -fstack-clash-protection \
+		   -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
+
+# x86_64 only flags
+CGO_CFLAGS_x86_64 ?= -fcf-protection
+
+# final flags to actually use
+CGO_CFLAGS ?= $(CGO_CFLAGS_BASE) $(CGO_CFLAGS_$(TARGET_ARCH))
 
 all: modctl
 
