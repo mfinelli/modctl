@@ -12,19 +12,28 @@ SOURCES := $(wildcard *.go cmd/*.go internal/*.go \
 VERSION ?= $(shell grep -P "^\tVersion:" cmd/root.go | awk -F\" '{print $$2}')
 TODAY ?= $(shell date +%Y-%m-%d)
 
+# hardening flags adapted from archlinux makepkg.conf
+CGO_CFLAGS ?= -O2 -fno-plt -fexceptions -Wp,-D_FORTIFY_SOURCE=3 -Wformat \
+	      -Werror=format-security -fstack-clash-protection -fcf-protection \
+	      -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
+LDFLAGS ?= -Wl,-O1 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now \
+	   -Wl,-z,pack-relative-relocs
+
 all: modctl
 
 clean:
 	rm -rf modctl dbq sample.tar.gz
 
 modctl: export CGO_ENABLED = 1
+modctl: export CGO_CFLAGS := $(CGO_CFLAGS)
+modctl: export CGO_LDFLAGS := $(LDFLAGS)
 modctl: $(SOURCES) go.mod go.sum dbq/db.go internal/nexusclient/dbc/db.go \
 	sample.tar.gz
 	$(GO) build -o $@ \
 		-buildmode=pie \
 		-trimpath \
 		-mod=readonly \
-		-ldflags "-s -w -linkmode=external" \
+		-ldflags "-s -w -linkmode=external -extldflags '$(LDFLAGS)'" \
 		-tags='no_clickhouse no_libsql no_mssql no_mysql no_postgres \
 			no_vertica no_ydb' \
 		main.go
