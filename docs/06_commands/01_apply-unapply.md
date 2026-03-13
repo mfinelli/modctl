@@ -5,7 +5,7 @@
 `modctl apply` deploys the active profile to your game directory. It computes
 the desired file state for the profile, compares it against what is currently
 on disk, and reconciles the difference. Only files that need to change are
-touched — files that are already correctly deployed are skipped automatically.
+touched; files that are already correctly deployed are skipped automatically.
 ```bash
 modctl apply
 ```
@@ -29,8 +29,8 @@ performed, without touching anything on disk.
 
 By default, before overwriting any file it previously installed modctl hashes
 the on-disk content and compares it against what it originally wrote. This
-detects external modifications — for example a game update that overwrote a
-modded file — and backs up the updated content before overwriting it, so
+detects external modifications (for example, a game update that overwrote a
+modded file) and backs up the updated content before overwriting it, so
 nothing is lost.
 
 If you have many mods and want a faster apply and are not concerned about
@@ -68,7 +68,7 @@ modctl unapply
 
 unapply operates on the actual installed state recorded in modctl's database,
 not on a profile. This means it works correctly even if the profile that
-produced the current install has since been modified or deleted — modctl
+produced the current install has since been modified or deleted; modctl
 always knows exactly which files it owns and where they are.
 
 ### Previewing changes
