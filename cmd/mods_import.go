@@ -316,13 +316,6 @@ func init() {
 	modsImportCmd.MarkFlagsMutuallyExclusive("name", "page-id")
 }
 
-func ptrIfNonEmpty(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
 func prepareImportArchive(ctx context.Context, inputPath string, listTimeout time.Duration) (prepareArchiveResult, error) {
 	// First, try to validate as an archive with bsdtar -t
 	ctxT, cancel := context.WithTimeout(ctx, listTimeout)
