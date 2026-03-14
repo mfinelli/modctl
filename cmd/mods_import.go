@@ -126,6 +126,7 @@ has been safely stored and the database has been updated successfully.`,
 		// Optional nexus parse
 		var gameDomain *string
 		var modID *int64
+		var canoncialNexusUrl *string
 		if modsImportNexusUrl != "" {
 			ref, err := nexus.ParseModURL(modsImportNexusUrl)
 			if err != nil {
@@ -133,6 +134,7 @@ has been safely stored and the database has been updated successfully.`,
 			}
 			gameDomain = &ref.GameDomain
 			modID = &ref.ModID
+			canoncialNexusUrl = &ref.CanonicalUrl
 		}
 
 		// Safety checks for --rm up front.
@@ -192,7 +194,7 @@ has been safely stored and the database has been updated successfully.`,
 			ArchivePath:      prep.PathToImport,
 			OriginalBasename: filepath.Base(inputPath),
 			PageID:           &modsImportPageID,
-			NexusURL:         ptrIfNonEmpty(modsImportNexusUrl),
+			NexusURL:         canoncialNexusUrl,
 			NexusGameDomain:  gameDomain,
 			NexusModID:       modID,
 			Wrapped:          prep.Wrapped,

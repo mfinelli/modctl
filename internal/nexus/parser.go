@@ -26,8 +26,9 @@ import (
 )
 
 type ModRef struct {
-	GameDomain string
-	ModID      int64
+	GameDomain   string
+	ModID        int64
+	CanonicalUrl string
 }
 
 // ParseModURL extracts (game_domain, mod_id) from a Nexus Mods mod page URL.
@@ -73,7 +74,14 @@ func ParseModURL(raw string) (ModRef, error) {
 			if convErr != nil || id <= 0 {
 				return ModRef{}, fmt.Errorf("invalid nexus mod id %q in path %q", idStr, u.Path)
 			}
-			return ModRef{GameDomain: game, ModID: id}, nil
+
+			canonical := &url.URL{
+				Scheme: u.Scheme,
+				Host:   u.Host,
+				Path:   fmt.Sprintf("/%s/mods/%d", game, id),
+			}
+
+			return ModRef{GameDomain: game, ModID: id, CanonicalUrl: canonical.String()}, nil
 		}
 	}
 
