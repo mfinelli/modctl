@@ -130,6 +130,24 @@ tree "$WORKDIR"
 if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
   echo "Pushing updated repo to R2..."
   rclone sync --config pkg/rclone.conf "$WORKDIR/repo" r2:modctl-pkgs
+
+  echo "Purging Cloudflare cache..."
+  curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache" \
+    -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+    -H "Content-Type: application/json" \
+    --data "{\"files\":[
+        \"https://pkg.modctl.org/apt/dists/stable/Release\",
+        \"https://pkg.modctl.org/apt/dists/stable/InRelease\",
+        \"https://pkg.modctl.org/apt/dists/stable/Release.gpg\",
+        \"https://pkg.modctl.org/apt/dists/stable/main/binary-amd64/Packages\",
+        \"https://pkg.modctl.org/apt/dists/stable/main/binary-amd64/Packages.gz\",
+        \"https://pkg.modctl.org/apt/dists/stable/main/binary-arm64/Packages\",
+        \"https://pkg.modctl.org/apt/dists/stable/main/binary-arm64/Packages.gz\",
+        \"https://pkg.modctl.org/rpm/x86_64/repodata/repomd.xml\",
+        \"https://pkg.modctl.org/rpm/x86_64/repodata/repomd.xml.asc\",
+        \"https://pkg.modctl.org/rpm/aarch64/repodata/repomd.xml\",
+        \"https://pkg.modctl.org/rpm/aarch64/repodata/repomd.xml.asc\"
+    ]}"
 fi
 
 exit 0

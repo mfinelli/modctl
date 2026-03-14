@@ -55,6 +55,16 @@ cp "$ARM64_SIG" "$WORKDIR/repo/arch/aarch64/"
 find "$WORKDIR/repo/arch" -name '*.old' -exec rm {} \;
 find "$WORKDIR/repo/arch" -name '*.old.sig' -exec rm {} \;
 
+# Remove old package versions
+find "$WORKDIR/repo/arch/x86_64" -name "*.pkg.tar.zst" \
+    ! -name "$(basename "$AMD64_PKG")" -delete
+find "$WORKDIR/repo/arch/x86_64" -name "*.pkg.tar.zst.sig" \
+    ! -name "$(basename "$AMD64_SIG")" -delete
+find "$WORKDIR/repo/arch/aarch64" -name "*.pkg.tar.zst" \
+    ! -name "$(basename "$ARM64_PKG")" -delete
+find "$WORKDIR/repo/arch/aarch64" -name "*.pkg.tar.zst.sig" \
+    ! -name "$(basename "$ARM64_SIG")" -delete
+
 # Dereference all symlinks so rclone can push regular files
 find "$WORKDIR/repo/arch" -type l | while read -r link; do
     cp --remove-destination "$(readlink -f "$link")" "$link"
@@ -65,6 +75,21 @@ tree "$WORKDIR"
 if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
   echo "Pushing updated repo to R2..."
   rclone sync --config pkg/rclone.conf "$WORKDIR/repo/arch" r2:modctl-pkgs/arch
+
+  echo "Purging Cloudflare cache..."
+  curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache" \
+    -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+    -H "Content-Type: application/json" \
+    --data "{\"files\":[
+      \"https://pkg.modctl.org/arch/x86_64/modctl.db\",
+      \"https://pkg.modctl.org/arch/x86_64/modctl.db.tar.zst\",
+      \"https://pkg.modctl.org/arch/x86_64/modctl.files\",
+      \"https://pkg.modctl.org/arch/x86_64/modctl.files.tar.zst\",
+      \"https://pkg.modctl.org/arch/aarch64/modctl.db\",
+      \"https://pkg.modctl.org/arch/aarch64/modctl.db.tar.zst\",
+      \"https://pkg.modctl.org/arch/aarch64/modctl.files\",
+      \"https://pkg.modctl.org/arch/aarch64/modctl.files.tar.zst\"
+    ]}"
 fi
 
 exit 0
