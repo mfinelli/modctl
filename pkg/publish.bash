@@ -58,13 +58,19 @@ cp pkg/modctl.sources "$APT_ROOT/"
 
 # Generate Packages files filtered by architecture
 echo "Generating APT Packages files..."
-apt-ftparchive packages --arch amd64 "$APT_POOL" \
-    > "$APT_DISTS/binary-amd64/Packages"
-gzip -k -f "$APT_DISTS/binary-amd64/Packages"
+(
+  cd "$APT_ROOT"
+  apt-ftparchive packages --arch amd64 pool/main \
+      > "$APT_DISTS/binary-amd64/Packages"
+)
+gzip -9 -k -f "$APT_DISTS/binary-amd64/Packages"
 
-apt-ftparchive packages --arch arm64 "$APT_POOL" \
-    > "$APT_DISTS/binary-arm64/Packages"
-gzip -k -f "$APT_DISTS/binary-arm64/Packages"
+(
+  cd "$APT_ROOT"
+  apt-ftparchive packages --arch arm64 pool/main \
+      > "$APT_DISTS/binary-arm64/Packages"
+)
+gzip -9 -k -f "$APT_DISTS/binary-arm64/Packages"
 
 # Generate Release file
 echo "Generating APT Release file..."
