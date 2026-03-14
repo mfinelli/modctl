@@ -47,6 +47,7 @@ type Client struct {
 	CacheReader
 	apiKey     string
 	userAgent  string
+	version    string
 	httpClient *http.Client
 	limiter    *rate.Limiter
 }
@@ -70,6 +71,7 @@ func New(ctx context.Context, apiKey string, logger *slog.Logger, version string
 		CacheReader: *reader,
 		apiKey:      apiKey,
 		userAgent:   ua,
+		version:     version,
 		httpClient:  httpClient,
 		limiter:     limiter,
 	}, nil

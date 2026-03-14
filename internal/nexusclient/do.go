@@ -82,6 +82,8 @@ func (c *Client) doRequest(method, path string, dst any, rawBody *[]byte) error 
 	req.Header.Set("apikey", c.apiKey)
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", c.userAgent)
+	req.Header.Set("Application-Name", "modctl")
+	req.Header.Set("Application-Version", c.version)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
