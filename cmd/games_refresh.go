@@ -21,6 +21,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/spf13/cobra"
 )
@@ -38,6 +39,18 @@ It is safe to run multiple times.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// TODO extract...
+		boldStyle := lipgloss.NewStyle().Bold(true)
+		styles := internal.RefreshStyles{
+			Bold:   boldStyle,
+			Subtle: lipgloss.NewStyle().Foreground(lipgloss.Color("245")),
+			Warn:   lipgloss.NewStyle().Foreground(lipgloss.Color("3")),
+			Green:  lipgloss.NewStyle().Foreground(lipgloss.Color("10")),
+			Red:    lipgloss.NewStyle().Foreground(lipgloss.Color("9")),
+			Yellow: lipgloss.NewStyle().Foreground(lipgloss.Color("11")),
+			Cyan:   lipgloss.NewStyle().Foreground(lipgloss.Color("14")),
+		}
+
 		ctx := cmd.Context()
 
 		err := internal.EnsureDBExists()
@@ -56,7 +69,34 @@ It is safe to run multiple times.`,
 			return fmt.Errorf("error migrating database: %w", err)
 		}
 
-		return internal.ScanStores(ctx, db)
+		fmt.Println(boldStyle.Render("Scanning stores..."))
+		fmt.Println()
+
+		result, err := internal.ScanStores(ctx, db, styles)
+		if err != nil {
+			return err
+		}
+
+		// Summary
+		fmt.Println()
+		fmt.Println(boldStyle.Render("Done."))
+		total := len(result.New) + len(result.Updated) + len(result.Returned)
+		fmt.Printf("  %d game(s) found", total)
+		if len(result.New) > 0 {
+			fmt.Printf(", %d new", len(result.New))
+		}
+		if len(result.Returned) > 0 {
+			fmt.Printf(", %d returned", len(result.Returned))
+		}
+		if len(result.Missing) > 0 {
+			fmt.Printf(", %d missing", len(result.Missing))
+		}
+		if len(result.Skipped) > 0 {
+			fmt.Printf(", %d skipped", len(result.Skipped))
+		}
+		fmt.Println()
+
+		return nil
 	},
 }
 

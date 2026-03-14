@@ -33,88 +33,177 @@ import (
 
 	"github.com/adrg/xdg"
 	"github.com/andygrunwald/vdf"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 )
 
-func ScanStores(ctx context.Context, db *sql.DB) error {
+// steamSkippedPrefixes are display names (or prefixes thereof) that are
+// internal Steam software, not real modding targets.
+var steamSkippedPrefixes = []string{
+	"Proton Experimental",
+	"Steam Linux Runtime",
+	"Steamworks Common Redistributables",
+}
+
+type RefreshResult struct {
+	New      []string // display names of newly discovered installs
+	Updated  []string // display names of installs seen again (already present)
+	Returned []string // display names of installs that were missing and came back
+	Missing  []string // display names of installs that disappeared
+	Skipped  []string // display names of installs that were filtered out
+	Warnings []string
+}
+
+type RefreshStyles struct {
+	Bold   lipgloss.Style
+	Subtle lipgloss.Style
+	Warn   lipgloss.Style
+	Green  lipgloss.Style
+	Red    lipgloss.Style
+	Yellow lipgloss.Style
+	Cyan   lipgloss.Style
+}
+
+func ScanStores(ctx context.Context, db *sql.DB, styles RefreshStyles) (RefreshResult, error) {
 	q := dbq.New(db)
 	stores, err := q.ListEnabledStores(ctx)
 	if err != nil {
-		return err
+		return RefreshResult{}, err
 	}
 
+	var combined RefreshResult
 	for _, store := range stores {
 		switch store.Implementation {
 		case "steam":
-			if err := refreshSteam(ctx, db, q); err != nil {
-				return err
+			result, err := refreshSteam(ctx, db, q, styles)
+			if err != nil {
+				return RefreshResult{}, err
 			}
+
+			combined.New = append(combined.New, result.New...)
+			combined.Updated = append(combined.Updated, result.Updated...)
+			combined.Returned = append(combined.Returned, result.Returned...)
+			combined.Missing = append(combined.Missing, result.Missing...)
+			combined.Skipped = append(combined.Skipped, result.Skipped...)
+			combined.Warnings = append(combined.Warnings, result.Warnings...)
 		default:
-			// TODO: make this pretty (WARN)
-			fmt.Printf("Implementation %s isn't currently implemented\n",
-				store.Implementation)
+			fmt.Println(styles.Warn.Render(fmt.Sprintf("  ⚠ store implementation %q is not supported", store.Implementation)))
 		}
 	}
 
-	return nil
+	return combined, nil
 }
 
-func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries) error {
+func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries, styles RefreshStyles) (RefreshResult, error) {
+	var result RefreshResult
+
 	libs, didScan, warns, err := discoverSteamLibraries()
 	for _, w := range warns {
-		// TODO make this pretty
-		fmt.Printf("WARNING: %s", w)
+		fmt.Println(styles.Warn.Render(fmt.Sprintf("  ⚠ %s", w)))
 	}
 	if err != nil {
-		return fmt.Errorf("error scanning for steam libraries: %w", err)
+		return result, fmt.Errorf("error scanning for steam libraries: %w", err)
 	}
 	if !didScan {
 		// discovery did not meaningfully run -> do NOT mark installs missing
-		return nil
+		return result, nil
 	}
 
 	instanceByLib := assignSteamInstanceIDs(libs)
-	installs, warns, err := discoverSteamInstalls(libs, instanceByLib)
+	installs, skips, warns, err := discoverSteamInstalls(libs, instanceByLib)
+	result.Skipped = append(result.Skipped, skips...)
+	result.Warnings = append(result.Warnings, warns...)
 	for _, w := range warns {
-		// TODO make this pretty
-		fmt.Printf("WARNING: %s", w)
+		fmt.Println(styles.Warn.Render(fmt.Sprintf("  ⚠ %s", w)))
 	}
 	if err != nil {
-		return fmt.Errorf("error enumerating steam installs: %w", err)
+		return result, fmt.Errorf("error enumerating steam installs: %w", err)
+	}
+
+	// Pre-fetch existing installs for this store so we can classify changes
+	existing, err := q.ListGameInstallsByStore(ctx, "steam")
+	if err != nil {
+		return result, fmt.Errorf("list existing steam installs: %w", err)
+	}
+
+	type existingKey struct{ gameID, instanceID string }
+	type existingVal struct {
+		displayName string
+		isPresent   bool
+	}
+	existingMap := make(map[existingKey]existingVal, len(existing))
+	for _, e := range existing {
+		existingMap[existingKey{e.StoreGameID, e.InstanceID}] = existingVal{
+			displayName: e.DisplayName,
+			isPresent:   e.IsPresent != 0,
+		}
+	}
+
+	// Build a set of what we're about to upsert for missing detection
+	type upsertKey struct{ gameID, instanceID string }
+	upsertSet := make(map[upsertKey]struct{}, len(installs))
+	for _, di := range installs {
+		upsertSet[upsertKey{di.StoreGameID, di.InstanceID}] = struct{}{}
+	}
+
+	// Detect missing: was present before, not in discovered set now
+	for k, v := range existingMap {
+		if v.isPresent {
+			if _, found := upsertSet[upsertKey{k.gameID, k.instanceID}]; !found {
+				result.Missing = append(result.Missing, v.displayName)
+				fmt.Println(styles.Red.Render(fmt.Sprintf("  - %s", v.displayName)) +
+					styles.Subtle.Render("  (no longer present)"))
+			}
+		}
 	}
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("error starting transaction: %w", err)
+		return result, fmt.Errorf("error starting transaction: %w", err)
 	}
 	defer tx.Rollback()
 	qtx := q.WithTx(tx)
 
 	if err := qtx.MarkStoreInstallsNotPresent(ctx, "steam"); err != nil {
-		return fmt.Errorf("error marking steam installs not present: %w", err)
+		return result, fmt.Errorf("error marking steam installs not present: %w", err)
 	}
 
 	for _, di := range installs {
 		id, err := qtx.UpsertGameInstall(ctx, di)
 		if err != nil {
-			return fmt.Errorf("upsert game install %s:%s#%s: %w",
+			return result, fmt.Errorf("upsert game install %s:%s#%s: %w",
 				di.StoreID, di.StoreGameID, di.InstanceID, err)
 		}
 
 		if err := upsertGameDirTarget(ctx, qtx, id, di.InstallRoot); err != nil {
-			return fmt.Errorf("error upserting target dir: %w", err)
+			return result, fmt.Errorf("error upserting target dir: %w", err)
 		}
 
 		if err := qtx.EnsureDefaultProfile(ctx, id); err != nil {
-			return fmt.Errorf("error ensuring default profile for install_id=%d: %w", id, err)
+			return result, fmt.Errorf("error ensuring default profile for install_id=%d: %w", id, err)
+		}
+
+		// Classify and print
+		k := existingKey{di.StoreGameID, di.InstanceID}
+		if prev, known := existingMap[k]; !known {
+			result.New = append(result.New, di.DisplayName)
+			fmt.Println(styles.Green.Render(fmt.Sprintf("  + %s", di.DisplayName)) +
+				styles.Subtle.Render("  (new)"))
+		} else if !prev.isPresent {
+			result.Returned = append(result.Returned, di.DisplayName)
+			fmt.Println(styles.Cyan.Render(fmt.Sprintf("  ↩ %s", di.DisplayName)) +
+				styles.Subtle.Render("  (returned)"))
+		} else {
+			result.Updated = append(result.Updated, di.DisplayName)
+			fmt.Println(styles.Subtle.Render(fmt.Sprintf("  = %s", di.DisplayName)))
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("error committing transaction: %w", err)
+		return result, fmt.Errorf("error committing transaction: %w", err)
 	}
 
-	return nil
+	return result, nil
 }
 
 // DiscoverSteamLibraries finds Steam library roots by locating and parsing
@@ -238,7 +327,7 @@ func assignSteamInstanceIDs(libs []string) map[string]string {
 func discoverSteamInstalls(
 	libraryRoots []string, // canonical library roots
 	instanceByLib map[string]string, // canonical lib root -> instance_id
-) ([]dbq.UpsertGameInstallParams, []string, error) {
+) ([]dbq.UpsertGameInstallParams, []string, []string, error) {
 	// for each lib:
 	// - list steamapps/appmanifest_*.acf
 	// - parse
@@ -247,6 +336,7 @@ func discoverSteamInstalls(
 	// - installCanon = canonicalizePathBestEffort(installRaw)
 	// - metadata: include install_root_raw + library_root (+ manifest_path)
 	warnings := []string{}
+	skipped := []string{}
 	installs := []dbq.UpsertGameInstallParams{}
 
 	type key struct {
@@ -303,6 +393,11 @@ func discoverSteamInstalls(
 				display = fmt.Sprintf("Steam %s", appid)
 			}
 
+			if isSteamInternalTitle(display) {
+				skipped = append(skipped, display)
+				continue
+			}
+
 			// Metadata: keep raw + provenance.
 			meta := map[string]any{
 				"install_root_raw": installRaw,
@@ -337,7 +432,7 @@ func discoverSteamInstalls(
 		}
 	}
 
-	return installs, warnings, nil
+	return installs, skipped, warnings, nil
 }
 
 func upsertGameDirTarget(ctx context.Context, q *dbq.Queries, gameInstallID int64, installRoot string) error {
@@ -551,4 +646,13 @@ func nullStringFromBytes(b []byte) sql.NullString {
 func nowISO8601Z() string {
 	// Match SQLite default format: %Y-%m-%dT%H:%M:%fZ
 	return time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+}
+
+func isSteamInternalTitle(name string) bool {
+	for _, prefix := range steamSkippedPrefixes {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+	return false
 }
