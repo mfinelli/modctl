@@ -13,7 +13,7 @@ This is another pre-release leading up to the final initial stable release.
 
 - Add `Application-Version` and `Application-Name` headers to requests made
   to the Nexus API
-- Fix debian repository packaging error
+- Fix apt/rpm repository packaging errors
 - Fix default profile creation when refreshing games
 
 ## v0.1.0 - 2026-03-14

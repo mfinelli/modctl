@@ -80,7 +80,7 @@ apt-ftparchive \
     > "$APT_ROOT/dists/stable/Release"
 
 # clean up old signature files... (that we pulled from r2)
-rm -rf "$APT_ROOT/dists/stable/Release.gpg" "$APT_ROOT/dists/stable/InRelease"
+rm -f "$APT_ROOT/dists/stable/Release.gpg" "$APT_ROOT/dists/stable/InRelease"
 
 # Sign Release file
 echo "Signing APT Release file..."
@@ -115,10 +115,14 @@ createrepo_c --update "$RPM_ROOT/aarch64/"
 # Sign repomd.xml for each arch
 echo "Signing YUM repomd.xml..."
 for arch in x86_64 aarch64; do
-    gpg --detach-sign --armor \
-        -u pkg@modctl.org \
-        -o "$RPM_ROOT/$arch/repodata/repomd.xml.asc" \
-        "$RPM_ROOT/$arch/repodata/repomd.xml"
+  # delete existing signature from r2 if it exists
+  rm -f "$RPM_ROOT/$arch/repodata/repomd.xml.asc"
+
+  # now sign the repomod
+  gpg --detach-sign --armor \
+    -u pkg@modctl.org \
+    -o "$RPM_ROOT/$arch/repodata/repomd.xml.asc" \
+    "$RPM_ROOT/$arch/repodata/repomd.xml"
 done
 
 tree "$WORKDIR"
