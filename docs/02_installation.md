@@ -75,7 +75,7 @@ Append the following to `/etc/pacman.conf`, before the `[core]` section:
 ```ini
 [modctl]
 Server = https://pkg.modctl.org/arch/$arch
-SigLevel = Required DatabaseOptional
+SigLevel = Required DatabaseRequired
 ```
 
 **4. Install**
