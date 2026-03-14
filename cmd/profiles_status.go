@@ -166,7 +166,7 @@ func init() {
 			return completion.GameInstallSelectors(cmd, toComplete)
 		})
 
-	profilesStatusCmd.Flags().StringVar(&profilesStatusProfile, "profile", "p",
+	profilesStatusCmd.Flags().StringVarP(&profilesStatusProfile, "profile", "p", "",
 		"Override the currently active profile")
 	profilesStatusCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
