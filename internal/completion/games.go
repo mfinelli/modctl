@@ -28,17 +28,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func likePrefixPattern(s string) string {
-	// Escape LIKE wildcards so user input is treated literally.
-	// Then append % for prefix match.
-	repl := strings.NewReplacer(
-		`\`, `\\`,
-		`%`, `\%`,
-		`_`, `\_`,
-	)
-	return repl.Replace(s) + `%`
-}
-
 // GameInstallSelectors completes "games set-active <selector>".
 // It returns *full selectors* (always includes #instance) with a description.
 func GameInstallSelectors(cmd *cobra.Command, toComplete string) ([]string, cobra.ShellCompDirective) {
