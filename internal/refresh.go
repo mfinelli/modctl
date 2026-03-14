@@ -149,7 +149,7 @@ func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries, styles Refres
 	// Detect missing: was present before, not in discovered set now
 	for k, v := range existingMap {
 		if v.isPresent {
-			if _, found := upsertSet[upsertKey{k.gameID, k.instanceID}]; !found {
+			if _, found := upsertSet[upsertKey(k)]; !found {
 				result.Missing = append(result.Missing, v.displayName)
 				fmt.Println(styles.Red.Render(fmt.Sprintf("  - %s", v.displayName)) +
 					styles.Subtle.Render("  (no longer present)"))
