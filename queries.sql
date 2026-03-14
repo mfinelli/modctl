@@ -199,26 +199,36 @@ INSERT INTO mod_file_versions (
 RETURNING id;
 
 -- name: ListModsByGameInstall :many
-WITH joined AS (
+WITH
+per_page_counts AS (
   SELECT
     mp.id AS mod_page_id,
+    COUNT(DISTINCT mf.id)  AS files_count,
+    COUNT(mfv.id)          AS versions_count
+  FROM mod_pages mp
+  LEFT JOIN mod_files mf
+    ON mf.mod_page_id = mp.id
+  LEFT JOIN mod_file_versions mfv
+    ON mfv.mod_file_id = mf.id
+  WHERE mp.game_install_id = ?1
+  GROUP BY mp.id
+),
+joined AS (
+  SELECT
+    mp.id   AS mod_page_id,
     mp.name AS mod_name,
     mp.source_kind,
     mp.nexus_game_domain,
     mp.nexus_mod_id,
-
-    mf.id AS mod_file_id,
+    mf.id   AS mod_file_id,
     mf.label AS mod_file_label,
-
-    mfv.id AS mod_file_version_id,
+    mfv.id  AS mod_file_version_id,
     mfv.version_string,
     mfv.nexus_file_id,
     mfv.archive_sha256,
     mfv.created_at AS imported_at,
-
-    COUNT(DISTINCT mf.id) OVER (PARTITION BY mp.id) AS files_count,
-    COUNT(mfv.id) OVER (PARTITION BY mp.id) AS versions_count,
-
+    COALESCE(ppc.files_count, 0) AS files_count,
+    COALESCE(ppc.versions_count, 0) AS versions_count,
     ROW_NUMBER() OVER (
       PARTITION BY mp.id
       ORDER BY
@@ -231,7 +241,9 @@ WITH joined AS (
     ON mf.mod_page_id = mp.id
   LEFT JOIN mod_file_versions mfv
     ON mfv.mod_file_id = mf.id
-  WHERE mp.game_install_id = ?
+  LEFT JOIN per_page_counts ppc
+    ON ppc.mod_page_id = mp.id
+  WHERE mp.game_install_id = ?1
 )
 SELECT
   mod_page_id,
@@ -239,10 +251,8 @@ SELECT
   source_kind,
   nexus_game_domain,
   nexus_mod_id,
-
   files_count,
   versions_count,
-
   mod_file_id,
   mod_file_label,
   mod_file_version_id,
