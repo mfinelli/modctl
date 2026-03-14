@@ -8,7 +8,7 @@ of the basic workflow.
 If you haven't installed modctl yet, start with the [Installation](../installation)
 guide first.
 
-# 1. Initialize modctl
+## 1. Initialize modctl
 
 The first thing to do after installing is initialize modctl's local state. This
 creates the data directories modctl needs and sets up the internal database:
