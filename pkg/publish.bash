@@ -79,15 +79,15 @@ apt-ftparchive \
     release "$APT_ROOT/dists/stable" \
     > "$APT_ROOT/dists/stable/Release"
 
+# clean up old signature files... (that we pulled from r2)
+rm -rf "$APT_ROOT/dists/stable/Release.gpg" "$APT_ROOT/dists/stable/InRelease"
+
 # Sign Release file
 echo "Signing APT Release file..."
 gpg --detach-sign \
     -u pkg@modctl.org \
     -o "$APT_ROOT/dists/stable/Release.gpg" \
     "$APT_ROOT/dists/stable/Release"
-
-# clean up old signature files... (that we pulled from r2)
-rm -rf "$APT_ROOT/dists/stable/Release.gpg" "$APT_ROOT/dists/stable/InRelease"
 
 gpg --clearsign \
     -u pkg@modctl.org \

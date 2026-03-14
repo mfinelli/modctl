@@ -2,4 +2,5 @@ Types: deb
 URIs: https://pkg.modctl.org/apt
 Suites: stable
 Components: main
+Architectures: amd64 arm64
 Signed-By: /usr/share/keyrings/modctl-archive-keyring.gpg
