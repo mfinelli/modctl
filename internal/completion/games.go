@@ -59,16 +59,35 @@ func GameInstallSelectors(cmd *cobra.Command, toComplete string) ([]string, cobr
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
+	// this could have false positives causing us to reverse the
+	// selector/title completion descriptions for a game title that
+	// contains ":" but I don't have a better way at the moment
+	nameMode := !strings.Contains(toComplete, ":")
+
 	out := make([]string, 0, len(rows))
 	for _, r := range rows {
 		sel := internal.FullSelector(r.StoreID, r.StoreGameID, r.InstanceID)
+		present := r.IsPresent == 0
 
-		desc := r.DisplayName
-		if r.IsPresent == 0 {
-			desc = desc + " (missing)"
+		var completion, desc string
+		if nameMode {
+			// completing by title: show the name as the completion value,
+			// selector as the description so the user knows what they'll get
+			completion = r.DisplayName
+			desc = sel
+			if present {
+				desc = desc + " (missing)"
+			}
+		} else {
+			// completing by selector: show the game title
+			completion = sel
+			desc = r.DisplayName
+			if present {
+				desc = desc + " (missing)"
+			}
 		}
 
-		out = append(out, fmt.Sprintf("%s\t%s", sel, desc))
+		out = append(out, fmt.Sprintf("%s\t%s", completion, desc))
 	}
 
 	return out, cobra.ShellCompDirectiveNoFileComp

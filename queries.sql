@@ -1518,3 +1518,8 @@ WHERE mp.id = ?
 UPDATE mod_file_versions
 SET version_string = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 WHERE id = ?;
+
+-- name: GetGameInstallsByName :many
+SELECT * FROM game_installs
+WHERE LOWER(display_name) = LOWER(?)
+ORDER BY store_id, store_game_id, instance_id;

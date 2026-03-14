@@ -30,7 +30,6 @@ import (
 
 func ResolveGameInstallArg(ctx context.Context, q *dbq.Queries, arg string) (dbq.GameInstall, error) {
 	// Fast path: numeric ID
-	// TODO: i'm not sure if I actually want this or not...
 	if id, ok := ParseInt64(arg); ok {
 		gi, err := q.GetGameInstallByID(ctx, id)
 		if err != nil {
@@ -42,68 +41,93 @@ func ResolveGameInstallArg(ctx context.Context, q *dbq.Queries, arg string) (dbq
 		return gi, nil
 	}
 
-	// Selector path
-	storeID, storeGameID, instanceID, err := ParseSelector(arg)
+	// Selector path: only attempt if arg contains ':'
+	if strings.Contains(arg, ":") {
+		// If user provided an explicit instance, lookup is unambiguous.
+		storeID, storeGameID, instanceID, parseErr := ParseSelector(arg)
+		if parseErr == nil {
+			gi, err := q.GetGameInstallBySelector(ctx, dbq.GetGameInstallBySelectorParams{
+				StoreID:     storeID,
+				StoreGameID: storeGameID,
+				InstanceID:  instanceID,
+			})
+
+			if err == nil {
+				return gi, nil
+			}
+			if !errors.Is(err, sql.ErrNoRows) {
+				return dbq.GameInstall{}, fmt.Errorf("get game install: %w", err)
+			}
+
+			// DB miss: if instance was explicitly provided, don't fall through
+			// to name search, the user was specific about what they wanted.
+			// ParseSelector defaults to "default" when omitted, so we need to distinguish.
+			// We'll treat the input containing '#' as "explicit instance".
+			if strings.Contains(arg, "#") {
+				return dbq.GameInstall{}, fmt.Errorf("no game install found for %s",
+					FullSelector(storeID, storeGameID, instanceID))
+			}
+
+			// No explicit instance and selector missed: also try the multi-instance
+			// path before falling through, in case store:gameid is unambiguous.
+			rows, lerr := q.ListGameInstallsByStoreGameID(ctx, dbq.ListGameInstallsByStoreGameIDParams{
+				StoreID:     storeID,
+				StoreGameID: storeGameID,
+			})
+			if lerr != nil {
+				return dbq.GameInstall{}, fmt.Errorf("list candidates: %w", lerr)
+			}
+			if len(rows) == 1 {
+				return rows[0], nil
+			}
+			if len(rows) > 1 {
+				var b strings.Builder
+				fmt.Fprintf(&b, "Multiple installs found for %s:%s. Choose one:\n\n", storeID, storeGameID)
+				for _, r := range rows {
+					sel := FullSelector(r.StoreID, r.StoreGameID, r.InstanceID)
+					present := "present"
+					if r.IsPresent == 0 {
+						present = "missing"
+					}
+					lastSeen := ""
+					if r.LastSeenAt.Valid {
+						lastSeen = r.LastSeenAt.String
+					}
+					fmt.Fprintf(&b, "  %s  (%s)  %s  %s\n", sel, r.DisplayName, present, lastSeen)
+				}
+				return dbq.GameInstall{}, errors.New(strings.TrimRight(b.String(), "\n"))
+			}
+			// Zero results from store:gameid lookup -> fall through to name search
+			// using the raw arg (e.g. "My Game: the sequel")
+		}
+		// ParseSelector failed or store:gameid found nothing -> fall through to name search
+	}
+
+	// Name search: case-insensitive, all installs including missing
+	rows, err := q.GetGameInstallsByName(ctx, arg)
 	if err != nil {
-		return dbq.GameInstall{}, err
+		return dbq.GameInstall{}, fmt.Errorf("get game installs by name: %w", err)
 	}
-
-	// If user provided an explicit instance, lookup is unambiguous.
-	gi, err := q.GetGameInstallBySelector(ctx, dbq.GetGameInstallBySelectorParams{
-		StoreID:     storeID,
-		StoreGameID: storeGameID,
-		InstanceID:  instanceID,
-	})
-	if err == nil {
-		return gi, nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		return dbq.GameInstall{}, fmt.Errorf("get game install: %w", err)
-	}
-
-	// If instance was explicitly provided and we didn't find it -> not found.
-	// ParseSelector defaults to "default" when omitted, so we need to distinguish.
-	// We'll treat the input containing '#' as "explicit instance".
-	if strings.Contains(arg, "#") {
-		return dbq.GameInstall{}, fmt.Errorf("no game install found for %s",
-			FullSelector(storeID, storeGameID, instanceID))
-	}
-
-	// Instance omitted: maybe ambiguous, list candidates
-	rows, lerr := q.ListGameInstallsByStoreGameID(ctx, dbq.ListGameInstallsByStoreGameIDParams{
-		StoreID:     storeID,
-		StoreGameID: storeGameID,
-	})
-	if lerr != nil {
-		return dbq.GameInstall{}, fmt.Errorf("list candidates: %w", lerr)
-	}
-	if len(rows) == 0 {
-		return dbq.GameInstall{}, fmt.Errorf("no game installs found for %s:%s", storeID, storeGameID)
-	}
-	if len(rows) == 1 {
-		// Only one install exists: treat it as the selected one
-		only := rows[0]
-		gi2, gerr := q.GetGameInstallByID(ctx, only.ID)
-		if gerr != nil {
-			return dbq.GameInstall{}, fmt.Errorf("get game install by id: %w", gerr)
+	switch len(rows) {
+	case 0:
+		return dbq.GameInstall{}, fmt.Errorf("no game install found for %q", arg)
+	case 1:
+		return rows[0], nil
+	default:
+		var b strings.Builder
+		fmt.Fprintf(&b, "Multiple installs found for %q. Be more specific:\n\n", arg)
+		for _, r := range rows {
+			sel := FullSelector(r.StoreID, r.StoreGameID, r.InstanceID)
+			present := "present"
+			if r.IsPresent == 0 {
+				present = "missing"
+			}
+			lastSeen := ""
+			if r.LastSeenAt.Valid {
+				lastSeen = r.LastSeenAt.String
+			}
+			fmt.Fprintf(&b, "  %s  (%s)  %s  %s\n", sel, r.DisplayName, present, lastSeen)
 		}
-		return gi2, nil
+		return dbq.GameInstall{}, errors.New(strings.TrimRight(b.String(), "\n"))
 	}
-
-	// Ambiguous: show choices and require instance
-	var b strings.Builder
-	fmt.Fprintf(&b, "Multiple installs found for %s:%s. Choose one:\n\n", storeID, storeGameID)
-	for _, r := range rows {
-		sel := FullSelector(r.StoreID, r.StoreGameID, r.InstanceID)
-		present := "present"
-		if r.IsPresent == 0 {
-			present = "missing"
-		}
-		lastSeen := ""
-		if r.LastSeenAt.Valid {
-			lastSeen = r.LastSeenAt.String
-		}
-		fmt.Fprintf(&b, "  %s  (%s)  %s  %s\n", sel, r.DisplayName, present, lastSeen)
-	}
-	return dbq.GameInstall{}, errors.New(b.String())
 }
