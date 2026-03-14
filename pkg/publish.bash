@@ -86,6 +86,9 @@ gpg --detach-sign \
     -o "$APT_ROOT/dists/stable/Release.gpg" \
     "$APT_ROOT/dists/stable/Release"
 
+# clean up old signature files... (that we pulled from r2)
+rm -rf "$APT_ROOT/dists/stable/Release.gpg" "$APT_ROOT/dists/stable/InRelease"
+
 gpg --clearsign \
     -u pkg@modctl.org \
     -o "$APT_ROOT/dists/stable/InRelease" \
