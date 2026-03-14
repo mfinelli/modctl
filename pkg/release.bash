@@ -13,6 +13,7 @@ go mod vendor
 go-licenses save ./... --ignore github.com/mfinelli/modctl --save_path \
     licenses
 find licenses -type f -exec chmod 0644 {} \;
+./pkg/copydocs.bash pkg/docs
 
 bname="modctl_${GITHUB_REF_NAME//\//-}"
 
@@ -29,6 +30,7 @@ make
 ./modctl completion bash > modctl.bash
 ./modctl completion fish > modctl.fish
 ./modctl completion zsh > modctl.zsh
+make modctl.1
 
 mkdir "${bname}_amd64"
 mkdir "${bname}_arm64"
@@ -40,12 +42,15 @@ make modctl
 mv modctl "${bname}_arm64"
 
 for arch in amd64 arm64; do
+  cp README.md "${bname}_${arch}"
   cp CHANGELOG.md "${bname}_${arch}"
   cp LICENSE "${bname}_${arch}"
   cp -r licenses "${bname}_${arch}"
+  cp -r pkg/docs "${bname}_${arch}"
   cp modctl.bash "${bname}_${arch}"
   cp modctl.fish "${bname}_${arch}"
   cp modctl.zsh "${bname}_${arch}"
+  cp modctl.1 "${bname}_${arch}"
   tar --owner=0 --group=0 --sort=name -cavf "${bname}_${arch}.tar.zst" \
     "${bname}_${arch}"
   gpg -u pkg@modctl.org -ba "${bname}_${arch}.tar.zst"

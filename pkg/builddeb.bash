@@ -20,12 +20,16 @@ for arch in amd64 arm64; do
   go-licenses save ./... --ignore github.com/mfinelli/modctl --save_path \
     "${dir}/usr/share/doc/modctl/licenses"
   find "${dir}/usr/share/doc/modctl/licenses" -type f -exec chmod 0644 {} \;
+
+  ./pkg/copydocs.bash "${dir}/usr/share/doc/modctl"
 done
 
 make
 ./modctl completion bash > modctl.bash
 ./modctl completion fish > modctl.fish
 ./modctl completion zsh > modctl.zsh
+make modctl.1
+gzip -9 -n modctl.1
 
 minlibc="$(objdump -p ./modctl | grep GLIBC | grep -oP 'GLIBC_\K[\d.]+' |
   sort -V | tail -1)"
@@ -39,8 +43,12 @@ for arch in amd64 arm64; do
     "${dir}/usr/share/fish/vendor_completions.d/modctl.fish"
   install -vDm0644 modctl.zsh \
     "${dir}/usr/share/zsh/vendor-completions/_modctl"
+  install -vDm0644 README.md \
+    "${dir}/usr/share/doc/modctl/README.md"
   install -vDm0644 CHANGELOG.md \
     "${dir}/usr/share/doc/modctl/CHANGELOG.md"
+  install -vDm0644 modctl.1.gz \
+    "${dir}/usr/share/man/man1/modctl.1.gz"
 done
 
 sed -e "s/MINGLIBC/$minlibc/" -e "s/PKGARCH/amd64/" -e "s/PKGVER/$pkgver/" \

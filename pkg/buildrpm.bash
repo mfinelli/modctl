@@ -12,12 +12,16 @@ pkgver="$(grep -P "^\tVersion:" cmd/root.go | awk -F\" '{print $2}')"
 
 rm modctl
 cp LICENSE pkg/rpmbuild/SOURCES
+cp README.md pkg/rpmbuild/SOURCES
 cp CHANGELOG.md pkg/rpmbuild/SOURCES
 go-licenses save ./... --ignore github.com/mfinelli/modctl --save_path \
   pkg/rpmbuild/SOURCES/licenses
 find pkg/rpmbuild/SOURCES/licenses -type f -exec chmod 0644 {} \;
+./pkg/copydocs.bash pkg/rpmbuild/SOURCES/docs
 
 cp modctl.bash modctl.fish modctl.zsh pkg/rpmbuild/SOURCES
+make modctl.1
+cp modctl.1 pkg/rpmbuild/SOURCES
 
 make
 cp modctl pkg/rpmbuild/SOURCES

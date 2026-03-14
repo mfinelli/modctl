@@ -3,6 +3,7 @@
 /hello.txt
 /internal/nexusclient/dbc/*
 /modctl
+/modctl.1
 /node_modules
 /sample.tar.gz
 /www/favicon.png

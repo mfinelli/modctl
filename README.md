@@ -1,67 +1,72 @@
 # mod control (modctl)
 
-Deterministic, profile-based mod manager for Linux.
+![CI](https://github.com/mfinelli/modctl/actions/workflows/default.yml/badge.svg)
+
+A deterministic mod manager for Linux.
 
 ## Overview
 
 modctl installs mods by extracting archives directly into game directories
-while tracking every installed file. It supports per-profile priority ordering,
-conflict detection, and safe rollback via automatic backups.
+while tracking every installed file. It supports per-profile priority
+ordering, conflict detection, and safe rollback via automatic backups.
 
-Designed for Steam/Proton first, with a store-agnostic architecture ready for
+Designed for Steam first, with a store-agnostic architecture ready for
 Heroic, Lutris, and future GOG clients.
 
 Metadata is stored in SQLite. Binary artifacts (archives and backups) are
-stored in content-addressed blob stores.
+stored in content-addressed blob stores on disk.
 
-I'm focusing on Linux for this tool, but if they don't raise the overall
-complexity too much I'm willing to accept patches for macOS or Windows support.
+## Architecture
 
-**Disclaimer:** I'm using AI to help me plan/build this tool (especially for
-writing the documentation). I'm not using an agent, just my the chat interface
-from my browser and when I ask it to write functions I'm reviewing, testing,
-and modifying (when necessary) all of its output.
+- **Metadata**: SQLite (via `mattn/go-sqlite3`)
+- **Blob stores**: Content-addressed on disk (`archives/`, `backups/`, `overrides/`)
+- **Extraction**: External `bsdtar` with staging directory and safe move into game directory
+- **Profiles**: Per-game, per-store, with unique priority ordering
+- **Conflict resolution**: Deterministic winner selection per destination path
+- **Export format**: zstd-compressed tar archive (database snapshot + blobs + manifest)
 
-### Motivation
+## Motivation
 
-Gaming on Linux is a real thing now (at least for the kinds of games that I
-play) but modding seems to still be stuck in Windows-only land. In theory one
-can run Vortex or Mod Organizer 2 on Linux using wine but it's clunky (and
-when I tried it I was able to successfully install the tools but the
-performance was abysmal even just starting the game through the mod launcher
-with no mods enabled). There are a few attempts that I'm aware of to make
-real Linux ports of these tools but there hasn't been any real progress that
-I can see. On the other hand for the games that I tried just dumping the files
-into the game directory worked without issue but I missed the nice things
-about a mod manager (e.g., version update check against Nexus, managing the
-load order if there are conflicts, etc).
+Gaming on Linux is a real thing now, at least for the kinds of games that I
+play. But modding seems to still be stuck in Windows-only land. In theory
+you can run Vortex or Mod Organizer 2 on Linux using Wine, but in my
+experience it's clunky; I was able to get the tools running but performance
+was abysmal even just starting the game through the mod launcher with no
+mods enabled. There are a few attempts to make real Linux ports of these
+tools but none have made meaningful progress.
 
-So I had a flash of inspiration that at the end of the day if all I'm doing
-is dumping the files into the game directory what I really need is just a
-simple package manager to keep track of which archives I've extracted and
-which files they have created so that install/uninstall is easy and if I keep
-track of the Nexus ID I can also make it check for updates (though probably
-not automatically update the mods which is fine) and get most of the
-functionality that matters to me. I thought that I could just keep everything
-in a SQLite database and I'd be most of the way there. A few messages with
-your friendly LLM to flesh out the idea and think about edge cases, etc and
-here we are.
+For the games I tried, just dumping files into the game directory worked
+without issue. But I missed the useful parts of a mod manager: conflict
+detection, load order management, update checking against Nexus. I realised
+that at the end of the day all I really need is a package manager for mods:
+something that tracks which archives have been extracted and which files they
+created, so that install and uninstall are possible. Keep everything in SQLite
+and you're most of the way there.
 
----
+So a few conversations with your friendly, neighborhood LLM to think through
+the design and edge cases, and here we are.
+
+## AI disclaimer
+
+I used AI assistance while planning and building this project, primarily
+for design discussions, thinking through edge cases, and writing
+documentation. I did not use an autonomous agent. Every line of code was
+reviewed, tested, and where necessary modified before being committed. This
+is not a vibe-coded project.
 
 ## Goals
 
 - Deterministic installs and uninstalls
-- Profile-based mod sets with per-profile priority
+- Profile-based mod sets with per-profile priority ordering
 - Explicit conflict resolution (highest priority wins)
 - Backup of overwritten non-tool-owned files
-- Safe rollback to tool-managed vanilla state
+- Safe rollback to a clean game directory state
 - Steam game discovery (no manual path management)
-- Export/import of full state (database + blobs)
+- Export and import of full state (database + blobs)
 - Multi-store architecture from day one
-- Nexus mod awareness (mod page + multiple files)
+- Nexus mod awareness (mod page + multiple files + update checking)
 
-## Non-Goals (v1)
+## Non-goals (v1)
 
 - No dependency resolution
 - No virtual filesystem
@@ -70,48 +75,97 @@ here we are.
 - No binary merge support
 - No GUI (I might add a TUI later)
 
----
+## Requirements
 
-## Architecture
+- Go (see `go.mod` for the minimum version; currently 1.25)
+- A C compiler (`gcc` is sufficient; CGO is required for `mattn/go-sqlite3`,
+  and `klauspost/compress/zstd`)
+- `bsdtar` at compile time and at runtime (provided by `libarchive-tools` on
+  Debian/Ubuntu, `bsdtar` on Fedora/RHEL, `libarchive` on Arch Linux)
 
-- **Metadata:** SQLite
-- **Blob Stores:** Content-addressed on disk
-  - `archives/`
-  - `backups/`
-- **Extraction:** External `bsdtar` with staging + safe move
-- **Profiles:** Per-game, per-store
-- **Conflict Model:** Deterministic winner selection per path
+## Building from source
 
----
+Clone the repository and run make:
+```bash
+git clone https://github.com/mfinelli/modctl
+cd modctl
+make
+```
 
-## Usage
+This produces a `modctl` binary in the project root. `CGO_ENABLED=1` is set
+automatically by the Makefile.
 
-TODO...
+To run the tests:
+```bash
+go test ./...
+```
 
----
+To format the code:
+```bash
+go fmt ./...
+```
 
-## Roadmap
+## Repository layout
+```
+.github/       CI workflows
+cmd/           Cobra command definitions
+docs/          User-facing documentation (also published to the website)
+internal/      Internal Go packages
+migrations/    Goose database migration files
+pkg/           Package build scripts, specs, PKGBUILDs, signing keys
+www/           Public website (Zola)
+```
 
-### v0.1
-- Steam store integration
-- Archive import
-- Dry-run planner
-- Apply engine with backups
-- Profiles and priority ordering
+## Development
 
-### v0.2
-- Drift detection
-- Garbage collection
-- Export/import bundle
+### Database migrations
 
-### Future
+modctl uses [goose](https://github.com/pressly/goose) for database
+migrations. Migration files live in `migrations/`. To create a new
+migration:
+```bash
+goose create MIGRATION_NAME sql -dir migrations -s
+```
+
+### Code generation
+
+modctl uses [sqlc](https://sqlc.dev) to generate type-safe Go code from SQL
+queries. To regenerate after modifying queries or schema:
+```bash
+sqlc generate
+```
+
+This is also run automatically by `make` when rebuilding the binary.
+
+### Adding a new command
+
+Commands are defined in `cmd/` using [Cobra](https://github.com/spf13/cobra).
+Each command or subcommand group has its own file following the naming
+convention already established in the package (e.g. `profiles_create.go`,
+`mods_nexus_link.go`).
+
+## Future ideas
+
 - Additional stores (Heroic, Lutris, GOG)
-- Structured overrides (INI/YAML/JSON)
-- Text-based merge policies
+- Structured overrides (INI/YAML/JSON patches on top of base mod layer)
+- Text-based file merge policies
 - Optional TUI
-- Game-specific integrations
+- Game-specific integrations (load order generation, Proton prefix targets)
 
----
+## Contributing
+
+Contributions are welcome. For bug reports and questions please use the
+[issue tracker](https://github.com/mfinelli/modctl/issues) and
+[GitHub Discussions](https://github.com/mfinelli/modctl/discussions).
+
+For code contributions, please open an issue first to discuss what you would
+like to change. There are no formal contribution guidelines yet: use common
+sense, follow the existing code style, and please make sure the tests pass (I
+would love it if all new new functionality came with supporting tests even if
+I've been pretty sparse so far myself).
+
+I am focused on Linux for this tool. Patches for macOS or Windows support
+may be considered if they do not raise overall complexity significantly.
 
 ## License
 

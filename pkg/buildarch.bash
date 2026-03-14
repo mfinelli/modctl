@@ -14,19 +14,27 @@ sed -e "s/PKGVER/$pkgver/" pkg/PKGBUILD > pkg/arch/PKGBUILD
 go-licenses save ./... --ignore github.com/mfinelli/modctl --save_path \
   pkg/licenses
 find pkg/licenses -type f -exec chmod 0644 {} \;
+./pkg/copydocs.bash pkg/docs
 
 (
   cd pkg || exit 1
   tar cvf arch/licenses.tar licenses
 )
 
+(
+  cd pkg || exit 1
+  tar cvf arch/docs.tar docs
+)
+
 make
 ./modctl completion bash > pkg/arch/modctl.bash
 ./modctl completion fish > pkg/arch/modctl.fish
 ./modctl completion zsh > pkg/arch/modctl.zsh
+make modctl.1
 cp LICENSE pkg/arch
 cp CHANGELOG.md pkg/arch
 mv modctl pkg/arch
+mv modctl.1 pkg/arch
 
 (
   set -e
