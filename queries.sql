@@ -105,14 +105,14 @@ INSERT INTO profiles (
   updated_at
 )
 SELECT
-  ?,
+  ?1,
   'default',
   NULL,
   TRUE,
   strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
   strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 WHERE NOT EXISTS (
-  SELECT 1 FROM profiles WHERE game_install_id = ?
+  SELECT 1 FROM profiles WHERE game_install_id = ?1
 );
 
 -- name: GetGameInstallByID :one
