@@ -532,6 +532,21 @@ func attemptNexusLink(
 		return fmt.Errorf("updating nexus file id: %w", err)
 	}
 
+	// Determine version string: CLI flag wins, otherwise use API value if non-empty
+	versionToStore := p.fileVersion
+	if versionToStore == "" {
+		versionToStore = match.File.Version
+	}
+	if versionToStore != "" {
+		if err := q.UpdateModFileVersionVersionString(ctx, dbq.UpdateModFileVersionVersionStringParams{
+			ID:            p.versionID,
+			VersionString: sql.NullString{String: versionToStore, Valid: true},
+		}); err != nil {
+			return fmt.Errorf("updating version string: %w", err)
+		}
+		fmt.Println(subtleStyle.Render(fmt.Sprintf("  set version: %s", versionToStore)))
+	}
+
 	if !p.labelProvided {
 		if err := q.UpdateModFileLabel(ctx, dbq.UpdateModFileLabelParams{
 			ID:    p.fileID,

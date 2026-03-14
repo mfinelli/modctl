@@ -1513,3 +1513,8 @@ SELECT
 FROM mod_pages mp
 WHERE mp.id = ?
   AND mp.game_install_id = ?;
+
+-- name: UpdateModFileVersionVersionString :exec
+UPDATE mod_file_versions
+SET version_string = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE id = ?;
