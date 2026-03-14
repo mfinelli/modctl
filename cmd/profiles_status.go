@@ -492,11 +492,23 @@ func formatAge(t time.Time) string {
 	case d < time.Minute:
 		return "just now"
 	case d < time.Hour:
-		return fmt.Sprintf("%d minutes ago", int(d.Minutes()))
+		if int(d.Minutes()) == 1 {
+			return "1 minute ago"
+		} else {
+			return fmt.Sprintf("%d minutes ago", int(d.Minutes()))
+		}
 	case d < 24*time.Hour:
-		return fmt.Sprintf("%d hours ago", int(d.Hours()))
+		if int(d.Hours()) == 1 {
+			return "1 hour ago"
+		} else {
+			return fmt.Sprintf("%d hours ago", int(d.Hours()))
+		}
 	default:
-		return fmt.Sprintf("%d days ago", int(d.Hours()/24))
+		if int(d.Hours()/24) == 1 {
+			return "1 day ago"
+		} else {
+			return fmt.Sprintf("%d days ago", int(d.Hours()/24))
+		}
 	}
 }
 
