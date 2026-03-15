@@ -49,6 +49,7 @@ var (
 	applyVerbose     bool
 	applyForce       bool
 	applyAbort       bool
+	applyPruneDirs   bool
 )
 
 var applyCmd = &cobra.Command{
@@ -311,6 +312,8 @@ Use --dry-run to preview the plan without making any changes.`,
 			}
 		}
 
+		var removedPaths []string
+
 		// Remove ops
 		for _, planOp := range removeOps {
 			printOp(redStyle.Render("-"), planOp.DestPath, "")
@@ -319,6 +322,7 @@ Use --dry-run to preview the plan without making any changes.`,
 				return markFailed(fmt.Errorf("remove %q: %w", planOp.DestPath, err))
 			}
 			countRemove++
+			removedPaths = append(removedPaths, planOp.DestPath)
 		}
 
 		// Restore ops
@@ -329,6 +333,12 @@ Use --dry-run to preview the plan without making any changes.`,
 				return markFailed(fmt.Errorf("restore %q: %w", planOp.DestPath, err))
 			}
 			countRestore++
+		}
+
+		// Prune empty directories if requested
+		if applyPruneDirs {
+			pruneWarnings := extractor.PruneDirs(plan.TargetRoot, removedPaths)
+			plan.Warnings = append(plan.Warnings, pruneWarnings...)
 		}
 
 		// Clear the spinner line before printing summary
@@ -436,6 +446,8 @@ func init() {
 		"Mark any incomplete operation as failed and start fresh")
 	applyCmd.Flags().BoolVar(&applyAbort, "abort", false,
 		"Mark any incomplete operation as failed and exit")
+	applyCmd.Flags().BoolVar(&applyPruneDirs, "prune-dirs", false,
+		"Remove empty directories left behind after file removals")
 }
 
 // printApplyPlan renders the dry-run plan output

@@ -756,12 +756,17 @@ This preserves a clean v1 while allowing richer v2.
 - `status` (conflicts, drift, missing)
 - `apply` (top-level) - apply the active profile to the game directory.
   Supports `--dry-run`, `--no-recheck`, `--keep-staging`, `--print-ops`,
-  `--force`, `--abort`. By default, files already correctly deployed are
-  skipped (noop) and externally modified files are detected and backed up
-  before overwriting. `--no-recheck` skips on-disk hash checks for faster
-  applies.
+  `--force`, `--abort`, `--prune-dirs`. By default, files already correctly
+  deployed are skipped (noop) and externally modified files are detected and
+  backed up before overwriting. `--no-recheck` skips on-disk hash checks for
+  faster applies. `--prune-dirs` attempts to remove empty directories left
+  behind after file removals; directories that still contain files not managed
+  by modctl are silently skipped.
 - `unapply` (top-level) - remove all tool-managed files and restore backups.
-  Supports `--dry-run`, `--print-ops`, `--force`, `--abort`.
+  Supports `--dry-run`, `--print-ops`, `--force`, `--abort`, `--prune-dirs`.
+  `--prune-dirs` attempts to remove empty directories left behind after file
+  removals; directories that still contain files not managed by modctl are
+  silently skipped.
 - `export` - export modctl state to a portable bundle. Defaults to a full
   export of all games and blobs. Use `--game` to scope to a single game
   install. Supports `--output`/`-o` to override the output filename,

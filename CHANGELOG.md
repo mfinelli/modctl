@@ -5,6 +5,13 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 
 `modctl` adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## unreleased
+
+### Changes
+
+- `apply` and `unapply` commands now clean up emptied directories if
+  `--prune-dirs` is passed.
+
 ## v0.2.0 - 2026-03-15
 
 This is another pre-release that fixes issues found during testing.

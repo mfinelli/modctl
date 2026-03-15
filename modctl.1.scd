@@ -216,15 +216,17 @@ Set the active game:
 
 ## Apply
 
-*modctl apply* [--dry-run] [--no-recheck] [--print-ops] [--keep-staging]
+*modctl apply* [--dry-run] [--no-recheck] [--print-ops] [--keep-staging] [--prune-dirs]
 	Reconcile the game directory to match the active profile. Backs up
 	game-owned files before overwriting them. Files already correctly
 	deployed are skipped. Use --dry-run to preview without making changes.
-	Use --no-recheck to skip on-disk hash checks for faster applies.
+	Use --no-recheck to skip on-disk hash checks for faster applies. Use
+	\--prune-dirs to remove empty directories left behind after file removals.
 
-*modctl unapply* [--dry-run] [--print-ops]
+*modctl unapply* [--dry-run] [--print-ops] [--prune-dirs]
 	Remove all tool-managed files and restore backed-up game files.
-	Operates on the recorded installed state, not the profile definition.
+	Operates on the recorded installed state, not the profile definition. Use
+	\--prune-dirs to remove empty directories left behind after file removals.
 
 ## Export and import
 

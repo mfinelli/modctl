@@ -41,11 +41,12 @@ import (
 )
 
 var (
-	unapplyGame     string
-	unapplyDryRun   bool
-	unapplyPrintOps bool
-	unapplyForce    bool
-	unapplyAbort    bool
+	unapplyGame      string
+	unapplyDryRun    bool
+	unapplyPrintOps  bool
+	unapplyForce     bool
+	unapplyAbort     bool
+	unapplyPruneDirs bool
 )
 
 var unapplyCmd = &cobra.Command{
@@ -237,6 +238,8 @@ Use --dry-run to preview the plan without making any changes.`,
 			return err
 		}
 
+		var removedPaths []string
+
 		for _, planOp := range plan.Ops {
 			switch planOp.Kind {
 			case planner.PlanOpRemove:
@@ -246,6 +249,7 @@ Use --dry-run to preview the plan without making any changes.`,
 					return markFailed(fmt.Errorf("remove %q: %w", planOp.DestPath, err))
 				}
 				countRemove++
+				removedPaths = append(removedPaths, planOp.DestPath)
 
 			case planner.PlanOpRestoreBackup:
 				printOp(cyanStyle.Render("↩"), planOp.DestPath)
@@ -259,6 +263,11 @@ Use --dry-run to preview the plan without making any changes.`,
 				plan.Warnings = append(plan.Warnings,
 					fmt.Sprintf("unexpected op kind %q for %q during unapply - skipped", planOp.Kind, planOp.DestPath))
 			}
+		}
+
+		if unapplyPruneDirs {
+			pruneWarnings := extractor.PruneDirs(plan.TargetRoot, removedPaths)
+			plan.Warnings = append(plan.Warnings, pruneWarnings...)
 		}
 
 		// Clear spinner line
@@ -332,6 +341,8 @@ func init() {
 		"Mark any incomplete operation as failed and start fresh")
 	unapplyCmd.Flags().BoolVar(&unapplyAbort, "abort", false,
 		"Mark any incomplete operation as failed and exit")
+	unapplyCmd.Flags().BoolVar(&unapplyPruneDirs, "prune-dirs", false,
+		"Remove empty directories left behind after file removals")
 }
 
 // printUnapplyPlan renders the dry-run unapply plan output

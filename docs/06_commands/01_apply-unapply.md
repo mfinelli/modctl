@@ -48,6 +48,18 @@ what was done:
 modctl apply --print-ops
 ```
 
+### Cleaning up empty directories
+
+modctl only manages files, not directories. Directories created implicitly
+during apply are not removed automatically when their contents are uninstalled.
+If you want modctl to clean up any directories it emptied during the operation,
+pass `--prune-dirs`:
+```bash
+modctl apply --prune-dirs
+```
+
+Directories that still contain files modctl did not install are left alone.
+
 ### Flags
 
 | Flag             | Description                                                                                |
@@ -56,6 +68,7 @@ modctl apply --print-ops
 | `--no-recheck`   | Skip on-disk hash checks (faster but will not detect or back up externally modified files) |
 | `--print-ops`    | Print each file operation on its own line instead of using a progress indicator            |
 | `--keep-staging` | Keep the staging directory after apply (useful for debugging)                              |
+| `--prune-dirs`   | Remove empty directories left behind after file removals                                   |
 
 ## unapply
 
@@ -81,12 +94,22 @@ modctl unapply --dry-run
 modctl unapply --print-ops
 ```
 
+### Cleaning up empty directories
+modctl only manages files, not directories. To remove any directories that are
+left empty after unapply completes, pass `--prune-dirs`:
+```bash
+modctl unapply --prune-dirs
+```
+
+Directories that still contain files modctl did not install are left alone.
+
 ### Flags
 
-| Flag          | Description                                                                     |
-|---------------|---------------------------------------------------------------------------------|
-| `--dry-run`   | Preview the plan without making any changes                                     |
-| `--print-ops` | Print each file operation on its own line instead of using a progress indicator |
+| Flag           | Description                                                                     |
+|----------------|---------------------------------------------------------------------------------|
+| `--dry-run`    | Preview the plan without making any changes                                     |
+| `--print-ops`  | Print each file operation on its own line instead of using a progress indicator |
+| `--prune-dirs` | Remove empty directories left behind after file removals                        |
 
 ---
 
