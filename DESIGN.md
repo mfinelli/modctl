@@ -698,6 +698,15 @@ Requirements
 - map appid → name + install dir
 - Store games in DB and allow refresh.
 
+#### Filtered titles
+
+The following Steam titles are filtered out during discovery and never written
+to the database, as they are internal Steam software rather than moddable games:
+
+- `Proton Experimental`
+- `Steam Linux Runtime *` (any title with this prefix, e.g. `Steam Linux Runtime 1.0`)
+- `Steamworks Common Redistributables`
+
 ## 13. Extensibility for game-specific integrations
 
 ### Integration type
@@ -823,6 +832,39 @@ Key behavior:
 The active profile is never automatically switched to default on deletion.
 When the applied profile is deleted, `applied_profile_id` is set to NULL
 automatically via the FK `ON DELETE SET NULL` behavior.
+
+#### `mods import`
+
+When `--nexus-url` is provided, the URL is normalized before storage: query
+strings, fragments, and extraneous path segments are stripped so only the
+canonical `/<game_domain>/mods/<mod_id>` path is retained. For example,
+`https://www.nexusmods.com/cyberpunk2077/mods/107?tab=files&file_id=123169`
+is stored as `https://www.nexusmods.com/cyberpunk2077/mods/107`.
+
+If the archive can be identified against the Nexus file list with certainty,
+the version string from the Nexus API is automatically written to
+`mod_file_versions.version_string`. If `--file-version` was explicitly passed
+on the command line, that value takes precedence over the API value.
+
+#### `mods remove`
+
+Removes a mod page and all files and versions under it. With `--file-version`,
+removes only that specific version instead.
+
+When removing a specific version, if the removal leaves the parent mod file
+with no remaining versions, the file is also removed. If that leaves the mod
+page with no remaining files, the page is also removed.
+
+Blobs (archive files on disk) are never removed by this command. Run `gc`
+afterwards to reclaim disk space.
+
+If any version to be removed is currently referenced by a profile item, the
+command refuses unless `--force` is passed. With `--force`, the affected
+profile items are deleted automatically via cascade. The affected profiles
+are always listed before deletion so the user is aware of what will change.
+
+The `--file-version` value must belong to the specified mod page. Passing a
+version ID from a different mod page is an error.
 
 ### Incomplete operations
 

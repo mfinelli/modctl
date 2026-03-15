@@ -13,6 +13,7 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 - When linking mods during import save the version from the nexus (if not
   provided manually)
 - Allow resolving games by name (in addition to ID and selector)
+- Add the `mods remove` command
 
 ## v0.1.1 - 2026-03-14
 

@@ -19,6 +19,10 @@ configuration are never deleted when a game goes missing.
 modctl games refresh
 ```
 
+Some internal Steam titles are filtered automatically and never added to
+the database, as they are not moddable games: Proton Experimental, Steam
+Linux Runtime, and Steamworks Common Redistributables.
+
 Safe to run at any time and as often as you like.
 
 ### games list
@@ -37,8 +41,9 @@ modctl games list
 ### games info
 
 Show detailed information about a specific game install. You can identify
-the game by its numeric install ID or by a store selector:
+the game by its numeric install ID, a store selector, or its title:
 ```bash
+modctl games info "Cyberpunk 2077"
 modctl games info steam:1091500
 ```
 
@@ -51,11 +56,14 @@ modctl games info steam:1091500#default
 ### games set-active
 
 Set the active game install used by modctl commands. Accepts a numeric
-install ID or a store selector:
+install ID, a store selector, or a game title:
 ```bash
 modctl games set-active "Cyberpunk 2077"
 modctl games set-active steam:1091500
 ```
+
+If the title matches more than one install, modctl will list the
+candidates and ask you to be more specific using a selector.
 
 If multiple installs exist for the same game you must specify the instance
 explicitly.

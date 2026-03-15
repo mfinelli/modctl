@@ -76,13 +76,18 @@ Set the active game:
 
 *modctl games refresh*
 	Scan all enabled stores and update the list of discovered game installs.
+	Internal Steam titles (Proton Experimental, Steam Linux Runtime, Steamworks
+	Common Redistributables) are silently filtered and never added to the
+	database.
 
 *modctl games info* <id>
-	Show detailed information about a game install. Accepts a numeric ID or
-	a selector such as _steam:1091500_ or _steam:1091500#default_.
+	Show detailed information about a game install. Accepts a numeric ID,
+	a selector such as _steam:1091500_ or _steam:1091500#default_, or a
+	game title such as _Cyberpunk 2077_.
 
 *modctl games set-active* <id>
-	Set the active game install used by subsequent commands.
+	Set the active game install used by subsequent commands. Accepts a
+	numeric ID, a selector, or a game title.
 
 ## Stores
 
@@ -106,6 +111,14 @@ Set the active game:
 *modctl mods info* <mod>
 	Show detailed information about a mod page including files, versions,
 	Nexus link state, and profile membership.
+
+*modctl mods remove* [--file-version <id>] [--force] <mod-page>
+	Remove a mod page and all files and versions under it. With
+	\--file-version, removes only that specific version; empty parent
+	files and pages are removed automatically. Blobs are not deleted
+	immediately — run *modctl gc* to reclaim disk space. If any version
+	to be removed is referenced by a profile, the command refuses unless
+	\--force is passed, which removes the profile items via cascade.
 
 *modctl mods scan-inventory*
 	Scan archive contents for all mods that have not yet been inventoried.

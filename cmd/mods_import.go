@@ -503,7 +503,6 @@ func attemptNexusLink(
 		return fmt.Errorf("fetching nexus file list: %w", err)
 	}
 
-	// TODO add an optional --file-version flag
 	match, warnings, err := nexus.IdentifyNexusFile(p.originalBasename, p.archiveSize, p.label, p.fileVersion, filesResp.Files)
 	if err != nil {
 		return fmt.Errorf("identifying nexus file: %w", err)

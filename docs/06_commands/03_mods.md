@@ -21,9 +21,12 @@ If the file is not a supported archive format, modctl will wrap it into a
 If you are importing from Nexus Mods, pass `--nexus-url` to link the archive
 to its mod page at import time. This is the most reliable way to ensure a
 clean Nexus link (see [Nexus integration](../../guides/nexus) for details).
+The URL is normalised automatically — you can paste it directly from your
+browser, including any query strings or tab parameters, and modctl will
+strip them.
 ```bash
 modctl mods import ~/Downloads/AppearanceMenuMod-790-2-6-2-1728496438.7z \
-  --nexus-url "https://www.nexusmods.com/cyberpunk2077/mods/790"
+  --nexus-url "https://www.nexusmods.com/cyberpunk2077/mods/790?tab=files"
 ```
 
 modctl does not perform any dependency resolution. If a mod requires other
@@ -63,6 +66,36 @@ modctl mods info "Appearance Menu Mod"
 
 Nexus data is read from the local cache only. Run `modctl mods nexus
 check-updates` to refresh it.
+
+## Deleting mods
+
+### mods remove
+
+Remove a mod page and everything under it from the database. This removes
+all mod files and versions associated with the page.
+```bash
+modctl mods remove "Appearance Menu Mod"
+```
+
+To remove a specific version rather than the entire mod page, pass
+`--file-version` with the version ID. If removing the version leaves the
+parent file with no remaining versions, the file is removed automatically.
+If that leaves the mod page empty, the page is removed too.
+```bash
+modctl mods remove "Appearance Menu Mod" --file-version 42
+```
+
+The archive file on disk is not deleted immediately. Run `modctl gc` after
+removing mods to reclaim disk space.
+
+If any version being removed is currently referenced by a profile, modctl
+will refuse and show which profiles are affected. Pass `--force` to remove
+anyway; the affected profile items are deleted automatically.
+
+| Flag                  | Description                                                       |
+|-----------------------|-------------------------------------------------------------------|
+| `--file-version <id>` | Remove a specific version instead of the entire mod page          |
+| `--force`             | Remove even if referenced by profiles (profile items are deleted) |
 
 ## Scanning inventory
 
