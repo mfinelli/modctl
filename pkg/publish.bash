@@ -19,10 +19,10 @@ echo "  rpm x86_64:   $AMD64_RPM"
 echo "  rpm aarch64:  $ARM64_RPM"
 
 for f in "$AMD64_DEB" "$ARM64_DEB" "$AMD64_RPM" "$ARM64_RPM"; do
-    if [[ -z "$f" ]]; then
-        echo "error: Could not find all required package files" >&2
-        exit 1
-    fi
+  if [[ -z $f ]]; then
+    echo "error: Could not find all required package files" >&2
+    exit 1
+  fi
 done
 
 echo "$RCLONE_CONFIG" > pkg/rclone.conf
@@ -30,7 +30,7 @@ echo "$RCLONE_CONFIG" > pkg/rclone.conf
 WORKDIR="$(mktemp -d)"
 mkdir -p "$WORKDIR/repo"
 
-if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+if [[ ${GITHUB_REF} == refs/tags/v* ]]; then
   echo "Pulling current repo state from R2..."
   rclone sync --config pkg/rclone.conf r2:modctl-pkgs "$WORKDIR/repo"
 fi
@@ -61,23 +61,23 @@ echo "Generating APT Packages files..."
 (
   cd "$APT_ROOT"
   apt-ftparchive packages --arch amd64 pool/main \
-      > "$APT_DISTS/binary-amd64/Packages"
+    > "$APT_DISTS/binary-amd64/Packages"
 )
 gzip -9 -k -f "$APT_DISTS/binary-amd64/Packages"
 
 (
   cd "$APT_ROOT"
   apt-ftparchive packages --arch arm64 pool/main \
-      > "$APT_DISTS/binary-arm64/Packages"
+    > "$APT_DISTS/binary-arm64/Packages"
 )
 gzip -9 -k -f "$APT_DISTS/binary-arm64/Packages"
 
 # Generate Release file
 echo "Generating APT Release file..."
 apt-ftparchive \
-    -c "pkg/apt-ftparchive.conf" \
-    release "$APT_ROOT/dists/stable" \
-    > "$APT_ROOT/dists/stable/Release"
+  -c "pkg/apt-ftparchive.conf" \
+  release "$APT_ROOT/dists/stable" \
+  > "$APT_ROOT/dists/stable/Release"
 
 # clean up old signature files... (that we pulled from r2)
 rm -f "$APT_ROOT/dists/stable/Release.gpg" "$APT_ROOT/dists/stable/InRelease"
@@ -85,14 +85,14 @@ rm -f "$APT_ROOT/dists/stable/Release.gpg" "$APT_ROOT/dists/stable/InRelease"
 # Sign Release file
 echo "Signing APT Release file..."
 gpg --detach-sign \
-    -u pkg@modctl.org \
-    -o "$APT_ROOT/dists/stable/Release.gpg" \
-    "$APT_ROOT/dists/stable/Release"
+  -u pkg@modctl.org \
+  -o "$APT_ROOT/dists/stable/Release.gpg" \
+  "$APT_ROOT/dists/stable/Release"
 
 gpg --clearsign \
-    -u pkg@modctl.org \
-    -o "$APT_ROOT/dists/stable/InRelease" \
-    "$APT_ROOT/dists/stable/Release"
+  -u pkg@modctl.org \
+  -o "$APT_ROOT/dists/stable/InRelease" \
+  "$APT_ROOT/dists/stable/Release"
 
 echo "Building YUM repository..."
 
@@ -127,7 +127,7 @@ done
 
 tree "$WORKDIR"
 
-if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+if [[ ${GITHUB_REF} == refs/tags/v* ]]; then
   echo "Pushing updated repo to R2..."
   rclone sync --config pkg/rclone.conf "$WORKDIR/repo" r2:modctl-pkgs
 
@@ -135,19 +135,19 @@ if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
   curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache" \
     -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
     -H "Content-Type: application/json" \
-    --data "{\"files\":[
-        \"https://pkg.modctl.org/apt/dists/stable/Release\",
-        \"https://pkg.modctl.org/apt/dists/stable/InRelease\",
-        \"https://pkg.modctl.org/apt/dists/stable/Release.gpg\",
-        \"https://pkg.modctl.org/apt/dists/stable/main/binary-amd64/Packages\",
-        \"https://pkg.modctl.org/apt/dists/stable/main/binary-amd64/Packages.gz\",
-        \"https://pkg.modctl.org/apt/dists/stable/main/binary-arm64/Packages\",
-        \"https://pkg.modctl.org/apt/dists/stable/main/binary-arm64/Packages.gz\",
-        \"https://pkg.modctl.org/rpm/x86_64/repodata/repomd.xml\",
-        \"https://pkg.modctl.org/rpm/x86_64/repodata/repomd.xml.asc\",
-        \"https://pkg.modctl.org/rpm/aarch64/repodata/repomd.xml\",
-        \"https://pkg.modctl.org/rpm/aarch64/repodata/repomd.xml.asc\"
-    ]}"
+    --data '{"files":[
+        "https://pkg.modctl.org/apt/dists/stable/Release",
+        "https://pkg.modctl.org/apt/dists/stable/InRelease",
+        "https://pkg.modctl.org/apt/dists/stable/Release.gpg",
+        "https://pkg.modctl.org/apt/dists/stable/main/binary-amd64/Packages",
+        "https://pkg.modctl.org/apt/dists/stable/main/binary-amd64/Packages.gz",
+        "https://pkg.modctl.org/apt/dists/stable/main/binary-arm64/Packages",
+        "https://pkg.modctl.org/apt/dists/stable/main/binary-arm64/Packages.gz",
+        "https://pkg.modctl.org/rpm/x86_64/repodata/repomd.xml",
+        "https://pkg.modctl.org/rpm/x86_64/repodata/repomd.xml.asc",
+        "https://pkg.modctl.org/rpm/aarch64/repodata/repomd.xml",
+        "https://pkg.modctl.org/rpm/aarch64/repodata/repomd.xml.asc"
+    ]}'
 fi
 
 exit 0

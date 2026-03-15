@@ -19,10 +19,10 @@ echo "  sig x86_64:   $AMD64_SIG"
 echo "  sig aarch64:  $ARM64_SIG"
 
 for f in "$AMD64_PKG" "$ARM64_PKG" "$AMD64_SIG" "$ARM64_SIG"; do
-    if [[ -z "$f" ]]; then
-        echo "error: Could not find all required package files" >&2
-        exit 1
-    fi
+  if [[ -z $f ]]; then
+    echo "error: Could not find all required package files" >&2
+    exit 1
+  fi
 done
 
 echo "$RCLONE_CONFIG" > pkg/rclone.conf
@@ -35,7 +35,7 @@ mkdir -p "$WORKDIR/repo/arch"
 # up the ubuntu minimum to noble) and so we need to make sure that we can
 # handle it already today
 
-if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+if [[ ${GITHUB_REF} == refs/tags/v* ]]; then
   echo "Pulling current repo state from R2..."
   rclone sync --config pkg/rclone.conf r2:modctl-pkgs/arch "$WORKDIR/repo/arch"
 fi
@@ -57,22 +57,22 @@ find "$WORKDIR/repo/arch" -name '*.old.sig' -exec rm {} \;
 
 # Remove old package versions
 find "$WORKDIR/repo/arch/x86_64" -name "*.pkg.tar.zst" \
-    ! -name "$(basename "$AMD64_PKG")" -delete
+  ! -name "$(basename "$AMD64_PKG")" -delete
 find "$WORKDIR/repo/arch/x86_64" -name "*.pkg.tar.zst.sig" \
-    ! -name "$(basename "$AMD64_SIG")" -delete
+  ! -name "$(basename "$AMD64_SIG")" -delete
 find "$WORKDIR/repo/arch/aarch64" -name "*.pkg.tar.zst" \
-    ! -name "$(basename "$ARM64_PKG")" -delete
+  ! -name "$(basename "$ARM64_PKG")" -delete
 find "$WORKDIR/repo/arch/aarch64" -name "*.pkg.tar.zst.sig" \
-    ! -name "$(basename "$ARM64_SIG")" -delete
+  ! -name "$(basename "$ARM64_SIG")" -delete
 
 # Dereference all symlinks so rclone can push regular files
 find "$WORKDIR/repo/arch" -type l | while read -r link; do
-    cp --remove-destination "$(readlink -f "$link")" "$link"
+  cp --remove-destination "$(readlink -f "$link")" "$link"
 done
 
 tree "$WORKDIR"
 
-if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+if [[ ${GITHUB_REF} == refs/tags/v* ]]; then
   echo "Pushing updated repo to R2..."
   rclone sync --config pkg/rclone.conf "$WORKDIR/repo/arch" r2:modctl-pkgs/arch
 
@@ -80,16 +80,16 @@ if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
   curl -s -X POST "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache" \
     -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
     -H "Content-Type: application/json" \
-    --data "{\"files\":[
-      \"https://pkg.modctl.org/arch/x86_64/modctl.db\",
-      \"https://pkg.modctl.org/arch/x86_64/modctl.db.tar.zst\",
-      \"https://pkg.modctl.org/arch/x86_64/modctl.files\",
-      \"https://pkg.modctl.org/arch/x86_64/modctl.files.tar.zst\",
-      \"https://pkg.modctl.org/arch/aarch64/modctl.db\",
-      \"https://pkg.modctl.org/arch/aarch64/modctl.db.tar.zst\",
-      \"https://pkg.modctl.org/arch/aarch64/modctl.files\",
-      \"https://pkg.modctl.org/arch/aarch64/modctl.files.tar.zst\"
-    ]}"
+    --data '{"files":[
+      "https://pkg.modctl.org/arch/x86_64/modctl.db",
+      "https://pkg.modctl.org/arch/x86_64/modctl.db.tar.zst",
+      "https://pkg.modctl.org/arch/x86_64/modctl.files",
+      "https://pkg.modctl.org/arch/x86_64/modctl.files.tar.zst",
+      "https://pkg.modctl.org/arch/aarch64/modctl.db",
+      "https://pkg.modctl.org/arch/aarch64/modctl.db.tar.zst",
+      "https://pkg.modctl.org/arch/aarch64/modctl.files",
+      "https://pkg.modctl.org/arch/aarch64/modctl.files.tar.zst"
+    ]}'
 fi
 
 exit 0

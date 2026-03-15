@@ -43,8 +43,8 @@ mv modctl.1 pkg/arch
   su builder -c "PKGEXT='.pkg.tar.zst' makepkg --nodeps"
   find . -name '*-x86_64.pkg.tar.zst' -exec \
     gpg --detach-sign \
-      -u pkg@modctl.org \
-      {} \;
+    -u pkg@modctl.org \
+    {} \;
 )
 
 export CC=aarch64-linux-gnu-gcc
@@ -58,8 +58,8 @@ mv modctl pkg/arch
   su builder -c "CARCH=aarch64 PKGEXT='.pkg.tar.zst' makepkg --nodeps"
   find . -name '*-aarch64.pkg.tar.zst' -exec \
     gpg --detach-sign \
-      -u pkg@modctl.org \
-      {} \;
+    -u pkg@modctl.org \
+    {} \;
 )
 
 exit 0

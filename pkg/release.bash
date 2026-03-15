@@ -11,7 +11,7 @@ sqlc generate
 go mod vendor
 
 go-licenses save ./... --ignore github.com/mfinelli/modctl --save_path \
-    licenses
+  licenses
 find licenses -type f -exec chmod 0644 {} \;
 ./pkg/copydocs.bash pkg/docs
 
