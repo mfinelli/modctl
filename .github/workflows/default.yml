@@ -92,10 +92,11 @@ jobs:
       - run: |
           apt-get install -y \
             apt-utils \
-            ca-certificates \
             binutils-aarch64-linux-gnu \
             build-essential \
+            ca-certificates \
             createrepo-c \
+            curl \
             debsigs \
             file \
             gcc-aarch64-linux-gnu \
@@ -153,8 +154,9 @@ jobs:
       - run: apt-get upgrade -y
       - run: |
           apt-get install -y \
-            ca-certificates \
             build-essential \
+            ca-certificates \
+            curl \
             file \
             gcc-aarch64-linux-gnu \
             libarchive-tools \
