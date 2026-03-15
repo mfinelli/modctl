@@ -90,7 +90,7 @@ It does not change files on disk; changes take effect the next time you apply.`,
 			return err
 		}
 
-		p, err := internal.ResolveProfileArg(ctx, q, &gi, profilesAddProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesAddProfile)
 		if err != nil {
 			return err
 		}

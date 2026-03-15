@@ -27,31 +27,6 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 )
 
-func ResolveProfileArg(ctx context.Context, q *dbq.Queries, gi *dbq.GameInstall, arg string) (dbq.Profile, error) {
-	if arg != "" {
-		p, err := q.GetProfileByName(ctx, dbq.GetProfileByNameParams{
-			GameInstallID: gi.ID,
-			Name:          arg,
-		})
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return dbq.Profile{}, fmt.Errorf("profile %q not found for this game", arg)
-			}
-			return dbq.Profile{}, fmt.Errorf("lookup profile: %w", err)
-		}
-		return p, nil
-	} else {
-		p, err := q.GetActiveProfileForGame(ctx, gi.ID)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return dbq.Profile{}, fmt.Errorf("no active profile set; run `modctl profiles set-active <name>` or pass --profile")
-			}
-			return dbq.Profile{}, fmt.Errorf("get active profile: %w", err)
-		}
-		return p, nil
-	}
-}
-
 func SetProfileItemEnabled(ctx context.Context, profile *dbq.Profile, q *dbq.Queries, versionID int64, enabled bool) error {
 	// Find the profile item row for this version.
 	item, err := q.GetProfileItemByVersion(ctx, dbq.GetProfileItemByVersionParams{

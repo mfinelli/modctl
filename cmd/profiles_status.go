@@ -105,7 +105,7 @@ on the same path - run 'modctl apply --dry-run' for a precise diff.`,
 			return err
 		}
 
-		p, err := internal.ResolveProfileArg(ctx, q, &gi, profilesStatusProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesStatusProfile)
 		if err != nil {
 			return err
 		}

@@ -89,7 +89,7 @@ Use 'remap list' to see current rules and their positions.`,
 			return err
 		}
 
-		p, err := internal.ResolveProfileArg(ctx, q, &gi, profilesRemapRemoveProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesRemapRemoveProfile)
 		if err != nil {
 			return err
 		}

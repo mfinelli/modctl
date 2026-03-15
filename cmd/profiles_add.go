@@ -97,7 +97,7 @@ profile. Higher priority wins conflicts.`,
 			return err
 		}
 
-		p, err := internal.ResolveProfileArg(ctx, q, &gi, profilesAddProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesAddProfile)
 		if err != nil {
 			return err
 		}

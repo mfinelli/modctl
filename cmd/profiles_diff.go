@@ -107,20 +107,20 @@ directional: profile A is the source and profile B is the target.`,
 
 		if len(args) == 1 {
 			// Diff active profile against the named one
-			profileA, err = internal.ResolveProfileArg(ctx, q, &gi, "")
+			profileA, err = argresolver.ResolveProfileArg(ctx, q, &gi, "")
 			if err != nil {
 				return fmt.Errorf("active profile: %w", err)
 			}
-			profileB, err = internal.ResolveProfileArg(ctx, q, &gi, args[0])
+			profileB, err = argresolver.ResolveProfileArg(ctx, q, &gi, args[0])
 			if err != nil {
 				return fmt.Errorf("profile B: %w", err)
 			}
 		} else {
-			profileA, err = internal.ResolveProfileArg(ctx, q, &gi, args[0])
+			profileA, err = argresolver.ResolveProfileArg(ctx, q, &gi, args[0])
 			if err != nil {
 				return fmt.Errorf("profile A: %w", err)
 			}
-			profileB, err = internal.ResolveProfileArg(ctx, q, &gi, args[1])
+			profileB, err = argresolver.ResolveProfileArg(ctx, q, &gi, args[1])
 			if err != nil {
 				return fmt.Errorf("profile B: %w", err)
 			}

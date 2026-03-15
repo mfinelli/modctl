@@ -88,7 +88,7 @@ version to the new version before removing the old version from the profile.`,
 			return err
 		}
 
-		p, err := internal.ResolveProfileArg(ctx, q, &gi, profilesRemapCopyProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesRemapCopyProfile)
 		if err != nil {
 			return err
 		}

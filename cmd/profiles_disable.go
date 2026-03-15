@@ -88,7 +88,7 @@ versions are ignored when computing the applied mod set.`,
 			return err
 		}
 
-		p, err := internal.ResolveProfileArg(ctx, q, &gi, profilesDisableProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesDisableProfile)
 		if err != nil {
 			return err
 		}
