@@ -24,6 +24,7 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
@@ -82,7 +83,7 @@ versions are ignored when computing the applied mod set.`,
 			profilesDisableGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, profilesDisableGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesDisableGame)
 		if err != nil {
 			return err
 		}

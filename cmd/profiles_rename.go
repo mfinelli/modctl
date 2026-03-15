@@ -27,6 +27,7 @@ import (
 	"github.com/mattn/go-sqlite3"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
@@ -85,7 +86,7 @@ Profile names must be unique per game.`,
 			profilesRenameGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, profilesRenameGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesRenameGame)
 		if err != nil {
 			return err
 		}

@@ -28,6 +28,7 @@ import (
 	"github.com/mattn/go-sqlite3"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
@@ -93,7 +94,7 @@ known crashes, conflicting game mechanics, or anything else.`,
 			modsIncompatibleAddGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, modsIncompatibleAddGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, modsIncompatibleAddGame)
 		if err != nil {
 			return err
 		}

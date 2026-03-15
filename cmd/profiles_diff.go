@@ -26,6 +26,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
@@ -96,7 +97,7 @@ directional: profile A is the source and profile B is the target.`,
 			profilesDiffGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, profilesDiffGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesDiffGame)
 		if err != nil {
 			return err
 		}

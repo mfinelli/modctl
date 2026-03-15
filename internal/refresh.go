@@ -35,6 +35,7 @@ import (
 	"github.com/andygrunwald/vdf"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
+	"go.finelli.dev/util"
 )
 
 // steamSkippedPrefixes are display names (or prefixes thereof) that are
@@ -427,6 +428,7 @@ func discoverSteamInstalls(
 				DisplayName:     display,
 				InstallRoot:     installCanon,
 				Metadata:        nullStringFromBytes(metaJSON),
+				IsPresent:       util.SqliteBoolToInt(true),
 				LastSeenAt:      sql.NullString{String: nowISO8601Z(), Valid: true}, // caller sets once per refresh
 			})
 		}

@@ -29,6 +29,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/extractor"
@@ -98,7 +99,7 @@ Use --dry-run to preview the plan without making any changes.`,
 			applyGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, applyGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, applyGame)
 		if err != nil {
 			return err
 		}

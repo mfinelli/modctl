@@ -27,9 +27,11 @@ import (
 	"github.com/mattn/go-sqlite3"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
+	"go.finelli.dev/util"
 )
 
 var (
@@ -83,7 +85,7 @@ Note: modctl automatically creates a "default" profile during game refresh.`,
 			profilesCreateGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, profilesCreateGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesCreateGame)
 		if err != nil {
 			return err
 		}
@@ -97,6 +99,7 @@ Note: modctl automatically creates a "default" profile during game refresh.`,
 			GameInstallID: gi.ID,
 			Name:          name,
 			Description:   desc,
+			IsActive:      util.SqliteBoolToInt(false),
 		})
 		if err != nil {
 			var se sqlite3.Error

@@ -24,6 +24,7 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
@@ -87,7 +88,7 @@ Use --multiple to assign priorities as N, 2N, 3N, ... (for example, --multiple
 			profilesOrderCompactGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, profilesOrderCompactGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesOrderCompactGame)
 		if err != nil {
 			return err
 		}

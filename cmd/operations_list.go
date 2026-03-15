@@ -28,6 +28,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
@@ -94,7 +95,7 @@ Use --limit to change the number of operations shown.`,
 			operationsListGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, operationsListGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, operationsListGame)
 		if err != nil {
 			return err
 		}

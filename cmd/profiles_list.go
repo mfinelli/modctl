@@ -25,6 +25,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
@@ -83,7 +84,7 @@ The current active game is used unless --game is provided.`,
 			profilesListGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, profilesListGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesListGame)
 		if err != nil {
 			return err
 		}

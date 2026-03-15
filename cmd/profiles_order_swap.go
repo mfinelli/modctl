@@ -26,6 +26,7 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
@@ -84,7 +85,7 @@ without having to choose unused priority numbers.`,
 			profilesAddGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, profilesAddGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesAddGame)
 		if err != nil {
 			return err
 		}

@@ -24,6 +24,7 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
@@ -83,7 +84,7 @@ Use 'remap list' to see current rules and their positions.`,
 			profilesRemapRemoveGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, profilesRemapRemoveGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesRemapRemoveGame)
 		if err != nil {
 			return err
 		}

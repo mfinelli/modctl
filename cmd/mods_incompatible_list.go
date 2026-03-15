@@ -26,6 +26,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
@@ -75,7 +76,7 @@ of which profiles they appear in.`,
 			modsIncompatibleListGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, modsIncompatibleListGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, modsIncompatibleListGame)
 		if err != nil {
 			return err
 		}

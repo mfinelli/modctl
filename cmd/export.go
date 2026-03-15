@@ -26,6 +26,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/exporter"
@@ -117,7 +118,7 @@ Examples:
 			return nil
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, exportGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, exportGame)
 		if err != nil {
 			return err
 		}

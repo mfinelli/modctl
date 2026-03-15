@@ -38,6 +38,7 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/archivescanner"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/importer"
@@ -184,7 +185,7 @@ has been safely stored and the database has been updated successfully.`,
 			modsImportGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, modsImportGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, modsImportGame)
 		if err != nil {
 			return err
 		}

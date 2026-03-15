@@ -59,7 +59,7 @@ func GooseProvider(db *sql.DB) (*goose.Provider, error) {
 		return nil, err
 	}
 	return goose.NewProvider(goose.DialectCustom, db, fsys,
-		goose.WithStore(&sqliteStore{Store: base}),
+		goose.WithStore(&SqliteStore{Store: base}),
 	)
 }
 
@@ -105,11 +105,11 @@ func EnsureDBExists() error {
 
 // A custom goose store to let us override the schema migrations table to use
 // more idiomatic sqlite
-type sqliteStore struct {
+type SqliteStore struct {
 	database.Store // embed and delegate everything
 }
 
-func (s *sqliteStore) CreateVersionTable(ctx context.Context, db database.DBTxConn) error {
+func (s *SqliteStore) CreateVersionTable(ctx context.Context, db database.DBTxConn) error {
 	_, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
         id         INTEGER PRIMARY KEY,
         version_id INTEGER NOT NULL,

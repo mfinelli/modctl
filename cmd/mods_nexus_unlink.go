@@ -27,6 +27,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
@@ -81,7 +82,7 @@ var modsNexusUnlinkCmd = &cobra.Command{
 			modsNexusUnlinkGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, modsNexusUnlinkGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, modsNexusUnlinkGame)
 		if err != nil {
 			return err
 		}

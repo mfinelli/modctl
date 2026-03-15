@@ -30,6 +30,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/nexusclient/dbc"
@@ -89,7 +90,7 @@ to refresh cached data.`,
 			modsInfoGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, modsInfoGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, modsInfoGame)
 		if err != nil {
 			return err
 		}

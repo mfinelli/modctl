@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package internal
+package argresolver
 
 import (
 	"context"
@@ -26,11 +26,12 @@ import (
 	"strings"
 
 	"github.com/mfinelli/modctl/dbq"
+	"github.com/mfinelli/modctl/internal"
 )
 
 func ResolveGameInstallArg(ctx context.Context, q *dbq.Queries, arg string) (dbq.GameInstall, error) {
 	// Fast path: numeric ID
-	if id, ok := ParseInt64(arg); ok {
+	if id, ok := internal.ParseInt64(arg); ok {
 		gi, err := q.GetGameInstallByID(ctx, id)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -44,7 +45,7 @@ func ResolveGameInstallArg(ctx context.Context, q *dbq.Queries, arg string) (dbq
 	// Selector path: only attempt if arg contains ':'
 	if strings.Contains(arg, ":") {
 		// If user provided an explicit instance, lookup is unambiguous.
-		storeID, storeGameID, instanceID, parseErr := ParseSelector(arg)
+		storeID, storeGameID, instanceID, parseErr := internal.ParseSelector(arg)
 		if parseErr == nil {
 			gi, err := q.GetGameInstallBySelector(ctx, dbq.GetGameInstallBySelectorParams{
 				StoreID:     storeID,
@@ -65,7 +66,7 @@ func ResolveGameInstallArg(ctx context.Context, q *dbq.Queries, arg string) (dbq
 			// We'll treat the input containing '#' as "explicit instance".
 			if strings.Contains(arg, "#") {
 				return dbq.GameInstall{}, fmt.Errorf("no game install found for %s",
-					FullSelector(storeID, storeGameID, instanceID))
+					internal.FullSelector(storeID, storeGameID, instanceID))
 			}
 
 			// No explicit instance and selector missed: also try the multi-instance
@@ -84,7 +85,7 @@ func ResolveGameInstallArg(ctx context.Context, q *dbq.Queries, arg string) (dbq
 				var b strings.Builder
 				fmt.Fprintf(&b, "Multiple installs found for %s:%s. Choose one:\n\n", storeID, storeGameID)
 				for _, r := range rows {
-					sel := FullSelector(r.StoreID, r.StoreGameID, r.InstanceID)
+					sel := internal.FullSelector(r.StoreID, r.StoreGameID, r.InstanceID)
 					present := "present"
 					if r.IsPresent == 0 {
 						present = "missing"
@@ -117,7 +118,7 @@ func ResolveGameInstallArg(ctx context.Context, q *dbq.Queries, arg string) (dbq
 		var b strings.Builder
 		fmt.Fprintf(&b, "Multiple installs found for %q. Be more specific:\n\n", arg)
 		for _, r := range rows {
-			sel := FullSelector(r.StoreID, r.StoreGameID, r.InstanceID)
+			sel := internal.FullSelector(r.StoreID, r.StoreGameID, r.InstanceID)
 			present := "present"
 			if r.IsPresent == 0 {
 				present = "missing"

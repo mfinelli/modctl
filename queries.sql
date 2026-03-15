@@ -51,7 +51,7 @@ VALUES (
   ?, -- install_root (canonical)
   ?, -- metadata (json text, nullable)
   ?, -- last_seen_at (iso8601z, nullable)
-  TRUE,
+  ?, -- is_present
   strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
   strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 )
@@ -300,7 +300,7 @@ WHERE mod_page_id = ?;
 
 -- name: CreateProfile :one
 INSERT INTO profiles (game_install_id, name, description, is_active)
-VALUES (?, ?, ?, FALSE)
+VALUES (?, ?, ?, ?)
 RETURNING id;
 
 -- name: GetProfileByName :one
@@ -1523,3 +1523,12 @@ WHERE id = ?;
 SELECT * FROM game_installs
 WHERE LOWER(display_name) = LOWER(?)
 ORDER BY store_id, store_game_id, instance_id;
+
+-- name: UpsertStore :exec
+INSERT INTO stores (id, display_name, implementation, enabled)
+VALUES (?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+  display_name = excluded.display_name,
+  implementation = excluded.implementation,
+  enabled = excluded.enabled,
+  updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now');

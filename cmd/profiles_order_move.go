@@ -24,6 +24,7 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
@@ -85,7 +86,7 @@ Exactly one of --before or --after is required.`,
 			profilesOrderMoveGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, profilesOrderMoveGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesOrderMoveGame)
 		if err != nil {
 			return err
 		}

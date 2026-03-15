@@ -24,6 +24,7 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
@@ -82,7 +83,7 @@ priority or position in the load order.`,
 			profilesEnableGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, profilesEnableGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesEnableGame)
 		if err != nil {
 			return err
 		}

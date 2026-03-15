@@ -26,6 +26,7 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
@@ -84,7 +85,7 @@ It does not change files on disk; changes take effect the next time you apply.`,
 			profilesRenameGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, profilesRenameGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesRenameGame)
 		if err != nil {
 			return err
 		}

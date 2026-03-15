@@ -28,6 +28,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/state"
@@ -103,7 +104,7 @@ Use --force to proceed even if the operation would exhaust your API quota.`,
 			modsNexusCheckUpdatesGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, modsNexusCheckUpdatesGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, modsNexusCheckUpdatesGame)
 		if err != nil {
 			return err
 		}

@@ -25,6 +25,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
@@ -83,7 +84,7 @@ Rules are shown in the order they will be applied during planning.`,
 			profilesRemapListGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := internal.ResolveGameInstallArg(ctx, q, profilesRemapListGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesRemapListGame)
 		if err != nil {
 			return err
 		}
