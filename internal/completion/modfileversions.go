@@ -21,10 +21,12 @@ package completion
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -40,27 +42,19 @@ func ModFileVersionIDs(cmd *cobra.Command, toComplete string) ([]string, cobra.S
 	}
 	defer db.Close()
 
-	var gameID int64
-	if f := cmd.Flags().Lookup("game"); f != nil && f.Changed {
-		v, err := cmd.Flags().GetInt64("game")
-		if err != nil || v <= 0 {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		gameID = v
-	} else {
-		active, err := state.LoadActive()
-		if err != nil || active.ActiveGameInstallID <= 0 {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		gameID = active.ActiveGameInstallID
+	q := dbq.New(db)
+
+	gi, err := resolveGameInstallForCompletion(cmd, ctx, q)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
-	q := dbq.New(db)
 	pat := likePrefixPattern(strings.TrimSpace(toComplete))
-	rows, err := q.CompleteModFileVersionsByGameInstall(ctx, dbq.CompleteModFileVersionsByGameInstallParams{
-		GameInstallID: gameID,
-		Prefix:        pat,
-	})
+	rows, err := q.CompleteModFileVersionsByGameInstall(ctx,
+		dbq.CompleteModFileVersionsByGameInstallParams{
+			GameInstallID: gi.ID,
+			Prefix:        pat,
+		})
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -74,4 +68,101 @@ func ModFileVersionIDs(cmd *cobra.Command, toComplete string) ([]string, cobra.S
 		out = append(out, fmt.Sprintf("%d\t%s", r.ID, desc))
 	}
 	return out, cobra.ShellCompDirectiveNoFileComp
+}
+
+// ModFileVersionIDsForPage completes mod file version IDs filtered to a
+// specific mod page. modPageArg may be a numeric ID or a name; if it is
+// non-empty and cannot be resolved unambiguously, no completions are returned.
+// Returns candidates as numeric IDs with a "File Label (version)" description.
+func ModFileVersionIDsForPage(cmd *cobra.Command, modPageArg string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	ctx := context.Background()
+	db, err := internal.SetupDBReadOnly()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	defer db.Close()
+
+	q := dbq.New(db)
+
+	gi, err := resolveGameInstallForCompletion(cmd, ctx, q)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	pat := likePrefixPattern(strings.TrimSpace(toComplete))
+
+	// If a mod page arg was provided, resolve it and filter by page.
+	// If it can't be resolved unambiguously, return nothing.
+	if modPageArg != "" {
+		var pageID int64
+		if id, ok := internal.ParseInt64(modPageArg); ok {
+			pageID = id
+		} else {
+			rows, err := q.GetModPagesByName(ctx, dbq.GetModPagesByNameParams{
+				GameInstallID: gi.ID,
+				Name:          modPageArg,
+			})
+			if err != nil || len(rows) != 1 {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			pageID = rows[0].ID
+		}
+
+		rows, err := q.CompleteModFileVersionsByPageAndGameInstall(ctx,
+			dbq.CompleteModFileVersionsByPageAndGameInstallParams{
+				GameInstallID: gi.ID,
+				ID:            pageID,
+				Prefix:        pat,
+			})
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		out := make([]string, 0, len(rows))
+		for _, r := range rows {
+			desc := r.FileLabel
+			if r.VersionString.Valid && r.VersionString.String != "" {
+				desc += " (" + r.VersionString.String + ")"
+			}
+			out = append(out, fmt.Sprintf("%d\t%s", r.ID, desc))
+		}
+		return out, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	// No mod page arg: fall back to unfiltered completion
+	rows, err := q.CompleteModFileVersionsByGameInstall(ctx,
+		dbq.CompleteModFileVersionsByGameInstallParams{
+			GameInstallID: gi.ID,
+			Prefix:        pat,
+		})
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	out := make([]string, 0, len(rows))
+	for _, r := range rows {
+		desc := r.ModPageName + " › " + r.FileLabel
+		if r.VersionString.Valid && r.VersionString.String != "" {
+			desc += " (" + r.VersionString.String + ")"
+		}
+		out = append(out, fmt.Sprintf("%d\t%s", r.ID, desc))
+	}
+	return out, cobra.ShellCompDirectiveNoFileComp
+}
+
+// resolveGameInstallForCompletion resolves the game install for a completion
+// function, preferring the --game flag if set, otherwise falling back to the
+// active selection.
+func resolveGameInstallForCompletion(cmd *cobra.Command, ctx context.Context, q *dbq.Queries) (dbq.GameInstall, error) {
+	gameArg := ""
+	if f := cmd.Flags().Lookup("game"); f != nil && f.Changed {
+		gameArg = f.Value.String()
+	} else {
+		active, err := state.LoadActive()
+		if err != nil || active.ActiveGameInstallID <= 0 {
+			return dbq.GameInstall{}, fmt.Errorf("no active game")
+		}
+		gameArg = strconv.FormatInt(active.ActiveGameInstallID, 10)
+	}
+	return argresolver.ResolveGameInstallArg(ctx, q, gameArg)
 }

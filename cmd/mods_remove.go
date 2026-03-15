@@ -245,6 +245,14 @@ func init() {
 
 	modsRemoveCmd.Flags().StringVar(&modsRemoveFileVersion, "file-version", "",
 		"Remove a specific mod file version instead of the entire mod page")
+	modsRemoveCmd.RegisterFlagCompletionFunc("file-version",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			modPageArg := ""
+			if len(args) > 0 {
+				modPageArg = strings.TrimSpace(args[0])
+			}
+			return completion.ModFileVersionIDsForPage(cmd, modPageArg, toComplete)
+		})
 
 	modsRemoveCmd.Flags().BoolVar(&modsRemoveForce, "force", false,
 		"Remove even if referenced by profiles (profile items will be deleted)")

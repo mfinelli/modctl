@@ -1532,3 +1532,59 @@ ON CONFLICT(id) DO UPDATE SET
   implementation = excluded.implementation,
   enabled = excluded.enabled,
   updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now');
+
+-- name: GetProfilesReferencingModPage :many
+SELECT DISTINCT
+    p.id AS profile_id,
+    p.name AS profile_name,
+    p.game_install_id
+FROM profile_items pi
+JOIN profiles p ON p.id = pi.profile_id
+JOIN mod_file_versions mfv ON mfv.id = pi.mod_file_version_id
+JOIN mod_files mf ON mf.id = mfv.mod_file_id
+WHERE mf.mod_page_id = ?
+ORDER BY p.name ASC;
+
+-- name: CountModFileVersionsForFile :one
+SELECT COUNT(*) AS count
+FROM mod_file_versions
+WHERE mod_file_id = ?;
+
+-- name: GetModFileVersionWithParentIDs :one
+SELECT
+    mfv.id,
+    mfv.mod_file_id,
+    mf.mod_page_id,
+    mf.label AS file_label,
+    mp.name  AS mod_page_name,
+    mp.game_install_id
+FROM mod_file_versions mfv
+JOIN mod_files mf ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp ON mp.id = mf.mod_page_id
+WHERE mfv.id = ?;
+
+-- name: DeleteModFileVersion :exec
+DELETE FROM mod_file_versions WHERE id = ?;
+
+-- name: DeleteModFile :exec
+DELETE FROM mod_files WHERE id = ?;
+
+-- name: DeleteModPage :exec
+DELETE FROM mod_pages WHERE id = ?;
+
+-- name: CompleteModFileVersionsByPageAndGameInstall :many
+SELECT
+    mfv.id,
+    mf.label   AS file_label,
+    mfv.version_string
+FROM mod_file_versions mfv
+JOIN mod_files mf ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp  ON mp.id = mf.mod_page_id
+WHERE mp.game_install_id = ?
+  AND mp.id = ?
+  AND (
+    (lower(mf.label) LIKE lower(sqlc.arg(prefix)) ESCAPE '\')
+    OR (lower(mfv.version_string) LIKE lower(sqlc.arg(prefix)) ESCAPE '\')
+  )
+ORDER BY mf.label COLLATE NOCASE, mfv.id DESC
+LIMIT 20;
