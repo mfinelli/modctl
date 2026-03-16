@@ -1590,3 +1590,19 @@ WHERE mp.game_install_id = ?
   )
 ORDER BY mf.label COLLATE NOCASE, mfv.id DESC
 LIMIT 20;
+
+-- name: DeleteAllInstalledFiles :exec
+DELETE FROM installed_files;
+
+-- name: DeleteAllBackups :exec
+DELETE FROM backups;
+
+-- name: DeleteAllOperations :exec
+-- nb: this cascades to operation_changes
+DELETE FROM operations;
+
+-- name: ZeroAllGameInstallsState :exec
+UPDATE game_installs
+  SET applied_profile_id = NULL,
+    applied_at = NULL,
+    applied_operation_id = NULL;

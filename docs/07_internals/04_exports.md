@@ -23,6 +23,10 @@ of the modctl database at the time of export. The `archives/` and `backups/`
 directories mirror the layout of the local blob stores, containing only the
 blobs referenced by the exported data.
 
+Note that game-scoped bundles never include a `backups/` directory. Backup
+blobs describe on-disk state on the source machine and have no meaning on the
+destination, so they are excluded from game-scoped exports.
+
 ## Manifest
 
 `manifest.json` contains:
@@ -48,6 +52,11 @@ to be offline.
 
 For game-scoped exports a fresh database is created and populated with only
 the rows relevant to the exported game. No other games' data is included.
+Backup records are excluded along with their blobs.
+
+The applied profile state is intentionally cleared in game-scoped bundles
+since the destination machine will have its own game installation. Operation
+history is also not included in game-scoped bundles.
 
 The applied profile state is intentionally cleared in game-scoped bundles
 since the destination machine will have its own game installation. Operation

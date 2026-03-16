@@ -51,13 +51,6 @@ func Game(
 		for _, b := range archiveBlobs {
 			toVerify = append(toVerify, blobToVerify{b.Sha256, blobstore.KindArchive})
 		}
-		backupBlobs, err := q.ListBackupBlobsForGameInstall(ctx, gi.ID)
-		if err != nil {
-			return fmt.Errorf("list backup blobs: %w", err)
-		}
-		for _, b := range backupBlobs {
-			toVerify = append(toVerify, blobToVerify{b.Sha256, blobstore.KindBackup})
-		}
 		if err := verifyBlobs(ctx, q, bs, toVerify); err != nil {
 			return fmt.Errorf("blob verification failed: %w", err)
 		}
@@ -106,10 +99,6 @@ func Game(
 	if err != nil {
 		return fmt.Errorf("list archive blobs for game: %w", err)
 	}
-	backupBlobs, err := q.ListBackupBlobsForGameInstall(ctx, gi.ID)
-	if err != nil {
-		return fmt.Errorf("list backup blobs for game: %w", err)
-	}
 
 	// 4. Write manifest
 	manifest := Manifest{
@@ -144,17 +133,6 @@ func Game(
 		skip, err := writeBlobToTar(ctx, tw, bs, blobstore.KindArchive, b.Sha256)
 		if err != nil {
 			return fmt.Errorf("write archive blob %s: %w", b.Sha256, err)
-		}
-		if skip {
-			skipped = append(skipped, b.Sha256)
-		}
-	}
-
-	// 7. Write backup blobs
-	for _, b := range backupBlobs {
-		skip, err := writeBlobToTar(ctx, tw, bs, blobstore.KindBackup, b.Sha256)
-		if err != nil {
-			return fmt.Errorf("write backup blob %s: %w", b.Sha256, err)
 		}
 		if skip {
 			skipped = append(skipped, b.Sha256)
@@ -225,7 +203,7 @@ func buildGameScopedDB(
 		return "", "", 0, 0, fmt.Errorf("export targets: %w", err)
 	}
 
-	archiveCount, backupCount, err = exportBlobs(ctx, q, sq, gi.ID)
+	archiveCount, err = exportBlobs(ctx, q, sq, gi.ID)
 	if err != nil {
 		os.Remove(tmpPath)
 		return "", "", 0, 0, fmt.Errorf("export blobs: %w", err)
@@ -278,11 +256,6 @@ func buildGameScopedDB(
 	if err := exportProfilePathPolicies(ctx, q, sq, gi.ID); err != nil {
 		os.Remove(tmpPath)
 		return "", "", 0, 0, fmt.Errorf("export profile path policies: %w", err)
-	}
-
-	if err := exportBackups(ctx, q, sq, gi.ID); err != nil {
-		os.Remove(tmpPath)
-		return "", "", 0, 0, fmt.Errorf("export backups: %w", err)
 	}
 
 	if err := exportModIncompatibilities(ctx, q, sq, gi.ID); err != nil {
@@ -342,30 +315,19 @@ func exportTargets(ctx context.Context, src, dst *dbq.Queries, gameInstallID int
 	return nil
 }
 
-func exportBlobs(ctx context.Context, src, dst *dbq.Queries, gameInstallID int64) (archiveCount, backupCount int, err error) {
+func exportBlobs(ctx context.Context, src, dst *dbq.Queries, gameInstallID int64) (archiveCount int, err error) {
 	archiveRows, err := src.ExportGetArchiveBlobsForGameInstall(ctx, gameInstallID)
 	if err != nil {
-		return 0, 0, fmt.Errorf("get archive blobs: %w", err)
+		return 0, fmt.Errorf("get archive blobs: %w", err)
 	}
 	for _, row := range archiveRows {
 		if err := dst.ExportInsertBlob(ctx, dbq.ExportInsertBlobParams(row)); err != nil {
-			return 0, 0, fmt.Errorf("insert archive blob %s: %w", row.Sha256, err)
+			return 0, fmt.Errorf("insert archive blob %s: %w", row.Sha256, err)
 		}
 		archiveCount++
 	}
 
-	backupRows, err := src.ExportGetBackupBlobsForGameInstall(ctx, gameInstallID)
-	if err != nil {
-		return 0, 0, fmt.Errorf("get backup blobs: %w", err)
-	}
-	for _, row := range backupRows {
-		if err := dst.ExportInsertBlob(ctx, dbq.ExportInsertBlobParams(row)); err != nil {
-			return 0, 0, fmt.Errorf("insert backup blob %s: %w", row.Sha256, err)
-		}
-		backupCount++
-	}
-
-	return archiveCount, backupCount, nil
+	return archiveCount, nil
 }
 
 func exportModPages(ctx context.Context, src, dst *dbq.Queries, gameInstallID int64) error {
@@ -477,28 +439,6 @@ func exportProfilePathPolicies(ctx context.Context, src, dst *dbq.Queries, gameI
 	for _, row := range rows {
 		if err := dst.ExportInsertProfilePathPolicy(ctx, dbq.ExportInsertProfilePathPolicyParams(row)); err != nil {
 			return fmt.Errorf("insert profile path policy %d: %w", row.ID, err)
-		}
-	}
-	return nil
-}
-
-func exportBackups(ctx context.Context, src, dst *dbq.Queries, gameInstallID int64) error {
-	rows, err := src.ExportGetBackupsForGameInstall(ctx, gameInstallID)
-	if err != nil {
-		return fmt.Errorf("get backups: %w", err)
-	}
-	for _, row := range rows {
-		if err := dst.ExportInsertBackup(ctx, dbq.ExportInsertBackupParams{
-			ID:                    row.ID,
-			GameInstallID:         row.GameInstallID,
-			TargetID:              row.TargetID,
-			Relpath:               row.Relpath,
-			BackupBlobSha256:      row.BackupBlobSha256,
-			OriginalContentSha256: row.OriginalContentSha256,
-			SizeBytes:             row.SizeBytes,
-			CreatedAt:             row.CreatedAt,
-		}); err != nil {
-			return fmt.Errorf("insert backup %d: %w", row.ID, err)
 		}
 	}
 	return nil

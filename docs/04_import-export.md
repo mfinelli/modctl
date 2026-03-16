@@ -79,6 +79,27 @@ wipe what's there, pass `--force`:
 modctl import --force modctl-backup.tar.zst
 ```
 
+By default, importing a full bundle clears all on-disk state: installed
+files, backups, and operation history are removed and applied profile state
+is reset. This means the destination machine starts clean, and you will need
+to run `modctl apply` to deploy mods after importing. This is the right
+behavior when migrating to a new machine.
+
+### Restoring to the same machine
+
+If you are restoring a backup to the same machine where your game directories
+are still intact, pass `--same-machine` to preserve all state verbatim:
+```bash
+modctl import --same-machine modctl-backup.tar.zst
+```
+
+`--same-machine` and `--force` are independent and can be combined:
+```bash
+modctl import --force --same-machine modctl-backup.tar.zst
+```
+
+`--same-machine` is not valid for game-scoped bundles.
+
 ### Importing a game-scoped bundle
 
 Importing a game-scoped bundle works the same way and adds the game to your
@@ -91,11 +112,16 @@ If that game already exists in your database, the import will refuse to
 proceed unless you pass `--force`, which will overwrite the existing game and
 all its data.
 
-You can also import a single game out of a full bundle, modctl will extract
-only the relevant data:
+### Importing a single game from a full bundle
+
+You can import a single game out of a full bundle by passing `--game`:
 ```bash
 modctl import --game steam:1091500 modctl-full-backup.tar.zst
 ```
+
+modctl will extract only the relevant data for that game and add it to your
+existing installation. This is useful if you want to restore one game's setup
+without affecting anything else.
 
 ### After importing
 

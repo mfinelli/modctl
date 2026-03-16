@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/blobstore"
@@ -52,8 +53,22 @@ func Game(
 ) (Result, error) {
 	var res Result
 
-	if bundle.Manifest.Game == nil {
-		return res, fmt.Errorf("bundle is not a game-scoped export")
+	// Resolve game identity: opts.Game takes precedence (set when extracting
+	// a single game from a full bundle), otherwise use the bundle manifest.
+	var storeID, storeGameID, displayName string
+	if opts.Game != "" {
+		parts := strings.SplitN(opts.Game, ":", 2)
+		if len(parts) != 2 {
+			return res, fmt.Errorf("invalid --game value %q: expected store_id:store_game_id", opts.Game)
+		}
+		storeID, storeGameID = parts[0], parts[1]
+		// displayName will be resolved from the bundle DB below
+	} else if bundle.Manifest.Game != nil {
+		storeID = bundle.Manifest.Game.StoreID
+		storeGameID = bundle.Manifest.Game.StoreGameID
+		displayName = bundle.Manifest.Game.DisplayName
+	} else {
+		return res, fmt.Errorf("no game specified: pass --game or use a game-scoped bundle")
 	}
 
 	// Validate schema version
@@ -70,15 +85,29 @@ func Game(
 
 	bq := dbq.New(bundle.BundleDB)
 
-	// fetch once, pass down to all helpers
+	// Find the matching game install in the bundle DB
 	bundleInstalls, err := bq.ExportGetGameInstalls(ctx)
 	if err != nil {
-		return res, fmt.Errorf("read game install from bundle: %w", err)
+		return res, fmt.Errorf("read game installs from bundle: %w", err)
 	}
-	if len(bundleInstalls) != 1 {
-		return res, fmt.Errorf("expected 1 game install in bundle, got %d", len(bundleInstalls))
+
+	var matchedInstall *dbq.GameInstall
+	for _, gi := range bundleInstalls {
+		if gi.StoreID == storeID && gi.StoreGameID == storeGameID {
+			gi := gi
+			matchedInstall = &gi
+			break
+		}
 	}
-	oldGameInstallID := bundleInstalls[0].ID
+	if matchedInstall == nil {
+		return res, fmt.Errorf("game %s:%s not found in bundle", storeID, storeGameID)
+	}
+	oldGameInstallID := matchedInstall.ID
+
+	// Resolve display name from bundle if not set from manifest
+	if displayName == "" {
+		displayName = matchedInstall.DisplayName
+	}
 
 	// Check if game already exists
 	existing, err := q.ImportGetGameInstallByStoreKey(ctx, dbq.ImportGetGameInstallByStoreKeyParams{
@@ -94,14 +123,12 @@ func Game(
 	if gameExists && !opts.Force {
 		return res, fmt.Errorf(
 			"game %q (%s:%s) already exists; use --force to overwrite",
-			bundle.Manifest.Game.DisplayName,
-			bundle.Manifest.Game.StoreID,
-			bundle.Manifest.Game.StoreGameID,
+			displayName, storeID, storeGameID,
 		)
 	}
 
 	if opts.DryRun {
-		return dryRunGame(ctx, bundle, bq)
+		return dryRunGame(ctx, bundle, bq, oldGameInstallID)
 	}
 
 	if gameExists && opts.Force {
@@ -110,13 +137,12 @@ func Game(
 		}
 	}
 
-	// Import blobs
-	archiveCount, backupCount, err := importBlobs(ctx, bundle, bs)
+	// Import blobs (archives only; game-scoped bundles never contain backup blobs)
+	archiveCount, _, err := importBlobs(ctx, bundle, bs)
 	if err != nil {
 		return res, fmt.Errorf("import blobs: %w", err)
 	}
 	res.Archives = archiveCount
-	res.Backups = backupCount
 
 	// ID remapping tables
 	remap := &idRemap{
@@ -134,7 +160,7 @@ func Game(
 	}
 
 	// Insert game install, capture new ID
-	newGameInstallID, err := importGameInstall(ctx, q, bq)
+	newGameInstallID, err := importGameInstall(ctx, q, bq, matchedInstall)
 	if err != nil {
 		return res, fmt.Errorf("import game install: %w", err)
 	}
@@ -184,11 +210,6 @@ func Game(
 		return res, fmt.Errorf("import profile path policies: %w", err)
 	}
 
-	// Backups
-	if err := importBackups(ctx, q, bq, newGameInstallID, oldGameInstallID, remap); err != nil {
-		return res, fmt.Errorf("import backups: %w", err)
-	}
-
 	// Mod incompatibilities
 	if err := importModIncompatibilities(ctx, q, bq, oldGameInstallID, remap); err != nil {
 		return res, fmt.Errorf("import mod incompatibilities: %w", err)
@@ -210,23 +231,10 @@ func Game(
 	return res, nil
 }
 
-func dryRunGame(ctx context.Context, bundle *Bundle, bq *dbq.Queries) (Result, error) {
+func dryRunGame(ctx context.Context, bundle *Bundle, bq *dbq.Queries, oldGameInstallID int64) (Result, error) {
 	var res Result
 
-	rows, err := bq.ExportGetGameInstalls(ctx)
-	if err != nil {
-		return res, err
-	}
-	if len(rows) != 1 {
-		return res, fmt.Errorf("expected 1 game install in bundle, got %d", len(rows))
-	}
-	oldGameInstallID := rows[0].ID
-
 	archiveBlobs, err := bq.ExportGetArchiveBlobsForGameInstall(ctx, oldGameInstallID)
-	if err != nil {
-		return res, err
-	}
-	backupBlobs, err := bq.ExportGetBackupBlobsForGameInstall(ctx, oldGameInstallID)
 	if err != nil {
 		return res, err
 	}
@@ -240,7 +248,6 @@ func dryRunGame(ctx context.Context, bundle *Bundle, bq *dbq.Queries) (Result, e
 	}
 
 	res.Archives = len(archiveBlobs)
-	res.Backups = len(backupBlobs)
 	res.ModPages = len(modPages)
 	res.Profiles = len(profiles)
 	return res, nil
@@ -263,16 +270,7 @@ func importStore(ctx context.Context, dst, src *dbq.Queries, storeID string) err
 	return dst.ExportInsertStore(ctx, dbq.ExportInsertStoreParams(row))
 }
 
-func importGameInstall(ctx context.Context, dst, src *dbq.Queries) (int64, error) {
-	// There is exactly one game_install in a game-scoped bundle
-	rows, err := src.ExportGetGameInstalls(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("get game installs from bundle: %w", err)
-	}
-	if len(rows) != 1 {
-		return 0, fmt.Errorf("expected 1 game install in bundle, got %d", len(rows))
-	}
-	gi := rows[0]
+func importGameInstall(ctx context.Context, dst, src *dbq.Queries, gi *dbq.GameInstall) (int64, error) {
 	newID, err := dst.ImportInsertGameInstall(ctx, dbq.ImportInsertGameInstallParams{
 		StoreID:         gi.StoreID,
 		StoreGameID:     gi.StoreGameID,
@@ -516,31 +514,6 @@ func importProfilePathPolicies(ctx context.Context, dst, src *dbq.Queries, oldGa
 			UpdatedAt:   p.UpdatedAt,
 		}); err != nil {
 			return fmt.Errorf("insert profile path policy: %w", err)
-		}
-	}
-	return nil
-}
-
-func importBackups(ctx context.Context, dst, src *dbq.Queries, newGameInstallID, oldGameInstallID int64, remap *idRemap) error {
-	backups, err := src.ExportGetBackupsForGameInstall(ctx, oldGameInstallID)
-	if err != nil {
-		return fmt.Errorf("get backups: %w", err)
-	}
-	for _, b := range backups {
-		newTargetID, ok := remap.targets[b.TargetID]
-		if !ok {
-			return fmt.Errorf("backup references unknown target %d", b.TargetID)
-		}
-		if _, err := dst.ImportInsertBackup(ctx, dbq.ImportInsertBackupParams{
-			GameInstallID:         newGameInstallID,
-			TargetID:              newTargetID,
-			Relpath:               b.Relpath,
-			BackupBlobSha256:      b.BackupBlobSha256,
-			OriginalContentSha256: b.OriginalContentSha256,
-			SizeBytes:             b.SizeBytes,
-			CreatedAt:             b.CreatedAt,
-		}); err != nil {
-			return fmt.Errorf("insert backup: %w", err)
 		}
 	}
 	return nil

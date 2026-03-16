@@ -103,6 +103,13 @@ func Full(
 	}
 	newQ := dbq.New(newDB)
 
+	// Zero out on-disk state unless this is a same-machine restore
+	if !opts.SameMachine {
+		if err := zeroOnDiskState(ctx, newDB, newQ); err != nil {
+			return res, fmt.Errorf("zero on-disk state: %w", err)
+		}
+	}
+
 	// Scan missing inventories against the restored DB
 	bq := dbq.New(bundle.BundleDB)
 	allVersions, err := bq.ListAllModFileVersions(ctx)
@@ -148,4 +155,36 @@ func dryRunFull(ctx context.Context, bundle *Bundle) (Result, error) {
 	res.Archives = len(archiveBlobs)
 	res.Backups = len(backupBlobs)
 	return res, nil
+}
+
+func zeroOnDiskState(ctx context.Context, db *sql.DB, q *dbq.Queries) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	qtx := q.WithTx(tx)
+
+	err = qtx.DeleteAllInstalledFiles(ctx)
+	if err != nil {
+		return fmt.Errorf("delete all installed_files: %w", err)
+	}
+
+	err = qtx.DeleteAllBackups(ctx)
+	if err != nil {
+		return fmt.Errorf("delete all backups: %w", err)
+	}
+
+	err = qtx.DeleteAllOperations(ctx)
+	if err != nil {
+		return fmt.Errorf("delete all operations and operation changes: %w", err)
+	}
+
+	err = qtx.ZeroAllGameInstallsState(ctx)
+	if err != nil {
+		return fmt.Errorf("zeroing game installs state: %w", err)
+	}
+
+	return tx.Commit()
 }

@@ -238,15 +238,22 @@ Set the active game:
 
 ## Export and import
 
-*modctl export* [--game <store-id>] [--output <path>] [--skip-inventory]
+*modctl export* [--game <store:game-id>] [--output <path>] [--skip-inventory]
 	Export modctl state to a portable bundle. By default performs a full
 	export. Use --game to scope the export to a single game install.
+	Game-scoped bundles do not include backup blobs.
 
-*modctl import* [--force] [--dry-run] [--skip-inventory] [--game <store-id>] <bundle>
+*modctl import* [--force] [--dry-run] [--skip-inventory] [--game <store:game-id>] [--same-machine] <bundle>
 	Import a modctl export bundle. For full bundles the database must be
-	empty unless --force is passed. For game-scoped bundles the game must
-	not already exist unless --force is passed. Does not apply any profiles
-	automatically.
+	empty unless --force is passed; by default on-disk state (installed
+	files, backups, and operation history) is cleared so the destination
+	machine starts clean. Pass --same-machine to restore all state verbatim,
+	which is only appropriate when restoring to the same machine with game
+	directories intact. --force and --same-machine are independent and can
+	be combined. For game-scoped bundles the game must not already exist
+	unless --force is passed; --same-machine is not valid for game-scoped
+	bundles. Pass --game to import a single game from a full bundle. Does
+	not apply any profiles automatically.
 
 *modctl verify* <bundle>
 	Check the integrity of an export bundle without importing it.

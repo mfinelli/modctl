@@ -52,6 +52,9 @@ Use --game to export only the data relevant to a single game install.
 The bundle is a zstd-compressed tar archive containing a database snapshot,
 all referenced blob files, and a manifest. It can be restored with 'import'.
 
+Game-scoped bundles do not include backup blobs, as those only have meaning
+on the machine where the game is installed.
+
 Examples:
   modctl export
   modctl export --game steam:1091500 --output cyberpunk-backup.tar.zst

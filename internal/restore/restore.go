@@ -48,6 +48,8 @@ type Options struct {
 	SkipInventory bool
 	Force         bool
 	DryRun        bool
+	SameMachine   bool
+	Game          string // "store_id:store_game_id", only set when extracting a game from a full bundle
 }
 
 type Result struct {

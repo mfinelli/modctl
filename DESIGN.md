@@ -280,12 +280,15 @@ Includes only data relevant to a single game install:
 - The store row for that game's store
 - The game install, targets, profiles, mod pages, mod files, mod file
   versions, remap configs and rules, profile items, profile path policies,
-  backups, and mod incompatibilities for that game
-- Only blobs referenced by that game's mod file versions and backups
+  and mod incompatibilities for that game
+- Only archive blobs referenced by that game's mod file versions
 - Archive inventory entries (unless `--skip-inventory` is passed)
 - `applied_profile_id`, `applied_at`, and `applied_operation_id` are
   nulled out - disk state is not valid on the destination machine
 - Operation history is not included
+- Backup blobs and backup records are not included - backups describe
+  on-disk state on the source machine and have no meaning on the
+  destination machine
 
 The game-scoped database is constructed as a fresh SQLite file with
 migrations applied, then populated with only the relevant rows. This
@@ -735,6 +738,7 @@ This preserves a clean v1 while allowing richer v2.
 
 ## 14. Commands
 
+- `init` initialized the modctl database and storage directories
 - `doctor` performs environment checks including bsdtar presence, store health,
   and blob verification (presence + size check). A `--rehash` flag is reserved
   for future full content integrity verification via sha256 rehash.
@@ -782,15 +786,30 @@ This preserves a clean v1 while allowing richer v2.
   part of this process. Default output filename: `modctl-export-<date>.tar.zst`
   (full) or `modctl-export-<slug>-<date>.tar.zst` (game-scoped).
 - `import <bundle>` - import a modctl export bundle. Accepts both full and
-  game-scoped bundles. For full bundles the database must be empty beyond
-  auto-seeded rows; use --force to wipe and restore. For game-scoped bundles
-  the game must not already exist; use --force to overwrite. Supports
-  --dry-run to preview without making changes. Use --skip-inventory to skip
-  scanning archives that have no inventory in the bundle (they can be
-  scanned later with 'mods scan-inventory'). Note: no profiles are applied
-  automatically after import - run 'profiles set-active' and 'apply' to
-  deploy mods. Requires temporary disk space roughly equal to the bundle
-  size.
+  game-scoped bundles.
+  For full bundles the database must be empty beyond auto-seeded rows; use
+  `--force` to wipe and restore. By default a full import clears all on-disk
+  state (`installed_files`, `backups`, `operations`, `operation_changes`) and
+  nulls out applied profile state on all game installs, so the destination
+  machine starts clean. Use `--same-machine` to restore all state verbatim;
+  this is only appropriate when restoring to the same machine where game
+  directories are still intact. `--force` and `--same-machine` are
+  independent and can be combined.
+  For game-scoped bundles the game must not already exist; use `--force` to
+  overwrite. `--same-machine` is not valid for game-scoped bundles and will
+  produce an error.
+  Pass `--game store_id:store_game_id` to import a single game from a full
+  bundle. modctl will print an informational message and run the game-scoped
+  import path against the full bundle, extracting only the relevant data.
+  If `--game` is passed with a game-scoped bundle and matches the bundle's
+  game, a warning is printed and the flag is ignored. If `--game` does not
+  match the bundle's game, the command errors.
+  Supports `--dry-run` to preview without making changes. Use
+  `--skip-inventory` to skip scanning archives that have no inventory in the
+  bundle (they can be scanned later with `mods scan-inventory`). Note: no
+  profiles are applied automatically after import - run `profiles set-active`
+  and `apply` to deploy mods. Requires temporary disk space roughly equal to
+  the bundle size.
 - `gc` - garbage collect unreferenced blobs from the blob store
 - `verify <bundle>` - verify the integrity of a modctl export bundle without
   importing it. Checks the database snapshot against the manifest sha256,
@@ -1164,6 +1183,9 @@ machine migration and full backup.
 
 A game-scoped export includes only data for a single game install and is
 suitable for sharing or archiving. It never includes other games' data.
+Backup blobs and backup records are excluded from game-scoped bundles since
+backups describe on-disk state on the source machine and have no meaning on
+the destination.
 
 ### Database snapshot
 
@@ -1202,18 +1224,31 @@ file is deleted automatically.
 
 Import validates the bundle before touching the destination database:
 1. Verifies `export_format_version` is supported (refuses if newer)
-2. Extracts and verifies `meta.sqlite` against `db_sha256` in the manifest
+2. Extracts and verifies `modctl.db` against `db_sha256` in the manifest
 3. Warns if `modctl_version` in the bundle is newer than the running binary
 4. Refuses if `schema_version` is newer than the current binary's schema
 
 Blob files are verified by hashing their content against their filename
 (which is their sha256) before ingestion. A mismatch causes import to abort.
 
-**Full import** copies `meta.sqlite` from the bundle directly into place as
+**Full import** copies `modctl.db` from the bundle directly into place as
 the new database, then runs migrations to bring it up to the current schema
 version if needed. The database must be empty (beyond auto-seeded store
 rows) unless `--force` is passed, in which case the existing database is
 wiped first.
+
+By default a full import clears all on-disk state after restoring the
+database, so the destination machine starts clean:
+- `installed_files` is truncated
+- `backups` is truncated
+- `operations` and `operation_changes` are truncated (via cascade)
+- `applied_profile_id`, `applied_at`, and `applied_operation_id` are set
+  to NULL on all `game_installs` rows
+
+Use `--same-machine` to skip this zeroing and restore all state verbatim.
+This is only appropriate when restoring to the same machine where game
+directories are still intact. `--force` and `--same-machine` are independent
+and can be combined.
 
 **Game-scoped import** inserts rows into the existing database with fresh
 IDs assigned by SQLite. A remapping table tracks old→new IDs for each table
@@ -1222,7 +1257,16 @@ dependency order. The game must not already exist (matched by
 `store_id + store_game_id + instance_id`) unless `--force` is passed, in
 which case the existing game install and all its dependent rows are deleted
 first (cascading via FK). Orphaned blobs from the deleted install are left
-for `gc` to clean up.
+for `gc` to clean up. `--same-machine` is not valid for game-scoped imports
+and will produce an error.
+
+**Importing a game from a full bundle**: passing `--game store_id:store_game_id`
+with a full bundle routes the import through the game-scoped import path,
+extracting only the relevant data for that game. modctl prints an
+informational message when this happens. If `--game` is passed with a
+game-scoped bundle and matches the bundle's game, a warning is printed and
+the flag is ignored. If `--game` does not match the bundle's game, the
+command errors.
 
 **Inventory scanning** is handled as follows:
 - If the bundle contains inventory entries (i.e. `inventory_scanned_at` is
@@ -1248,7 +1292,7 @@ importing it. It is useful for validating a bundle before importing, or for
 checking a stored backup for corruption.
 
 Checks performed:
-- `db_sha256` in the manifest matches the actual sha256 of `meta.sqlite`
+- `db_sha256` in the manifest matches the actual sha256 of `modctl.db`
 - `export_format_version` is supported (hard error if newer)
 - `PRAGMA quick_check` on the bundle database
 - `PRAGMA foreign_key_check` on the bundle database

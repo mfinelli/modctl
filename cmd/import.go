@@ -37,6 +37,8 @@ var (
 	importForce         bool
 	importDryRun        bool
 	importSkipInventory bool
+	importSameMachine   bool
+	importGame          string
 )
 
 var importCmd = &cobra.Command{
@@ -49,10 +51,16 @@ full and game-scoped bundles.
 
 For full bundles, the destination database must be empty (beyond the
 auto-seeded store rows). Use --force to wipe and restore into an existing
-installation.
+installation. By default, on-disk state (installed files, backups, and
+operation history) is cleared on import so the destination machine starts
+clean. Use --same-machine to restore all state verbatim, which is only
+appropriate when restoring to the same machine with game directories intact.
 
 For game-scoped bundles, the game must not already exist in the destination
 database. Use --force to overwrite an existing game install.
+
+To import a single game from a full bundle, pass --game:
+  modctl import --game steam:1091500 modctl-full-backup.tar.zst
 
 Note: import does not apply any profiles automatically. After importing,
 run 'modctl profiles set-active' and 'modctl apply' to deploy mods.
@@ -66,6 +74,7 @@ Use --dry-run to preview what would be imported without making any changes.`,
 		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+		infoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
 
 		ctx := cmd.Context()
 
@@ -78,6 +87,11 @@ Use --dry-run to preview what would be imported without making any changes.`,
 			return fmt.Errorf("invalid bundle: %w", err)
 		}
 		defer bundle.Close()
+
+		// --same-machine is only valid for full bundles
+		if importSameMachine && bundle.Manifest.ExportKind != "full" {
+			return fmt.Errorf("--same-machine is not valid for game-scoped bundles")
+		}
 
 		fmt.Println(subtleStyle.Render(fmt.Sprintf("  format version: %d", bundle.Manifest.ExportFormatVersion)))
 		fmt.Println(subtleStyle.Render(fmt.Sprintf("  export kind:    %s", bundle.Manifest.ExportKind)))
@@ -122,6 +136,8 @@ Use --dry-run to preview what would be imported without making any changes.`,
 			Force:         importForce,
 			DryRun:        importDryRun,
 			SkipInventory: importSkipInventory,
+			SameMachine:   importSameMachine,
+			Game:          importGame,
 		}
 
 		// Warn if bundle modctl version is newer
@@ -146,14 +162,36 @@ Use --dry-run to preview what would be imported without making any changes.`,
 
 		switch bundle.Manifest.ExportKind {
 		case "full":
-			fmt.Println(boldStyle.Render("Importing (full)..."))
-			result, importErr = restore.Full(
-				ctx, db, q, bs, bundle, opts,
-				viper.GetString("database"),
-				rootCmd.Version,
-				logger,
-			)
+			if importGame != "" {
+				fmt.Println(infoStyle.Render(fmt.Sprintf(
+					"  ℹ full bundle detected, importing only game %s", importGame,
+				)))
+				fmt.Println()
+				fmt.Println(boldStyle.Render(fmt.Sprintf("Importing game: %s...", importGame)))
+				result, importErr = restore.Game(ctx, db, q, bs, bundle, opts, rootCmd.Version, logger)
+			} else {
+				fmt.Println(boldStyle.Render("Importing (full)..."))
+				result, importErr = restore.Full(
+					ctx, db, q, bs, bundle, opts,
+					viper.GetString("database"),
+					rootCmd.Version,
+					logger,
+				)
+			}
 		case "game":
+			if importGame != "" {
+				bundleGame := bundle.Manifest.Game.StoreID + ":" + bundle.Manifest.Game.StoreGameID
+				if importGame != bundleGame {
+					return fmt.Errorf(
+						"bundle contains game %s, not %s",
+						bundleGame, importGame,
+					)
+				}
+				fmt.Println(warnStyle.Render(fmt.Sprintf(
+					"  ⚠ --game flag is redundant: bundle is already scoped to %s", bundleGame,
+				)))
+				fmt.Println()
+			}
 			fmt.Println(boldStyle.Render(fmt.Sprintf("Importing game: %s...",
 				bundle.Manifest.Game.DisplayName)))
 			result, importErr = restore.Game(ctx, db, q, bs, bundle, opts, rootCmd.Version, logger)
@@ -213,4 +251,8 @@ func init() {
 		"Preview what would be imported without making any changes")
 	importCmd.Flags().BoolVar(&importSkipInventory, "skip-inventory", false,
 		"Skip scanning archives that have no inventory in the bundle")
+	importCmd.Flags().BoolVar(&importSameMachine, "same-machine", false,
+		"Restore all state verbatim including installed files and operation history (use only when restoring to the same machine)")
+	importCmd.Flags().StringVar(&importGame, "game", "",
+		"Import only this game from a full bundle (format: store_id:store_game_id)")
 }
