@@ -198,3 +198,28 @@ rules they will be replaced.
 ```bash
 modctl profiles remap copy "Appearance Menu Mod v1.0" "Appearance Menu Mod v1.1"
 ```
+
+### profiles remap preview
+
+Preview how remap rules transform a mod's archive entries. Shows each file
+entry in the archive alongside the destination path it would be installed to
+after all rules have been applied. Useful for verifying that your remap
+configuration does what you expect before running an apply.
+
+If no remap rules are configured, all archive entries are shown as-is.
+```bash
+modctl profiles remap preview "Appearance Menu Mod"
+```
+
+Entries filtered out by rules are hidden by default. Pass `--show-filtered`
+to see them alongside the reason they were excluded:
+```bash
+modctl profiles remap preview --show-filtered "Appearance Menu Mod"
+```
+
+The archive must be inventoried before running this command. If it has not
+been scanned yet, run `modctl mods scan-inventory` first.
+
+| Flag              | Description                                                            |
+|-------------------|------------------------------------------------------------------------|
+| `--show-filtered` | Show entries excluded by rules alongside the reason they were filtered |

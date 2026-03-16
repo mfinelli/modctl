@@ -22,6 +22,7 @@
 package remap
 
 import (
+	"fmt"
 	"path"
 	"strings"
 
@@ -34,6 +35,10 @@ type Result struct {
 	Path string
 	// Skip is true if the entry should be excluded from the install
 	Skip bool
+	// SkipReason is a human-readable explanation of why the entry was
+	// skipped. Empty when Skip is false. Callers that don't need the
+	// reason (e.g. the planner) can ignore this field.
+	SkipReason string
 }
 
 // Apply applies a slice of RemapRules (sorted by position ascending) to the
@@ -50,7 +55,10 @@ func Apply(rules []dbq.RemapRule, rawPath string) (Result, error) {
 			current = stripComponents(current, n)
 			// if stripping leaves us with an empty path, skip the entry
 			if current == "" {
-				return Result{Skip: true}, nil
+				return Result{
+					Skip:       true,
+					SkipReason: fmt.Sprintf("stripped by strip_components %d", n),
+				}, nil
 			}
 
 		case "select_subdir":
@@ -61,15 +69,24 @@ func Apply(rules []dbq.RemapRule, rawPath string) (Result, error) {
 			prefix := subdirClean + "/"
 			if currentClean == subdirClean {
 				// the entry IS the subdir itself (a directory entry); skip it
-				return Result{Skip: true}, nil
+				return Result{
+					Skip:       true,
+					SkipReason: fmt.Sprintf("excluded by select_subdir %q (is the subdir itself)", subdir),
+				}, nil
 			}
 			if !strings.HasPrefix(currentClean, prefix) {
-				return Result{Skip: true}, nil
+				return Result{
+					Skip:       true,
+					SkipReason: fmt.Sprintf("excluded by select_subdir %q", subdir),
+				}, nil
 			}
 			// strip the subdir prefix so the entry installs relative to it
 			current = currentClean[len(prefix):]
 			if current == "" {
-				return Result{Skip: true}, nil
+				return Result{
+					Skip:       true,
+					SkipReason: fmt.Sprintf("excluded by select_subdir %q (empty path after stripping prefix)", subdir),
+				}, nil
 			}
 
 		case "dest_prefix":
@@ -83,7 +100,10 @@ func Apply(rules []dbq.RemapRule, rawPath string) (Result, error) {
 				return Result{}, &InvalidGlobError{Pattern: pattern, Err: err}
 			}
 			if !matched {
-				return Result{Skip: true}, nil
+				return Result{
+					Skip:       true,
+					SkipReason: fmt.Sprintf("excluded by include_glob %q", pattern),
+				}, nil
 			}
 
 		case "exclude_glob":
@@ -93,7 +113,10 @@ func Apply(rules []dbq.RemapRule, rawPath string) (Result, error) {
 				return Result{}, &InvalidGlobError{Pattern: pattern, Err: err}
 			}
 			if matched {
-				return Result{Skip: true}, nil
+				return Result{
+					Skip:       true,
+					SkipReason: fmt.Sprintf("excluded by exclude_glob %q", pattern),
+				}, nil
 			}
 		}
 	}

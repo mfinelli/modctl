@@ -1477,7 +1477,9 @@ SELECT
     mfv.id,
     mp.name   AS mod_page_name,
     mf.label  AS file_label,
-    mfv.version_string
+    mfv.version_string,
+    mfv.inventory_scanned_at AS inventory_scanned_at,
+    mfv.archive_sha256 AS archive_sha256
 FROM mod_file_versions mfv
 JOIN mod_files mf ON mf.id = mfv.mod_file_id
 JOIN mod_pages mp  ON mp.id = mf.mod_page_id

@@ -11,6 +11,8 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 
 - `apply` and `unapply` commands now clean up emptied directories if
   `--prune-dirs` is passed.
+- Add `profiles remap preview` command to preview remap rule behavior without
+  a full planner dry-run.
 
 ## v0.2.0 - 2026-03-15
 

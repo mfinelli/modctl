@@ -106,6 +106,33 @@ To remove all rules for a mod version at once:
 modctl profiles remap clear "Appearance Menu Mod"
 ```
 
+## Previewing the effect of your rules
+
+Before running an apply it can be useful to see exactly what your remap rules
+will do to a mod's archive entries. The `remap preview` command shows every
+file entry in the archive alongside the destination path it would be installed
+to after all rules have been applied:
+```bash
+modctl profiles remap preview "Appearance Menu Mod"
+```
+
+If no remap rules are configured, the command shows all entries as-is so you
+can see the raw archive layout which can be useful for deciding which rules you
+need to add.
+
+By default entries that are filtered out by rules are hidden. Pass
+`--show-filtered` to see them alongside the reason they were excluded:
+```bash
+modctl profiles remap preview --show-filtered "Appearance Menu Mod"
+```
+
+This is particularly helpful when a `select_subdir` or `exclude_glob` rule is
+filtering more than you expected: you can see exactly which entries were
+dropped and which rule caused each one to be skipped.
+
+The archive must be inventoried before running this command. If it has not
+been scanned yet, run `modctl mods scan-inventory` first.
+
 ## Copying rules when upgrading a mod
 
 When you upgrade a mod to a new version you will typically want the same remap

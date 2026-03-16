@@ -541,6 +541,10 @@ v1 remap capabilities (stored as structured data):
 Remap rules are per profile + mod version (or mayber per mod version with
 profile overrides later).
 
+The `Result` type returned by the remap engine includes a `SkipReason` field
+describing why an entry was filtered. Callers that do not need the reason
+(such as the planner) can ignore it.
+
 ### Remap evaluation
 
 Remap configs are profile-scoped and are re-evaluated on every apply. Because
@@ -746,11 +750,12 @@ This preserves a clean v1 while allowing richer v2.
     but the CLI overrides this at insert time. Use `--disabled` to explicitly add
     an item without enabling it.
 - `profiles order compact|move|set|swap`
-- `profiles remap add|remove|list|clear|copy` - manage remap rules for a
-  mod version within a profile. Rules are appended by default; use
+- `profiles remap add|remove|list|clear|copy|preview` - manage remap rules for
+  a mod version within a profile. Rules are appended by default; use
   `--position` on `add` to insert at a specific position. Use `copy` to
   transfer remap rules from one mod version to another (e.g. when upgrading
-  a mod).
+  a mod). Use `preview` to see how the rules would apply without a full dry
+  run.
 - `overrides set|unset|list` (v2 behavior; schema ready in v1)
 - `policy set` (future: merge/manual policy)
 - `status` (conflicts, drift, missing)

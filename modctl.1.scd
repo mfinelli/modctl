@@ -116,7 +116,7 @@ Set the active game:
 	Remove a mod page and all files and versions under it. With
 	\--file-version, removes only that specific version; empty parent
 	files and pages are removed automatically. Blobs are not deleted
-	immediately — run *modctl gc* to reclaim disk space. If any version
+	immediately; run *modctl gc* to reclaim disk space. If any version
 	to be removed is referenced by a profile, the command refuses unless
 	\--force is passed, which removes the profile items via cascade.
 
@@ -213,6 +213,14 @@ Set the active game:
 
 *modctl profiles remap copy* <src-mod> <dst-mod>
 	Copy remap rules from one mod version to another.
+
+*modctl profiles remap preview* [--show-filtered] <mod>
+	Preview how remap rules transform a mod's archive entries. Shows each
+	file entry in the archive and the destination path it would be installed
+	to after all rules have been applied. Entries filtered out by rules are
+	hidden by default; pass --show-filtered to see them alongside the reason
+	they were excluded. The archive must be inventoried first; run
+	*modctl mods scan-inventory* if needed.
 
 ## Apply
 
