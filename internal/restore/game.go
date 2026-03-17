@@ -38,6 +38,7 @@ type idRemap struct {
 	modFileVersions map[int64]int64
 	remapConfigs    map[int64]int64
 	profiles        map[int64]int64
+	overrides       map[int64]int64
 }
 
 // Game imports a game-scoped bundle into an existing database.
@@ -138,11 +139,12 @@ func Game(
 	}
 
 	// Import blobs (archives only; game-scoped bundles never contain backup blobs)
-	archiveCount, _, err := importBlobs(ctx, bundle, bs)
+	archiveCount, _, overrideCount, err := importBlobs(ctx, bundle, bs)
 	if err != nil {
 		return res, fmt.Errorf("import blobs: %w", err)
 	}
 	res.Archives = archiveCount
+	res.Overrides = overrideCount
 
 	// ID remapping tables
 	remap := &idRemap{
@@ -152,6 +154,7 @@ func Game(
 		modFileVersions: make(map[int64]int64),
 		remapConfigs:    make(map[int64]int64),
 		profiles:        make(map[int64]int64),
+		overrides:       make(map[int64]int64),
 	}
 
 	// Insert store (reuse existing if present)
@@ -215,6 +218,11 @@ func Game(
 		return res, fmt.Errorf("import mod incompatibilities: %w", err)
 	}
 
+	// Overrides and patch entries
+	if err := importOverrides(ctx, q, bq, oldGameInstallID, remap); err != nil {
+		return res, fmt.Errorf("import overrides: %w", err)
+	}
+
 	// Inventory entries (no ID remapping, keyed by archive_sha256 + position)
 	if err := importInventory(ctx, q, bq, oldGameInstallID); err != nil {
 		return res, fmt.Errorf("import inventory: %w", err)
@@ -246,10 +254,15 @@ func dryRunGame(ctx context.Context, bundle *Bundle, bq *dbq.Queries, oldGameIns
 	if err != nil {
 		return res, err
 	}
+	overrides, err := bq.ExportGetOverridesForGameInstall(ctx, oldGameInstallID)
+	if err != nil {
+		return res, err
+	}
 
 	res.Archives = len(archiveBlobs)
 	res.ModPages = len(modPages)
 	res.Profiles = len(profiles)
+	res.Overrides = len(overrides)
 	return res, nil
 }
 
@@ -572,6 +585,59 @@ func importInventory(ctx context.Context, dst, src *dbq.Queries, oldGameInstallI
 				continue
 			}
 			return fmt.Errorf("insert inventory entry: %w", err)
+		}
+	}
+	return nil
+}
+
+func importOverrides(ctx context.Context, dst, src *dbq.Queries, oldGameInstallID int64, remap *idRemap) error {
+	overrides, err := src.ExportGetOverridesForGameInstall(ctx, oldGameInstallID)
+	if err != nil {
+		return fmt.Errorf("get overrides: %w", err)
+	}
+	for _, o := range overrides {
+		newProfileID, ok := remap.profiles[o.ProfileID]
+		if !ok {
+			return fmt.Errorf("override references unknown profile %d", o.ProfileID)
+		}
+		newTargetID, ok := remap.targets[o.TargetID]
+		if !ok {
+			return fmt.Errorf("override references unknown target %d", o.TargetID)
+		}
+		newID, err := dst.ImportInsertOverride(ctx, dbq.ImportInsertOverrideParams{
+			ProfileID:           newProfileID,
+			TargetID:            newTargetID,
+			Relpath:             o.Relpath,
+			BlobSha256:          o.BlobSha256,
+			OverrideType:        o.OverrideType,
+			SourceArchiveSha256: o.SourceArchiveSha256,
+			SourceRawPath:       o.SourceRawPath,
+			SourceContentSha256: o.SourceContentSha256,
+			Notes:               o.Notes,
+			CreatedAt:           o.CreatedAt,
+			UpdatedAt:           o.UpdatedAt,
+		})
+		if err != nil {
+			return fmt.Errorf("insert override for %q: %w", o.Relpath, err)
+		}
+		remap.overrides[o.ID] = newID
+
+		// import patch entries for this override
+		entries, err := src.ExportGetPatchEntriesForOverride(ctx, o.ID)
+		if err != nil {
+			return fmt.Errorf("get patch entries for override %d: %w", o.ID, err)
+		}
+		for _, e := range entries {
+			if err := dst.ImportInsertPatchEntry(ctx, dbq.ImportInsertPatchEntryParams{
+				OverrideID:   newID,
+				Position:     e.Position,
+				PatchType:    e.PatchType,
+				EntrySection: e.EntrySection,
+				EntryKey:     e.EntryKey,
+				EntryValue:   e.EntryValue,
+			}); err != nil {
+				return fmt.Errorf("insert patch entry: %w", err)
+			}
 		}
 	}
 	return nil

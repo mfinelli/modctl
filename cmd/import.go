@@ -100,6 +100,7 @@ Use --dry-run to preview what would be imported without making any changes.`,
 		fmt.Println(subtleStyle.Render(fmt.Sprintf("  schema version: %d", bundle.Manifest.SchemaVersion)))
 		fmt.Println(subtleStyle.Render(fmt.Sprintf("  archives:       %d", bundle.Manifest.Counts.Archives)))
 		fmt.Println(subtleStyle.Render(fmt.Sprintf("  backups:        %d", bundle.Manifest.Counts.Backups)))
+		fmt.Println(subtleStyle.Render(fmt.Sprintf("  overrides:      %d", bundle.Manifest.Counts.Overrides)))
 		if bundle.Manifest.Game != nil {
 			fmt.Println(subtleStyle.Render(fmt.Sprintf("  game:           %s (%s:%s)",
 				bundle.Manifest.Game.DisplayName,
@@ -213,7 +214,12 @@ Use --dry-run to preview what would be imported without making any changes.`,
 			fmt.Println(boldStyle.Render("Import complete"))
 		}
 		fmt.Printf("  archives:  %d\n", result.Archives)
-		fmt.Printf("  backups:   %d\n", result.Backups)
+		if result.Backups > 0 {
+			fmt.Printf("  backups:   %d\n", result.Backups)
+		}
+		if result.Overrides > 0 {
+			fmt.Printf("  overrides: %d\n", result.Overrides)
+		}
 		if result.ModPages > 0 {
 			fmt.Printf("  mod pages: %d\n", result.ModPages)
 		}

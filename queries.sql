@@ -1962,3 +1962,51 @@ SELECT
     END, 'unknown') AS TEXT) AS staleness_state
 FROM winning_base
 ORDER BY relpath ASC;
+
+-- name: ExportGetOverridesForGameInstall :many
+SELECT o.* FROM overrides o
+JOIN profiles p ON p.id = o.profile_id
+WHERE p.game_install_id = ?
+ORDER BY o.id ASC;
+
+-- name: ExportInsertOverride :exec
+INSERT INTO overrides (
+    id, profile_id, target_id, relpath, blob_sha256, override_type,
+    source_archive_sha256, source_raw_path, source_content_sha256,
+    notes, created_at, updated_at
+) VALUES (
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+);
+
+-- name: ExportGetPatchEntriesForOverride :many
+SELECT * FROM override_patch_entries
+WHERE override_id = ?
+ORDER BY position ASC;
+
+-- name: ExportInsertPatchEntry :exec
+INSERT INTO override_patch_entries (
+    id, override_id, position, patch_type,
+    entry_section, entry_key, entry_value
+) VALUES (?, ?, ?, ?, ?, ?, ?);
+
+-- name: ListOverrideBlobsForGameInstall :many
+-- Returns override blobs referenced by the given game install's profiles.
+SELECT DISTINCT b.* FROM blobs b
+JOIN overrides o ON o.blob_sha256 = b.sha256
+JOIN profiles p ON p.id = o.profile_id
+WHERE p.game_install_id = ?
+  AND b.kind = 'override';
+
+-- name: ImportInsertOverride :one
+INSERT INTO overrides (
+    profile_id, target_id, relpath, blob_sha256, override_type,
+    source_archive_sha256, source_raw_path, source_content_sha256,
+    notes, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+RETURNING id;
+
+-- name: ImportInsertPatchEntry :exec
+INSERT INTO override_patch_entries (
+    override_id, position, patch_type,
+    entry_section, entry_key, entry_value
+) VALUES (?, ?, ?, ?, ?, ?);

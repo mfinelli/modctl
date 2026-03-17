@@ -51,6 +51,13 @@ func Game(
 		for _, b := range archiveBlobs {
 			toVerify = append(toVerify, blobToVerify{b.Sha256, blobstore.KindArchive})
 		}
+		overrideBlobs, err := q.ListOverrideBlobsForGameInstall(ctx, gi.ID)
+		if err != nil {
+			return fmt.Errorf("list override blobs: %w", err)
+		}
+		for _, b := range overrideBlobs {
+			toVerify = append(toVerify, blobToVerify{b.Sha256, blobstore.KindOverride})
+		}
 		if err := verifyBlobs(ctx, q, bs, toVerify); err != nil {
 			return fmt.Errorf("blob verification failed: %w", err)
 		}
@@ -80,7 +87,7 @@ func Game(
 	defer tw.Close()
 
 	// 1. Build the scoped SQLite database
-	scopedDBPath, dbSha256, archiveCount, backupCount, err := buildGameScopedDB(
+	scopedDBPath, dbSha256, archiveCount, backupCount, overrideCount, err := buildGameScopedDB(
 		ctx, q, gi, opts.SkipInventory,
 	)
 	if err != nil {
@@ -99,6 +106,10 @@ func Game(
 	if err != nil {
 		return fmt.Errorf("list archive blobs for game: %w", err)
 	}
+	overrideBlobs, err := q.ListOverrideBlobsForGameInstall(ctx, gi.ID)
+	if err != nil {
+		return fmt.Errorf("list override blobs for game: %w", err)
+	}
 
 	// 4. Write manifest
 	manifest := Manifest{
@@ -109,8 +120,9 @@ func Game(
 		SchemaVersion:       schemaVersion,
 		DBSha256:            dbSha256,
 		Counts: ManifestCounts{
-			Archives: archiveCount,
-			Backups:  backupCount,
+			Archives:  archiveCount,
+			Backups:   backupCount,
+			Overrides: overrideCount,
 		},
 		Game: &ManifestGame{
 			StoreID:     gi.StoreID,
@@ -133,6 +145,17 @@ func Game(
 		skip, err := writeBlobToTar(ctx, tw, bs, blobstore.KindArchive, b.Sha256)
 		if err != nil {
 			return fmt.Errorf("write archive blob %s: %w", b.Sha256, err)
+		}
+		if skip {
+			skipped = append(skipped, b.Sha256)
+		}
+	}
+
+	// 7. Write override blobs
+	for _, b := range overrideBlobs {
+		skip, err := writeBlobToTar(ctx, tw, bs, blobstore.KindOverride, b.Sha256)
+		if err != nil {
+			return fmt.Errorf("write override blob %s: %w", b.Sha256, err)
 		}
 		if skip {
 			skipped = append(skipped, b.Sha256)
@@ -166,10 +189,10 @@ func buildGameScopedDB(
 	q *dbq.Queries,
 	gi dbq.GameInstall,
 	skipInventory bool,
-) (path string, dbSha256 string, archiveCount int, backupCount int, err error) {
+) (path string, dbSha256 string, archiveCount int, backupCount int, overrideCount int, err error) {
 	tmp, err := os.CreateTemp("", "modctl-export-*.sqlite")
 	if err != nil {
-		return "", "", 0, 0, fmt.Errorf("create temp db: %w", err)
+		return "", "", 0, 0, 0, fmt.Errorf("create temp db: %w", err)
 	}
 	tmpPath := tmp.Name()
 	tmp.Close()
@@ -177,104 +200,110 @@ func buildGameScopedDB(
 	scopedDB, err := sql.Open("sqlite3", tmpPath+internal.DB_PRAGMAS)
 	if err != nil {
 		os.Remove(tmpPath)
-		return "", "", 0, 0, fmt.Errorf("open scoped db: %w", err)
+		return "", "", 0, 0, 0, fmt.Errorf("open scoped db: %w", err)
 	}
 	defer scopedDB.Close()
 
 	if err := internal.MigrateDB(ctx, scopedDB); err != nil {
 		os.Remove(tmpPath)
-		return "", "", 0, 0, fmt.Errorf("migrate scoped db: %w", err)
+		return "", "", 0, 0, 0, fmt.Errorf("migrate scoped db: %w", err)
 	}
 
 	sq := dbq.New(scopedDB)
 
 	if err := exportStore(ctx, q, sq, gi.StoreID); err != nil {
 		os.Remove(tmpPath)
-		return "", "", 0, 0, fmt.Errorf("export store: %w", err)
+		return "", "", 0, 0, 0, fmt.Errorf("export store: %w", err)
 	}
 
 	if err := exportGameInstall(ctx, sq, gi); err != nil {
 		os.Remove(tmpPath)
-		return "", "", 0, 0, fmt.Errorf("export game install: %w", err)
+		return "", "", 0, 0, 0, fmt.Errorf("export game install: %w", err)
 	}
 
 	if err := exportTargets(ctx, q, sq, gi.ID); err != nil {
 		os.Remove(tmpPath)
-		return "", "", 0, 0, fmt.Errorf("export targets: %w", err)
+		return "", "", 0, 0, 0, fmt.Errorf("export targets: %w", err)
 	}
 
 	archiveCount, err = exportBlobs(ctx, q, sq, gi.ID)
 	if err != nil {
 		os.Remove(tmpPath)
-		return "", "", 0, 0, fmt.Errorf("export blobs: %w", err)
+		return "", "", 0, 0, 0, fmt.Errorf("export blobs: %w", err)
 	}
 
 	if err := exportModPages(ctx, q, sq, gi.ID); err != nil {
 		os.Remove(tmpPath)
-		return "", "", 0, 0, fmt.Errorf("export mod pages: %w", err)
+		return "", "", 0, 0, 0, fmt.Errorf("export mod pages: %w", err)
 	}
 
 	if err := exportModFiles(ctx, q, sq, gi.ID); err != nil {
 		os.Remove(tmpPath)
-		return "", "", 0, 0, fmt.Errorf("export mod files: %w", err)
+		return "", "", 0, 0, 0, fmt.Errorf("export mod files: %w", err)
 	}
 
 	if err := exportModFileVersions(ctx, q, sq, gi.ID); err != nil {
 		os.Remove(tmpPath)
-		return "", "", 0, 0, fmt.Errorf("export mod file versions: %w", err)
+		return "", "", 0, 0, 0, fmt.Errorf("export mod file versions: %w", err)
 	}
 
 	if !skipInventory {
 		if err := exportInventory(ctx, q, sq, gi.ID); err != nil {
 			os.Remove(tmpPath)
-			return "", "", 0, 0, fmt.Errorf("export inventory: %w", err)
+			return "", "", 0, 0, 0, fmt.Errorf("export inventory: %w", err)
 		}
 	} else {
 		// make sure the bundle doesn't mark blobs as inventoried
 		// we explicitly excluded the inventories!
 		if err := sq.ExportUnmarkInventoried(ctx); err != nil {
 			os.Remove(tmpPath)
-			return "", "", 0, 0, fmt.Errorf("mark uninventories: %w", err)
+			return "", "", 0, 0, 0, fmt.Errorf("mark uninventories: %w", err)
 		}
 	}
 
 	if err := exportRemapConfigs(ctx, q, sq, gi.ID); err != nil {
 		os.Remove(tmpPath)
-		return "", "", 0, 0, fmt.Errorf("export remap configs: %w", err)
+		return "", "", 0, 0, 0, fmt.Errorf("export remap configs: %w", err)
 	}
 
 	if err := exportProfiles(ctx, q, sq, gi.ID); err != nil {
 		os.Remove(tmpPath)
-		return "", "", 0, 0, fmt.Errorf("export profiles: %w", err)
+		return "", "", 0, 0, 0, fmt.Errorf("export profiles: %w", err)
 	}
 
 	if err := exportProfileItems(ctx, q, sq, gi.ID); err != nil {
 		os.Remove(tmpPath)
-		return "", "", 0, 0, fmt.Errorf("export profile items: %w", err)
+		return "", "", 0, 0, 0, fmt.Errorf("export profile items: %w", err)
 	}
 
 	if err := exportProfilePathPolicies(ctx, q, sq, gi.ID); err != nil {
 		os.Remove(tmpPath)
-		return "", "", 0, 0, fmt.Errorf("export profile path policies: %w", err)
+		return "", "", 0, 0, 0, fmt.Errorf("export profile path policies: %w", err)
 	}
 
 	if err := exportModIncompatibilities(ctx, q, sq, gi.ID); err != nil {
 		os.Remove(tmpPath)
-		return "", "", 0, 0, fmt.Errorf("export mod incompatibilities: %w", err)
+		return "", "", 0, 0, 0, fmt.Errorf("export mod incompatibilities: %w", err)
+	}
+
+	overrideCount, err = exportOverrides(ctx, q, sq, gi.ID)
+	if err != nil {
+		os.Remove(tmpPath)
+		return "", "", 0, 0, 0, fmt.Errorf("export overrides: %w", err)
 	}
 
 	if err := scopedDB.Close(); err != nil {
 		os.Remove(tmpPath)
-		return "", "", 0, 0, fmt.Errorf("close scoped db: %w", err)
+		return "", "", 0, 0, 0, fmt.Errorf("close scoped db: %w", err)
 	}
 
 	sha, err := hashFile(tmpPath)
 	if err != nil {
 		os.Remove(tmpPath)
-		return "", "", 0, 0, fmt.Errorf("hash scoped db: %w", err)
+		return "", "", 0, 0, 0, fmt.Errorf("hash scoped db: %w", err)
 	}
 
-	return tmpPath, sha, archiveCount, backupCount, nil
+	return tmpPath, sha, archiveCount, backupCount, overrideCount, nil
 }
 
 func exportStore(ctx context.Context, src, dst *dbq.Queries, storeID string) error {
@@ -455,4 +484,45 @@ func exportModIncompatibilities(ctx context.Context, src, dst *dbq.Queries, game
 		}
 	}
 	return nil
+}
+
+func exportOverrides(ctx context.Context, src, dst *dbq.Queries, gameInstallID int64) (int, error) {
+	overrideCount := 0
+	rows, err := src.ExportGetOverridesForGameInstall(ctx, gameInstallID)
+	if err != nil {
+		return 0, fmt.Errorf("get overrides: %w", err)
+	}
+	for _, row := range rows {
+		if row.BlobSha256.Valid {
+			overrideCount++
+		}
+
+		if err := dst.ExportInsertOverride(ctx, dbq.ExportInsertOverrideParams{
+			ID:                  row.ID,
+			ProfileID:           row.ProfileID,
+			TargetID:            row.TargetID,
+			Relpath:             row.Relpath,
+			BlobSha256:          row.BlobSha256,
+			OverrideType:        row.OverrideType,
+			SourceArchiveSha256: row.SourceArchiveSha256,
+			SourceRawPath:       row.SourceRawPath,
+			SourceContentSha256: row.SourceContentSha256,
+			Notes:               row.Notes,
+			CreatedAt:           row.CreatedAt,
+			UpdatedAt:           row.UpdatedAt,
+		}); err != nil {
+			return 0, fmt.Errorf("insert override %d: %w", row.ID, err)
+		}
+
+		entries, err := src.ExportGetPatchEntriesForOverride(ctx, row.ID)
+		if err != nil {
+			return 0, fmt.Errorf("get patch entries for override %d: %w", row.ID, err)
+		}
+		for _, entry := range entries {
+			if err := dst.ExportInsertPatchEntry(ctx, dbq.ExportInsertPatchEntryParams(entry)); err != nil {
+				return 0, fmt.Errorf("insert patch entry %d: %w", entry.ID, err)
+			}
+		}
+	}
+	return overrideCount, nil
 }

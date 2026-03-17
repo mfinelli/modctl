@@ -56,6 +56,7 @@ type Result struct {
 	// counts of what was imported
 	Archives         int
 	Backups          int
+	Overrides        int
 	ModPages         int
 	Profiles         int
 	InventoryScanned int
@@ -312,10 +313,11 @@ func extractBundle(ctx context.Context, bundlePath, destDir string) error {
 
 // importBlobs extracts and verifies all blobs from the bundle,
 // ingesting them into the blob store.
-func importBlobs(ctx context.Context, bundle *Bundle, bs blobstore.Store) (archiveCount, backupCount int, err error) {
+func importBlobs(ctx context.Context, bundle *Bundle, bs blobstore.Store) (archiveCount, backupCount, overrideCount int, err error) {
 	kindDirs := map[string]blobstore.Kind{
-		"archives": blobstore.KindArchive,
-		"backups":  blobstore.KindBackup,
+		"archives":  blobstore.KindArchive,
+		"backups":   blobstore.KindBackup,
+		"overrides": blobstore.KindOverride,
 	}
 
 	for dirName, kind := range kindDirs {
@@ -366,14 +368,16 @@ func importBlobs(ctx context.Context, bundle *Bundle, bs blobstore.Store) (archi
 				archiveCount++
 			case blobstore.KindBackup:
 				backupCount++
+			case blobstore.KindOverride:
+				overrideCount++
 			}
 			return nil
 		})
 		if err != nil {
-			return 0, 0, err
+			return 0, 0, 0, err
 		}
 	}
-	return archiveCount, backupCount, nil
+	return archiveCount, backupCount, overrideCount, nil
 }
 
 func isSQLiteUniqueConstraint(err error) bool {
