@@ -244,6 +244,40 @@ Set the active game:
 	they were excluded. The archive must be inventoried first; run
 	*modctl mods scan-inventory* if needed.
 
+*modctl profiles overrides list*
+	List all overrides for the active profile with a summary staleness
+	status. Run *modctl profiles overrides status* for full detail.
+
+*modctl profiles overrides status* [<path>]
+	Show detailed staleness information for all overrides in the active
+	profile, or for a single path if specified.
+
+*modctl profiles overrides set* [--notes <text>] [--force] <path> <file>
+	Set a full-file override for a path in the active profile. The file
+	is imported from disk and stored in the override blob store. The path
+	must be relative to the game directory. If an override already exists for
+	this path the command refuses unless --force is passed, in which case the
+	existing override is replaced.
+
+*modctl profiles overrides edit* [--reset] <path>
+	Edit a file override in your preferred editor. If no override exists,
+	the base file is extracted from the current winning mod's archive and
+	opened as a starting point; on save, a new override is created. If an
+	override already exists, the current override content is opened; on save,
+	the override blob is updated. Pass --reset to discard the existing override
+	and start fresh from the current base file. Respects _$VISUAL_ then
+	_$EDITOR_, falling back to _vi_. Note: requires archive extraction which may
+	be slow for large archives.
+
+*modctl profiles overrides unset* <path>
+	Remove the override for a path in the active profile. If the override was
+	applied, run *modctl apply* to reconcile the game directory.
+
+*modctl profiles overrides copy* [--force] <src-profile>
+	Copy all overrides from a source profile into the active profile.
+	Errors if the active profile already has overrides at any of the same paths
+	unless --force is passed, in which case conflicting overrides are replaced.
+
 ## Apply
 
 *modctl apply* [--dry-run] [--no-recheck] [--print-ops] [--keep-staging] [--prune-dirs]
@@ -332,7 +366,7 @@ _~/.local/share/modctl/backups/_
 	Content-addressed store for backed-up game files.
 
 _~/.local/share/modctl/overrides/_
-	Content-addressed store for user overrides.
+	Content-addressed store for full-file override blobs.
 
 _~/.local/state/modctl/locks/_
 	Per-game lock files.
