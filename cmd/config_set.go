@@ -85,9 +85,9 @@ Valid keys:
 		}
 
 		if key == "nexus.apikey" {
-			nexus, ok := cfg["nexus"].(map[string]interface{})
+			nexus, ok := cfg["nexus"].(map[string]any)
 			if !ok {
-				nexus = make(map[string]interface{})
+				nexus = make(map[string]any)
 			}
 			nexus["apikey"] = value
 			cfg["nexus"] = nexus
@@ -129,12 +129,12 @@ func ensureConfigFile(path string) error {
 	return f.Close()
 }
 
-func readOrCreateToml(path string) (map[string]interface{}, error) {
+func readOrCreateToml(path string) (map[string]any, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[string]interface{})
+	out := make(map[string]any)
 	if len(strings.TrimSpace(string(data))) == 0 {
 		return out, nil
 	}

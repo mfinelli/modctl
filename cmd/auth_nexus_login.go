@@ -87,9 +87,9 @@ you complete authorization.`,
 			return fmt.Errorf("read config file: %w", err)
 		}
 
-		nexusCfg, ok := cfg["nexus"].(map[string]interface{})
+		nexusCfg, ok := cfg["nexus"].(map[string]any)
 		if !ok {
-			nexusCfg = make(map[string]interface{})
+			nexusCfg = make(map[string]any)
 		}
 		nexusCfg["apikey"] = apiKey
 		cfg["nexus"] = nexusCfg

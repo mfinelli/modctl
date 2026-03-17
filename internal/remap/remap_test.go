@@ -128,7 +128,6 @@ func TestApply(t *testing.T) {
 		}
 
 		for _, tc := range cases {
-			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 				result, err := Apply([]dbq.RemapRule{stripRule(0, tc.n)}, tc.input)
@@ -190,7 +189,6 @@ func TestApply(t *testing.T) {
 		}
 
 		for _, tc := range cases {
-			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 				result, err := Apply([]dbq.RemapRule{subdirRule(0, tc.subdir)}, tc.input)
@@ -233,7 +231,6 @@ func TestApply(t *testing.T) {
 		}
 
 		for _, tc := range cases {
-			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 				result, err := Apply([]dbq.RemapRule{prefixRule(0, tc.prefix)}, tc.input)
@@ -278,7 +275,6 @@ func TestApply(t *testing.T) {
 		}
 
 		for _, tc := range cases {
-			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 				result, err := Apply([]dbq.RemapRule{includeRule(0, tc.pattern)}, tc.input)
@@ -311,7 +307,6 @@ func TestApply(t *testing.T) {
 		}
 
 		for _, tc := range cases {
-			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 				result, err := Apply([]dbq.RemapRule{excludeRule(0, tc.pattern)}, tc.input)

@@ -66,7 +66,7 @@ visit your Nexus Mods account settings at:
 			return fmt.Errorf("read config file: %w", err)
 		}
 
-		if nexusCfg, ok := cfg["nexus"].(map[string]interface{}); ok {
+		if nexusCfg, ok := cfg["nexus"].(map[string]any); ok {
 			delete(nexusCfg, "apikey")
 			if len(nexusCfg) == 0 {
 				delete(cfg, "nexus")

@@ -1,6 +1,6 @@
 module github.com/mfinelli/modctl
 
-go 1.25.7
+go 1.26.1
 
 require (
 	github.com/adrg/xdg v0.5.3
@@ -10,7 +10,7 @@ require (
 	github.com/coder/websocket v1.8.14
 	github.com/google/uuid v1.6.0
 	github.com/klauspost/compress v1.18.4
-	github.com/mattn/go-sqlite3 v1.14.34
+	github.com/mattn/go-sqlite3 v1.14.37
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/pressly/goose/v3 v3.27.0
 	github.com/spf13/cobra v1.10.2

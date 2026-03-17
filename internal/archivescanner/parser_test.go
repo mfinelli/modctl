@@ -73,7 +73,6 @@ func TestParse(t *testing.T) {
 		}
 
 		for _, tc := range cases {
-			tc := tc
 			t.Run(tc.desc, func(t *testing.T) {
 				t.Parallel()
 				input := "-rw-r--r--  0 0      0           6 Mar  2 21:21 hello.txt\n" + tc.trailer
@@ -199,7 +198,6 @@ func TestParseLine(t *testing.T) {
 		}
 
 		for _, tc := range cases {
-			tc := tc
 			t.Run(tc.desc, func(t *testing.T) {
 				t.Parallel()
 				entry := parseLine(tc.line, 0)
@@ -236,7 +234,6 @@ func TestParseLine(t *testing.T) {
 		}
 
 		for _, tc := range cases {
-			tc := tc
 			t.Run(tc.desc, func(t *testing.T) {
 				t.Parallel()
 				entry := parseLine(tc.line, 0)
@@ -281,7 +278,6 @@ func TestParseLine(t *testing.T) {
 		}
 
 		for _, tc := range cases {
-			tc := tc
 			t.Run(tc.desc, func(t *testing.T) {
 				t.Parallel()
 				entry := parseLine(tc.line, 0)
@@ -315,7 +311,6 @@ func TestParseLine(t *testing.T) {
 		}
 
 		for _, tc := range cases {
-			tc := tc
 			t.Run(tc.desc, func(t *testing.T) {
 				t.Parallel()
 				entry := parseLine(tc.line, 0)
@@ -355,7 +350,6 @@ func TestParseLine(t *testing.T) {
 		}
 
 		for _, tc := range cases {
-			tc := tc
 			t.Run(tc.desc, func(t *testing.T) {
 				t.Parallel()
 				entry := parseLine(tc.line, 0)
@@ -380,7 +374,6 @@ func TestParseLine(t *testing.T) {
 		}
 
 		for _, tc := range cases {
-			tc := tc
 			t.Run("", func(t *testing.T) {
 				t.Parallel()
 				line := "-rw-r--r--  0 0      0        1024 Jan  1 00:00 Data/file.esp"

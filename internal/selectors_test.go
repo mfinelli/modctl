@@ -65,7 +65,6 @@ func TestFullSelector(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := FullSelector(tt.storeID, tt.storeGame, tt.instanceID)
@@ -115,7 +114,6 @@ func TestShortSelector(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := ShortSelector(tt.storeID, tt.storeGame, tt.instanceID)
@@ -203,7 +201,6 @@ func TestParseSelector(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 

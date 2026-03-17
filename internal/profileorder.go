@@ -54,10 +54,7 @@ func RewriteProfilePriorities(
 	if err != nil {
 		return fmt.Errorf("get max priority: %w", err)
 	}
-	offset := (maxPrio + 1)
-	if offset < 1 {
-		offset = 1
-	}
+	offset := max((maxPrio + 1), 1)
 
 	if err := qtx.BumpPrioritiesForProfile(ctx, dbq.BumpPrioritiesForProfileParams{
 		Offset:    offset, // if your sqlc param name is different, adjust
