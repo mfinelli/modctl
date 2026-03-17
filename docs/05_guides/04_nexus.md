@@ -11,15 +11,49 @@ account settings.
 
 ## Setting up your API key
 
-Add your API key to modctl's configuration:
+The easiest way to authenticate is with the built-in SSO login:
 ```bash
-modctl config set nexus.apikey YOUR_API_KEY
+modctl auth nexus login
 ```
+
+This opens your browser to a Nexus Mods authorization page. Once you approve
+the request your API key is saved automatically — no manual copying required.
+
+In headless environments the authorization URL is printed to the terminal
+instead. Open it in a browser on any other device and approve the request;
+modctl will receive the key automatically once you do.
 
 The key is stored in plain text in your config file at
 `$XDG_CONFIG_HOME/modctl/config.toml`, which is created with permissions
 that allow only your user account to read it. There is no keyring
 integration in v1.
+
+If you prefer to manage your key manually, you can set it directly:
+```bash
+modctl config set nexus.apikey YOUR_API_KEY
+```
+
+### Checking your authentication status
+
+To confirm your key is valid and see your current API quota:
+```bash
+modctl auth nexus status
+```
+
+This shows your Nexus username and how many API requests remain in your
+current daily and hourly windows, along with the time until each resets.
+
+### Removing your API key
+
+To remove the stored key from your config file:
+```bash
+modctl auth nexus logout
+```
+
+This only removes the key locally. The key remains active on Nexus Mods; to
+fully revoke it visit your
+[Nexus Mods API settings](https://www.nexusmods.com/settings/api-keys).
+
 
 # Linking mods at import time
 

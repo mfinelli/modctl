@@ -739,6 +739,19 @@ This preserves a clean v1 while allowing richer v2.
 ## 14. Commands
 
 - `init` initialized the modctl database and storage directories
+- `auth`
+  - `auth nexus login` - authenticate with Nexus Mods via SSO; opens the
+    browser to authorize modctl and saves the API key automatically. Use
+    `--force` to replace an existing key. In headless environments the
+    authorization URL is printed for completion on another machine.
+  - `auth nexus logout` - remove the stored Nexus Mods API key from the
+    config file. The key remains active on Nexus Mods; to revoke it visit
+    https://www.nexusmods.com/settings/api-keys
+  - `auth nexus status` - show authentication status and current API quota.
+    Makes a live call to the Nexus validate endpoint (which does not count
+    against the rate limit) and displays the authenticated username, daily
+    remaining requests, and hourly remaining requests with human-readable
+    reset times.
 - `doctor` performs environment checks including bsdtar presence, store health,
   and blob verification (presence + size check). A `--rehash` flag is reserved
   for future full content integrity verification via sha256 rehash.
@@ -747,7 +760,7 @@ This preserves a clean v1 while allowing richer v2.
 - `mods import|list|info|remove`
 - `mods scan-inventory`
 - `mods incompatible add|remove|list`
-- `nexus link` (attach mod_id/file_id metadata)
+- `nexus link|check-updates` (attach mod_id/file_id metadata)
 - `profiles
   create|list|rename|delete|set-active|apply|diff|add|remove|enable|disable|order|status`
   - Items are added to a profile enabled by default. The schema default is `FALSE`
@@ -1002,6 +1015,10 @@ Only `nexus.apikey` has no default. All other keys have sane defaults and
 most users will never need to change them. See section 5 for the rationale
 behind the `tmp_dir` default.
 
+`nexus.apikey` can be provisioned automatically via `auth nexus login` without
+the user needing to visit their API settings page. `config set nexus.apikey`
+remains available for users who prefer to manage their key manually.
+
 ### Security note
 
 The Nexus API key is stored in plain text in the config file. There is no
@@ -1035,6 +1052,36 @@ The Nexus integration is intentionally limited in v1: there is no download
 manager or `nxm://` handler. The user downloads files manually and the tool
 handles identification, linking, and update checking.
 
+### Authentication
+
+The Nexus API key can be provisioned in two ways:
+
+- **SSO login** (recommended): `auth nexus login` opens the user's browser
+  to the Nexus Mods authorization page. The key is received automatically
+  over a WebSocket connection to `wss://sso.nexusmods.com` and written to
+  the config file without the user needing to locate or copy it manually.
+  In headless environments the authorization URL is printed so it can be
+  opened on any other machine or device; the WebSocket connection waits
+  on the local machine regardless.
+- **Manual**: `config set nexus.apikey <key>` for users who prefer to
+  manage their own keys directly from their Nexus account settings page.
+
+The SSO flow is implemented in `internal/nexussso` using
+`github.com/coder/websocket`. A UUID is generated per login attempt and
+used as the session identifier shared between the local WebSocket
+connection and the browser authorization page. No connection state is
+persisted between attempts; if the connection drops the user simply
+re-runs `auth nexus login`.
+
+`auth nexus logout` removes the key from the config file locally. It does
+not invalidate the key on Nexus Mods.
+
+`auth nexus status` calls `GET /v1/users/validate.json` to confirm the key
+is valid and displays the authenticated username and current rate limit
+quota. This endpoint is explicitly excluded from Nexus rate limit accounting.
+Rate limit state is updated as a side effect of the validate call and
+persisted to `$XDG_STATE_HOME/modctl/nexus.json` for use by other commands.
+
 ### Rate limiting
 
 Nexus enforces per-user rate limits (2,500 requests/24h, 100 requests/hour
@@ -1044,6 +1091,10 @@ call from response headers. Batch operations perform a pre-flight check and
 warn the user if quota may be insufficient, with `--force` to proceed anyway.
 The client also enforces a local 30 req/sec limit via a token bucket rate
 limiter to avoid nginx-level 429s.
+
+Rate limit reset timestamps in Nexus API response headers use the format
+`2006-01-02 15:04:05 +0000` rather than RFC3339. The client parses these
+with the layout `"2006-01-02 15:04:05 -0700"`.
 
 ### Caching
 

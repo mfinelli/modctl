@@ -1,5 +1,48 @@
 # Utility commands
 
+## auth
+
+Manage authentication with mod hosting services.
+
+### auth nexus login
+
+Authenticate with Nexus Mods using Single Sign-On. Opens your browser to
+the Nexus Mods authorization page and waits for approval. The API key is
+received and saved automatically once you approve the request.
+```bash
+modctl auth nexus login
+```
+
+In headless environments (SSH sessions, servers) the authorization URL is
+printed to the terminal. Open it in a browser on any other device to
+complete the flow; modctl will receive the key automatically once you do.
+
+Pass `--force` to replace an existing key.
+
+| Flag      | Description                   |
+|-----------|-------------------------------|
+| `--force` | Replace an existing API key   |
+
+### auth nexus logout
+
+Remove the stored Nexus Mods API key from the config file. The key remains
+active on Nexus Mods; to fully revoke it visit your
+[Nexus Mods API settings](https://www.nexusmods.com/users/myaccount?tab=api).
+```bash
+modctl auth nexus logout
+```
+
+### auth nexus status
+
+Confirm your API key is valid and show current rate limit quota. Displays
+your Nexus username, remaining daily and hourly requests, and the time until
+each quota window resets. This call does not count against your rate limit.
+```bash
+modctl auth nexus status
+```
+
+---
+
 ## config
 
 View and modify modctl's configuration without editing the config file by
@@ -29,6 +72,11 @@ modctl config get nexus.apikey
 Set a key in the config file. The file is created if it does not exist.
 ```bash
 modctl config set tmp_dir /var/tmp/modctl
+```
+
+To set your Nexus API key manually (for scripted or non-interactive
+environments; most users should use `modctl auth nexus login` instead):
+```bash
 modctl config set nexus.apikey YOUR_API_KEY
 ```
 

@@ -68,6 +68,28 @@ Set the active game:
 	Show a high-level status summary of all known game installs, including
 	the applied profile, file counts, and any warnings.
 
+## Authentication
+
+*modctl auth nexus login* [--force]
+	Authenticate with Nexus Mods using Single Sign-On. Opens the default
+	browser to the Nexus Mods authorization page and waits for approval.
+	The API key is received automatically and saved to the config file;
+	no manual key copying is required. In headless environments the
+	authorization URL is printed so it can be opened on another machine.
+	Pass --force to replace an existing key.
+
+*modctl auth nexus logout*
+	Remove the stored Nexus Mods API key from the config file. The key
+	remains active on Nexus Mods; to revoke it visit
+	_https://www.nexusmods.com/settings/api-keys_
+
+*modctl auth nexus status*
+	Show Nexus Mods authentication status and current API quota. Makes a
+	live call to confirm the stored key is valid and displays the
+	authenticated username, daily and hourly requests remaining, and the
+	time until each quota window resets. This call does not count against
+	the rate limit.
+
 ## Games
 
 *modctl games list* [--all] [--store <store>]
@@ -313,6 +335,10 @@ _~/.local/state/modctl/locks/_
 _~/.cache/modctl/nexus_cache.db_
 	Nexus API response cache. Safe to delete; repopulated automatically.
 
+_~/.local/state/modctl/nexus.json_
+	Persisted Nexus Mods API rate limit state. Updated after every API
+	call. Safe to delete; repopulated on the next API call.
+
 # ENVIRONMENT
 
 _XDG_CONFIG_HOME_
@@ -323,7 +349,8 @@ _XDG_DATA_HOME_
 	_~/.local/share_.
 
 _XDG_STATE_HOME_
-	Base directory for lock files. Defaults to _~/.local/state_.
+	Base directory for lock files and Nexus rate limit state. Defaults
+	to _~/.local/state_.
 
 _XDG_RUNTIME_DIR_
 	Base directory for the staging directory. Typically a tmpfs mount,

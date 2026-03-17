@@ -1,0 +1,57 @@
+/*
+ * mod control (modctl): command-line mod manager
+ * Copyright © 2026 Mario Finelli
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package nexusclient
+
+import "net/http"
+
+// UserInfo contains the fields from /v1/users/validate.json that we surface.
+// The validate endpoint does not count against the Nexus rate limit.
+type UserInfo struct {
+	UserID int    `json:"user_id"`
+	Name   string `json:"name"`
+	// IsPremium and IsSupporter are present in two forms in the API response
+	// ("is_premium?" and "is_premium"). We decode both and prefer the
+	// non-punctuated form.
+	IsPremium   bool `json:"is_premium"`
+	IsSupporter bool `json:"is_supporter"`
+
+	// Punctuated variants (decoded but not used directly)
+	IsPremiumAlt   bool `json:"is_premium?"`
+	IsSupporterAlt bool `json:"is_supporter?"`
+}
+
+// ValidateUser calls /v1/users/validate.json to confirm the configured API
+// key is valid and returns basic user info. Rate limit headers from this
+// response are persisted as a side effect via doRequest. This endpoint does
+// not count against the Nexus rate limit quota.
+func (c *Client) ValidateUser() (*UserInfo, error) {
+	var info UserInfo
+	if err := c.doRequest(http.MethodGet, "/v1/users/validate.json", &info, nil); err != nil {
+		return nil, err
+	}
+	// Prefer the non-punctuated fields; fall back to the punctuated variants
+	// in case the API only returns one form.
+	if !info.IsPremium {
+		info.IsPremium = info.IsPremiumAlt
+	}
+	if !info.IsSupporter {
+		info.IsSupporter = info.IsSupporterAlt
+	}
+	return &info, nil
+}

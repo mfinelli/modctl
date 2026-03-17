@@ -7,6 +7,8 @@ require (
 	github.com/andygrunwald/vdf v1.1.0
 	github.com/brianvoe/gofakeit/v7 v7.14.1
 	github.com/charmbracelet/lipgloss v1.1.0
+	github.com/coder/websocket v1.8.14
+	github.com/google/uuid v1.6.0
 	github.com/klauspost/compress v1.18.4
 	github.com/mattn/go-sqlite3 v1.14.34
 	github.com/pelletier/go-toml/v2 v2.2.4

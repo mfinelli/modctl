@@ -3,7 +3,7 @@
 modctl's configuration is stored in a TOML file at
 `$XDG_CONFIG_HOME/modctl/config.toml`. The file is optional — if it does not
 exist, modctl uses built-in defaults for everything except `nexus.apikey`,
-which has no default and must be set explicitly to use Nexus features.
+which has no default and is required to use Nexus features.
 
 You can edit the file directly or use the `config` commands to read and write
 values without touching it by hand. Note that `config set` rewrites the entire
@@ -67,9 +67,20 @@ modctl config set tmp_dir /var/tmp/modctl
 The config file is created if it does not exist. A notice is printed when
 setting `nexus.apikey` as a reminder that the key is stored in plain text.
 
-To set your Nexus API key:
+## Nexus API key
+
+The recommended way to configure your Nexus API key is via SSO login, which
+handles everything automatically:
+```bash
+modctl auth nexus login
+```
+
+If you prefer to set the key manually (for example in a scripted or
+non-interactive environment) you can write it directly to the config file:
 ```bash
 modctl config set nexus.apikey YOUR_API_KEY
 ```
 
-See [Nexus integration](../nexus) for more on using modctl with Nexus Mods.
+Either way the key ends up in the same place in your config file and works
+identically. See [Nexus integration](../nexus) for more on authenticating
+and using modctl with Nexus Mods.

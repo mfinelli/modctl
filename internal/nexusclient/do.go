@@ -27,6 +27,10 @@ import (
 	"time"
 )
 
+// NexusMods rate limit reset headers use the format:
+// "2006-01-02 15:04:05 +0000" (not RFC3339)
+const nexusTimeLayout = "2006-01-02 15:04:05 -0700"
+
 // ModInfo represents the fields we care about from
 // /v1/games/{domain}/mods/{id}.json
 type ModInfo struct {
@@ -144,11 +148,11 @@ func (c *Client) updateRateLimitState(resp *http.Response) error {
 	if err != nil {
 		return nil
 	}
-	hourlyReset, err := time.Parse(time.RFC3339, resp.Header.Get("X-RL-Hourly-Reset"))
+	hourlyReset, err := time.Parse(nexusTimeLayout, resp.Header.Get("X-RL-Hourly-Reset"))
 	if err != nil {
 		return nil
 	}
-	dailyReset, err := time.Parse(time.RFC3339, resp.Header.Get("X-RL-Daily-Reset"))
+	dailyReset, err := time.Parse(nexusTimeLayout, resp.Header.Get("X-RL-Daily-Reset"))
 	if err != nil {
 		return nil
 	}
