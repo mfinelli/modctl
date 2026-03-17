@@ -35,7 +35,6 @@ import (
 var (
 	profilesOverridesStatusGame    string
 	profilesOverridesStatusProfile string
-	profilesOverridesStatusPath    string
 )
 
 var profilesOverridesStatusCmd = &cobra.Command{
