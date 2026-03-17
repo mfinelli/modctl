@@ -166,55 +166,6 @@ The `doctor` command will surface the same missing blobs independently.
 
 ---
 
-## verify
-
-Check the integrity of a modctl export bundle without importing it. Useful
-for validating a stored backup before you need to rely on it.
-```bash
-modctl verify cyberpunk-backup.tar.zst
-```
-
-Checks performed:
-
-- Bundle manifest checksum matches the database snapshot
-- SQLite quick check and foreign key check on the bundle database
-- Every blob in the bundle hashes correctly against its filename
-- Every blob referenced in the database has a corresponding file in the bundle
-- Every file in the bundle has a corresponding database row
-
-Version warnings (if the bundle was produced by a newer version of modctl) are
-printed but verify will still report the bundle as valid. Any other issue is
-treated as a failure.
-
----
-
-## extract
-
-Extract raw mod archives from a modctl export bundle without performing a
-full import. See [Import & Export](../../import-export) for full details and
-examples.
-
-Without `--mod`, lists all mods in the bundle:
-```bash
-modctl extract ./backup.tar.zst
-```
-
-With `--mod`, extracts a specific mod archive:
-```bash
-modctl extract ./backup.tar.zst --game steam:1091500 --mod "Appearance Menu Mod"
-```
-
-| Flag                  | Description                                            |
-|-----------------------|--------------------------------------------------------|
-| `--game <store-id>`   | Required for full bundles when extracting with `--mod` |
-| `--mod <name>`        | Extract a specific mod by mod page name                |
-| `--file <label>`      | Narrow selection by file label                         |
-| `--version <version>` | Narrow selection by version string                     |
-| `--output-dir <path>` | Directory to extract into (default: current directory) |
-| `--overwrite`         | Replace existing files (default: skip with a warning)  |
-
----
-
 ## operations
 
 The `operations` commands let you inspect the history of apply and unapply
