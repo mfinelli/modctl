@@ -38,6 +38,7 @@ var (
 	profilesOverridesSetGame    string
 	profilesOverridesSetProfile string
 	profilesOverridesSetNotes   string
+	profilesOverridesSetForce   bool
 )
 
 var profilesOverridesSetCmd = &cobra.Command{
@@ -105,6 +106,21 @@ winner for this path in the active profile.`,
 			return fmt.Errorf("resolve game_dir target: %w", err)
 		}
 
+		// check for existing override unless --force
+		if !profilesOverridesSetForce {
+			_, err := q.GetOverride(ctx, dbq.GetOverrideParams{
+				ProfileID: p.ID,
+				TargetID:  target.ID,
+				Relpath:   relpath,
+			})
+			if err == nil {
+				return fmt.Errorf(
+					"override already exists for %q in profile %q — pass --force to replace it",
+					relpath, p.Name,
+				)
+			}
+		}
+
 		bs := blobstore.Store{
 			ArchivesDir:  viper.GetString("archives_dir"),
 			BackupsDir:   viper.GetString("backups_dir"),
@@ -151,7 +167,7 @@ winner for this path in the active profile.`,
 			srcRawPath = anchor.RawPath
 			srcContentSha256 = anchor.ContentSha256
 		}
-		// if no winner found anchor stays NULL — net-new override
+		// if no winner found anchor stays NULL (net-new override)
 
 		notes := sql.NullString{}
 		if profilesOverridesSetNotes != "" {
@@ -202,4 +218,6 @@ func init() {
 		})
 	profilesOverridesSetCmd.Flags().StringVar(&profilesOverridesSetNotes, "notes", "",
 		"Optional notes for this override")
+	profilesOverridesSetCmd.Flags().BoolVar(&profilesOverridesSetForce, "force", false,
+		"Replace existing override if one already exists for this path")
 }
