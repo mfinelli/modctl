@@ -1,5 +1,20 @@
 # Utility commands
 
+## init
+
+Initialize modctl's data directories and database. Creates all required
+directories under `$XDG_DATA_HOME`, `$XDG_STATE_HOME`, and `$XDG_CACHE_HOME`
+if they do not already exist, and runs any pending database migrations. Safe
+to run multiple times.
+```bash
+modctl init
+```
+
+Run `init` once after installing modctl before using any other commands. It
+is also safe to run after upgrading modctl to apply any new migrations.
+
+---
+
 ## auth
 
 Manage authentication with mod hosting services.
