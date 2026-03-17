@@ -913,9 +913,10 @@ INSERT INTO operation_changes (
     old_size_bytes,
     new_size_bytes,
     mod_file_version_id,
+    owner_override_id,
     backup_blob_sha256,
     notes
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: UpsertInstalledFile :exec
 INSERT INTO installed_files (
@@ -1614,3 +1615,350 @@ WHERE applied_profile_id IS NOT NULL;
 -- name: GetInstalledFilesForGameInstall :many
 SELECT * FROM installed_files
 WHERE game_install_id = ?;
+
+-- name: InsertOverride :one
+INSERT INTO overrides (
+    profile_id,
+    target_id,
+    relpath,
+    blob_sha256,
+    override_type,
+    source_archive_sha256,
+    source_raw_path,
+    source_content_sha256,
+    notes
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+RETURNING *;
+
+-- name: UpdateOverride :one
+UPDATE overrides
+SET
+    blob_sha256           = ?,
+    source_archive_sha256 = ?,
+    source_raw_path       = ?,
+    source_content_sha256 = ?,
+    notes                 = ?,
+    updated_at            = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE profile_id = ?
+  AND target_id  = ?
+  AND relpath    = ?
+RETURNING *;
+
+-- name: UpsertOverride :one
+INSERT INTO overrides (
+    profile_id,
+    target_id,
+    relpath,
+    blob_sha256,
+    override_type,
+    source_archive_sha256,
+    source_raw_path,
+    source_content_sha256,
+    notes
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT (profile_id, target_id, relpath) DO UPDATE SET
+    blob_sha256           = excluded.blob_sha256,
+    source_archive_sha256 = excluded.source_archive_sha256,
+    source_raw_path       = excluded.source_raw_path,
+    source_content_sha256 = excluded.source_content_sha256,
+    notes                 = excluded.notes,
+    updated_at            = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+RETURNING *;
+
+-- name: GetOverride :one
+SELECT * FROM overrides
+WHERE profile_id = ?
+  AND target_id  = ?
+  AND relpath    = ?;
+
+-- name: ListOverridesByProfile :many
+SELECT * FROM overrides
+WHERE profile_id = ?
+ORDER BY relpath ASC;
+
+-- name: DeleteOverride :exec
+DELETE FROM overrides
+WHERE profile_id = ?
+  AND target_id  = ?
+  AND relpath    = ?;
+
+-- name: DeleteOverridesByProfile :exec
+DELETE FROM overrides
+WHERE profile_id = ?;
+
+-- name: InsertOverridePatchEntry :one
+INSERT INTO override_patch_entries (
+    override_id,
+    position,
+    patch_type,
+    entry_section,
+    entry_key,
+    entry_value
+) VALUES (?, ?, ?, ?, ?, ?)
+RETURNING *;
+
+-- name: ListOverridePatchEntries :many
+SELECT * FROM override_patch_entries
+WHERE override_id = ?
+ORDER BY position ASC;
+
+-- name: DeleteOverridePatchEntry :exec
+DELETE FROM override_patch_entries
+WHERE override_id = ?
+  AND position    = ?;
+
+-- name: DeleteOverridePatchEntriesByOverride :exec
+DELETE FROM override_patch_entries
+WHERE override_id = ?;
+
+-- name: GetMaxOverridePatchPosition :one
+SELECT CAST(COALESCE(MAX(position), -1) AS integer) AS max_position
+FROM override_patch_entries
+WHERE override_id = ?;
+
+-- name: GetStalenessHeuristicForProfile :many
+-- Returns overrides that are potentially stale or have no base mod.
+-- For each override with a non-null source anchor, checks whether the
+-- highest-priority enabled mod providing source_raw_path still comes
+-- from the same archive sha256.
+WITH winning_base AS (
+    SELECT
+        o.id          AS override_id,
+        o.relpath,
+        o.source_archive_sha256,
+        o.source_raw_path,
+        (
+            SELECT mfv.archive_sha256
+            FROM profile_items pi
+            JOIN mod_file_versions mfv ON mfv.id = pi.mod_file_version_id
+            JOIN archive_inventory_entries aie
+                ON aie.archive_sha256 = mfv.archive_sha256
+            WHERE pi.profile_id = o.profile_id
+              AND pi.enabled = TRUE
+              AND aie.raw_path = o.source_raw_path
+              AND aie.entry_type = 'file'
+            ORDER BY pi.priority DESC
+            LIMIT 1
+        ) AS current_archive_sha256
+    FROM overrides o
+    WHERE o.profile_id = ?1
+),
+classified AS (
+    SELECT
+        override_id,
+        relpath,
+        source_archive_sha256,
+        source_raw_path,
+        current_archive_sha256,
+        CAST(COALESCE(CASE
+            WHEN source_archive_sha256 IS NULL AND current_archive_sha256 IS NOT NULL
+                THEN 'anchor_lost'
+            WHEN source_archive_sha256 IS NOT NULL AND current_archive_sha256 IS NULL
+                THEN 'no_base'
+            WHEN source_archive_sha256 IS NOT NULL
+                AND current_archive_sha256 != source_archive_sha256
+                THEN 'stale'
+        END, '') AS TEXT) AS staleness
+    FROM winning_base
+)
+SELECT
+    override_id,
+    relpath,
+    source_archive_sha256,
+    source_raw_path,
+    current_archive_sha256,
+    staleness
+FROM classified
+WHERE staleness != '';
+
+-- name: ListOverridesForApply :many
+-- Fetches all overrides for a profile with blob info needed by the apply pipeline.
+SELECT
+    o.id,
+    o.target_id,
+    o.relpath,
+    o.override_type,
+    o.blob_sha256,
+    o.source_archive_sha256,
+    o.source_raw_path,
+    b.size_bytes
+FROM overrides o
+LEFT JOIN blobs b ON b.sha256 = o.blob_sha256
+WHERE o.profile_id = ?
+ORDER BY o.relpath ASC;
+
+-- name: CopyOverridesToProfile :exec
+-- Copies all overrides from src_profile_id into dst_profile_id.
+-- Caller is responsible for ensuring target_ids are valid for dst profile's
+-- game install. Conflicts on (profile_id, target_id, relpath) are replaced.
+INSERT INTO overrides (
+    profile_id,
+    target_id,
+    relpath,
+    blob_sha256,
+    override_type,
+    source_archive_sha256,
+    source_raw_path,
+    source_content_sha256,
+    notes
+)
+SELECT
+    ?2,
+    src.target_id,
+    src.relpath,
+    src.blob_sha256,
+    src.override_type,
+    src.source_archive_sha256,
+    src.source_raw_path,
+    src.source_content_sha256,
+    src.notes
+FROM overrides src
+WHERE src.profile_id = ?1
+ON CONFLICT (profile_id, target_id, relpath) DO UPDATE SET
+    blob_sha256           = excluded.blob_sha256,
+    override_type         = excluded.override_type,
+    source_archive_sha256 = excluded.source_archive_sha256,
+    source_raw_path       = excluded.source_raw_path,
+    source_content_sha256 = excluded.source_content_sha256,
+    notes                 = excluded.notes,
+    updated_at            = strftime('%Y-%m-%dT%H:%M:%fZ', 'now');
+
+-- name: CopyOverridePatchEntriesToProfile :exec
+-- Copies patch entries for all overrides copied from src to dst profile.
+-- Must be called after CopyOverridesToProfile.
+INSERT INTO override_patch_entries (
+    override_id,
+    position,
+    patch_type,
+    entry_section,
+    entry_key,
+    entry_value
+)
+SELECT
+    dst.id,
+    src_entries.position,
+    src_entries.patch_type,
+    src_entries.entry_section,
+    src_entries.entry_key,
+    src_entries.entry_value
+FROM override_patch_entries src_entries
+JOIN overrides src_o ON src_o.id = src_entries.override_id
+JOIN overrides dst   ON dst.profile_id = ?2
+                     AND dst.target_id  = src_o.target_id
+                     AND dst.relpath    = src_o.relpath
+WHERE src_o.profile_id = ?1
+ON CONFLICT (override_id, position) DO UPDATE SET
+    patch_type    = excluded.patch_type,
+    entry_section = excluded.entry_section,
+    entry_key     = excluded.entry_key,
+    entry_value   = excluded.entry_value;
+
+-- name: ListUnreferencedOverrideBlobs :many
+-- Returns override blobs with no referencing overrides row.
+SELECT b.sha256, b.size_bytes, b.original_name
+FROM blobs b
+WHERE b.kind = 'override'
+  AND NOT EXISTS (
+      SELECT 1 FROM overrides o WHERE o.blob_sha256 = b.sha256
+  );
+
+-- name: CountOverridesByProfile :one
+SELECT COUNT(*) FROM overrides WHERE profile_id = ?;
+
+-- name: GetCurrentWinnerForPath :one
+-- Returns the archive and inventory details for the highest-priority
+-- enabled mod in the profile that provides the given raw path.
+-- Used to capture the source anchor when creating an override.
+SELECT
+    mfv.archive_sha256,
+    aie.raw_path,
+    aie.content_sha256
+FROM profile_items pi
+JOIN mod_file_versions mfv ON mfv.id = pi.mod_file_version_id
+JOIN archive_inventory_entries aie
+    ON aie.archive_sha256 = mfv.archive_sha256
+WHERE pi.profile_id = ?1
+  AND pi.enabled = TRUE
+  AND aie.raw_path = sqlc.arg(raw_path)
+  AND aie.entry_type = 'file'
+ORDER BY pi.priority DESC
+LIMIT 1;
+
+-- name: GetOverrideStatusDetail :many
+-- Full staleness detail for all overrides in a profile.
+-- Returns all overrides with their current base mod info for display.
+-- The redundant state isn't computed here": detecting it would require
+-- comparing the override blob content against the base file content, which
+-- means reading from the blob store at query time, which we obviously can't do.
+-- That state would need to be computed in Go after fetching the rows, if we
+-- want to support it. For now base_unchanged is the closest we get from the query alone.
+WITH winning_base AS (
+    SELECT
+        o.id                    AS override_id,
+        o.relpath,
+        o.override_type,
+        o.blob_sha256,
+        o.source_archive_sha256,
+        o.source_raw_path,
+        o.source_content_sha256,
+        o.notes,
+        o.updated_at,
+        CAST((
+            SELECT mfv.archive_sha256
+            FROM profile_items pi
+            JOIN mod_file_versions mfv ON mfv.id = pi.mod_file_version_id
+            JOIN archive_inventory_entries aie
+                ON aie.archive_sha256 = mfv.archive_sha256
+            WHERE pi.profile_id = o.profile_id
+              AND pi.enabled = TRUE
+              AND aie.raw_path = o.source_raw_path
+              AND aie.entry_type = 'file'
+            ORDER BY pi.priority DESC
+            LIMIT 1
+        ) AS TEXT) AS current_archive_sha256,
+        CAST((
+            SELECT aie.content_sha256
+            FROM profile_items pi
+            JOIN mod_file_versions mfv ON mfv.id = pi.mod_file_version_id
+            JOIN archive_inventory_entries aie
+                ON aie.archive_sha256 = mfv.archive_sha256
+            WHERE pi.profile_id = o.profile_id
+              AND pi.enabled = TRUE
+              AND aie.raw_path = o.source_raw_path
+              AND aie.entry_type = 'file'
+            ORDER BY pi.priority DESC
+            LIMIT 1
+        ) AS TEXT) AS current_content_sha256
+    FROM overrides o
+    WHERE o.profile_id = ?1
+)
+SELECT
+    override_id,
+    relpath,
+    override_type,
+    blob_sha256,
+    source_archive_sha256,
+    source_raw_path,
+    source_content_sha256,
+    current_archive_sha256,
+    current_content_sha256,
+    notes,
+    updated_at,
+    CAST(COALESCE(CASE
+        WHEN source_archive_sha256 IS NULL AND current_archive_sha256 IS NULL
+            THEN 'net_new_no_anchor'
+        WHEN source_archive_sha256 IS NULL AND current_archive_sha256 IS NOT NULL
+            THEN 'anchor_lost'
+        WHEN source_archive_sha256 IS NOT NULL AND current_archive_sha256 IS NULL
+            THEN 'no_base'
+        WHEN current_archive_sha256 != source_archive_sha256
+            AND (current_content_sha256 IS NULL OR current_content_sha256 != source_content_sha256)
+            THEN 'stale'
+        WHEN current_archive_sha256 != source_archive_sha256
+            AND current_content_sha256 = source_content_sha256
+            THEN 'base_unchanged'
+        WHEN current_archive_sha256 = source_archive_sha256
+            THEN 'base_unchanged'
+    END, 'unknown') AS TEXT) AS staleness_state
+FROM winning_base
+ORDER BY relpath ASC;
