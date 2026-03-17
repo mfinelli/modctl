@@ -291,10 +291,15 @@ Set the active game:
 	without making changes. Use --min-age to protect recently created blobs
 	(e.g. _7d_, _24h_, _2w_).
 
-*modctl doctor* [--deep]
+*modctl doctor* [--deep] [--recheck] [--check-installs] [--rehash-installs]
 	Run a read-only health check. Verifies state directories, database
-	integrity, bsdtar availability, and blob store integrity. Pass --deep
-	for a more thorough database check.
+	integrity, bsdtar availability, game install target writability, and
+	blob store integrity (presence and size). Pass --deep for a more
+	thorough database check. Pass --recheck to rehash all blobs and verify
+	content against their stored SHA-256. Pass --check-installs to verify
+	that all recorded installed files exist on disk for applied game
+	installs. Pass --rehash-installs to also hash those files and compare
+	against recorded checksums (implies --check-installs).
 
 *modctl operations list* [--all] [--limit <n>]
 	List recent apply and unapply operations for the current game.

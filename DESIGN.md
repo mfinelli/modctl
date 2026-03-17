@@ -752,9 +752,14 @@ This preserves a clean v1 while allowing richer v2.
     against the rate limit) and displays the authenticated username, daily
     remaining requests, and hourly remaining requests with human-readable
     reset times.
-- `doctor` performs environment checks including bsdtar presence, store health,
-  and blob verification (presence + size check). A `--rehash` flag is reserved
-  for future full content integrity verification via sha256 rehash.
+- `doctor` performs environment checks: state directory layout and
+  writability, database integrity (quick check by default; full integrity
+  check and foreign key check with `--deep`), bsdtar availability, game
+  install target writability, and blob store integrity (presence and size
+  by default; content hash with `--recheck`). Pass `--check-installs` to
+  verify that all files recorded in `installed_files` are present on disk
+  for applied game installs. Pass `--rehash-installs` to also hash those
+  files and compare against the recorded `content_sha256`.
 - `stores list|set-active` (supported integrations)
 - `games list|refresh|info|set-active`
 - `mods import|list|info|remove`

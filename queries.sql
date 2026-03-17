@@ -1606,3 +1606,11 @@ UPDATE game_installs
   SET applied_profile_id = NULL,
     applied_at = NULL,
     applied_operation_id = NULL;
+
+-- name: GetGameInstallsWithAppliedProfile :many
+SELECT * FROM game_installs
+WHERE applied_profile_id IS NOT NULL;
+
+-- name: GetInstalledFilesForGameInstall :many
+SELECT * FROM installed_files
+WHERE game_install_id = ?;

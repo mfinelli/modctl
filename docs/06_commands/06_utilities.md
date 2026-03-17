@@ -126,7 +126,8 @@ Doctor checks:
 - The database is present, usable, and has no pending migrations
 - SQLite integrity (quick check by default)
 - `bsdtar` is installed and working
-- All blobs in the store are present, the correct size, and hash correctly
+- All known game install targets are writable
+- All blobs in the store are present and the correct size
 
 Doctor never modifies your game installs or modctl state. It may read files
 to validate integrity.
@@ -137,13 +138,35 @@ check and foreign key check in addition to the default quick check:
 modctl doctor --deep
 ```
 
+To rehash all blobs and verify their content against their stored SHA-256,
+pass `--recheck`. This updates `verified_at` on each blob that passes:
+```bash
+modctl doctor --recheck
+```
+
+To verify that all files recorded as installed are actually present on disk
+for all applied game installs, pass `--check-installs`:
+```bash
+modctl doctor --check-installs
+```
+
+To also hash those files and compare against the recorded checksums, pass
+`--rehash-installs`. This is independent of `--recheck` so you can verify
+installed files without rehashing the blob store:
+```bash
+modctl doctor --rehash-installs
+```
+
 Run `doctor` before exporting if you want to verify blob integrity ahead of
 time, and after an unexpected crash to confirm nothing is in an inconsistent
 state.
 
-| Flag     | Description                                           |
-|----------|-------------------------------------------------------|
-| `--deep` | Run full SQLite integrity check and foreign key check |
+| Flag                | Description                                                        |
+|---------------------|--------------------------------------------------------------------|
+| `--deep`            | Run full SQLite integrity check and foreign key check              |
+| `--recheck`         | Rehash all blobs and verify content against stored SHA-256         |
+| `--check-installs`  | Verify installed files exist on disk for all applied game installs |
+| `--rehash-installs` | Hash installed files and compare against recorded checksums        |
 
 ---
 

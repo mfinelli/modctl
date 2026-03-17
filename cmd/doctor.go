@@ -38,14 +38,18 @@ import (
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"go.finelli.dev/util"
 )
 
-var deepCheck bool
-var doctorRehash bool
+var (
+	deepCheck            bool
+	doctorRehash         bool
+	doctorCheckInstalls  bool
+	doctorRehashInstalls bool
+)
 
 var SampleTarGz []byte
 
-// doctorCmd represents the doctor command
 var doctorCmd = &cobra.Command{
 	Use:   "doctor",
 	Short: "Run health checks on the modctl state, database, and dependencies",
@@ -59,12 +63,13 @@ Doctor verifies:
     foreign_key_check with --deep)
   - External dependencies (bsdtar present, --version works, and can list a
     built-in test archive)
-  - (TODO) Steam readiness when the Steam store is enabled (locates Steam root
-    and parses libraryfolders.vdf)
+  - Game install target writability (all known game installs)
   - Integrity of blobs stored on disk (presence, size, hash)
+  - Installed file presence and optionally content hash (--check-installs,
+    --rehash-installs)
 
-Doctor does not modify Steam or your game installs. It may read files to
-validate integrity.`,
+Doctor does not modify your game installs. It may read files to validate
+integrity.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -80,11 +85,16 @@ validate integrity.`,
 			if err := checkBsdtar(ctx); err != nil {
 				return err
 			}
-			if err := checkSteamStatus(); err != nil {
+			if err := checkGameInstalls(ctx); err != nil {
 				return err
 			}
 			if err := checkBlobs(ctx); err != nil {
 				return err
+			}
+			if doctorCheckInstalls || doctorRehashInstalls {
+				if err := checkInstalledFiles(ctx); err != nil {
+					return err
+				}
 			}
 			return nil
 		}
@@ -103,8 +113,14 @@ validate integrity.`,
 func init() {
 	rootCmd.AddCommand(doctorCmd)
 
-	doctorCmd.Flags().BoolVar(&deepCheck, "full", false, "Runs a more complete database check")
-	doctorCmd.Flags().BoolVar(&doctorRehash, "recheck", false, "Rehashes all blobs in the blob store to ensure integrity")
+	doctorCmd.Flags().BoolVar(&deepCheck, "full", false,
+		"Runs a more complete database check")
+	doctorCmd.Flags().BoolVar(&doctorRehash, "recheck", false,
+		"Rehashes all blobs in the blob store to ensure integrity")
+	doctorCmd.Flags().BoolVar(&doctorCheckInstalls, "check-installs", false,
+		"Verify that installed files exist on disk for all applied game installs")
+	doctorCmd.Flags().BoolVar(&doctorRehashInstalls, "rehash-installs", false,
+		"Hash installed files and compare against recorded checksums (implies --check-installs)")
 }
 
 // checkDb verifies the DB exists and is usable, and warns if migrations
@@ -429,8 +445,82 @@ func checkBsdtar(ctx context.Context) error {
 	return nil
 }
 
-func checkSteamStatus() error {
-	// TODO loop through game installs and ensure that we can write into them
+func checkGameInstalls(ctx context.Context) error {
+	// TODO: extract
+	headerStyle := lipgloss.NewStyle().Bold(true).
+		Foreground(lipgloss.Color("63"))
+	subtleStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("245"))
+	errStyle := lipgloss.NewStyle().Bold(true).
+		Foreground(lipgloss.Color("1"))
+	okStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("2"))
+	warnStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("3"))
+
+	fmt.Println(headerStyle.Render("Game Install Checks"))
+	fmt.Println()
+
+	db, err := internal.SetupDB()
+	if err != nil {
+		fmt.Println(errStyle.Render("  ✗ could not open database"))
+		fmt.Println(subtleStyle.Render("    " + err.Error()))
+		fmt.Println()
+		return fmt.Errorf("cannot open database: %w", err)
+	}
+	defer db.Close()
+
+	q := dbq.New(db)
+
+	installs, err := q.ListAllGameInstalls(ctx)
+	if err != nil {
+		fmt.Println(errStyle.Render("  ✗ could not list game installs"))
+		fmt.Println(subtleStyle.Render("    " + err.Error()))
+		fmt.Println()
+		return fmt.Errorf("list game installs: %w", err)
+	}
+
+	if len(installs) == 0 {
+		fmt.Println(subtleStyle.Render("  no game installs found"))
+		fmt.Println()
+		return nil
+	}
+
+	for _, gi := range installs {
+		label := fmt.Sprintf("%s (%s:%s)", gi.DisplayName, gi.StoreID, gi.StoreGameID)
+
+		if !util.SqliteIntToBool(gi.IsPresent) {
+			fmt.Println(warnStyle.Render(fmt.Sprintf("  ⚠ %s: not present (game may have moved or been uninstalled)", label)))
+			continue
+		}
+
+		targets, err := q.ListTargetsForGameInstall(ctx, gi.ID)
+		if err != nil {
+			fmt.Println(errStyle.Render(fmt.Sprintf("  ✗ %s: could not list targets", label)))
+			fmt.Println(subtleStyle.Render("    " + err.Error()))
+			continue
+		}
+
+		allOk := true
+		for _, t := range targets {
+			testFile := filepath.Join(t.RootPath, ".modctl-doctor-write-test")
+			if err := os.WriteFile(testFile, []byte("ok"), 0o600); err != nil {
+				fmt.Println(errStyle.Render(fmt.Sprintf(
+					"  ✗ %s: target %q not writable (%s)",
+					label, t.Name, t.RootPath,
+				)))
+				allOk = false
+				continue
+			}
+			_ = os.Remove(testFile)
+		}
+
+		if allOk {
+			fmt.Println(okStyle.Render(fmt.Sprintf("  ✓ %s: all targets writable", label)))
+		}
+	}
+
+	fmt.Println()
 	return nil
 }
 
@@ -679,5 +769,186 @@ func rehashBlobs(
 	}
 	fmt.Println(subtleStyle.Render(fmt.Sprintf("    verified %d blobs", hashed)))
 
+	return nil
+}
+
+func checkInstalledFiles(ctx context.Context) error {
+	// TODO: extract
+	headerStyle := lipgloss.NewStyle().Bold(true).
+		Foreground(lipgloss.Color("63"))
+	subtleStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("245"))
+	errStyle := lipgloss.NewStyle().Bold(true).
+		Foreground(lipgloss.Color("1"))
+	okStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("2"))
+	warnStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("3"))
+
+	fmt.Println(headerStyle.Render("Installed File Checks"))
+	fmt.Println()
+
+	db, err := internal.SetupDB()
+	if err != nil {
+		fmt.Println(errStyle.Render("  ✗ could not open database"))
+		fmt.Println(subtleStyle.Render("    " + err.Error()))
+		fmt.Println()
+		return fmt.Errorf("cannot open database: %w", err)
+	}
+	defer db.Close()
+
+	q := dbq.New(db)
+
+	installs, err := q.GetGameInstallsWithAppliedProfile(ctx)
+	if err != nil {
+		fmt.Println(errStyle.Render("  ✗ could not list applied game installs"))
+		fmt.Println(subtleStyle.Render("    " + err.Error()))
+		fmt.Println()
+		return fmt.Errorf("list applied game installs: %w", err)
+	}
+
+	if len(installs) == 0 {
+		fmt.Println(subtleStyle.Render("  no applied game installs found"))
+		fmt.Println()
+		return nil
+	}
+
+	buf := make([]byte, 1024*1024)
+
+	for _, gi := range installs {
+		label := fmt.Sprintf("%s (%s:%s)", gi.DisplayName, gi.StoreID, gi.StoreGameID)
+
+		if !util.SqliteIntToBool(gi.IsPresent) {
+			fmt.Println(warnStyle.Render(fmt.Sprintf(
+				"  ⚠ %s: skipping installed file check (game not present on disk)",
+				label,
+			)))
+			continue
+		}
+
+		targets, err := q.ListTargetsForGameInstall(ctx, gi.ID)
+		if err != nil {
+			fmt.Println(errStyle.Render(fmt.Sprintf("  ✗ %s: could not list targets", label)))
+			fmt.Println(subtleStyle.Render("    " + err.Error()))
+			continue
+		}
+
+		targetPaths := make(map[int64]string, len(targets))
+		for _, t := range targets {
+			targetPaths[t.ID] = t.RootPath
+		}
+
+		files, err := q.GetInstalledFilesForGameInstall(ctx, gi.ID)
+		if err != nil {
+			fmt.Println(errStyle.Render(fmt.Sprintf("  ✗ %s: could not list installed files", label)))
+			fmt.Println(subtleStyle.Render("    " + err.Error()))
+			continue
+		}
+
+		if len(files) == 0 {
+			fmt.Println(subtleStyle.Render(fmt.Sprintf("  %s: no installed files recorded", label)))
+			continue
+		}
+
+		var missing, mismatched int
+
+		for _, f := range files {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
+
+			rootPath, ok := targetPaths[f.TargetID]
+			if !ok {
+				// target was removed from DB but installed_files row remains
+				missing++
+				fmt.Println(warnStyle.Render(fmt.Sprintf(
+					"    missing target: target_id=%d relpath=%s",
+					f.TargetID, f.Relpath,
+				)))
+				continue
+			}
+
+			fullPath := filepath.Join(rootPath, f.Relpath)
+
+			st, err := os.Stat(fullPath)
+			if err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					missing++
+					fmt.Println(warnStyle.Render(fmt.Sprintf(
+						"    missing: %s", f.Relpath,
+					)))
+					continue
+				}
+				return fmt.Errorf("stat %s: %w", fullPath, err)
+			}
+
+			if !doctorRehashInstalls {
+				continue
+			}
+
+			// Size check first as a cheap pre-filter
+			if st.Size() != f.SizeBytes {
+				mismatched++
+				fmt.Println(warnStyle.Render(fmt.Sprintf(
+					"    size mismatch: %s (expected %d got %d)",
+					f.Relpath, f.SizeBytes, st.Size(),
+				)))
+				continue
+			}
+
+			file, err := os.Open(fullPath)
+			if err != nil {
+				return fmt.Errorf("open %s: %w", fullPath, err)
+			}
+
+			h := sha256.New()
+			_, cerr := blobstore.CopyWithContext(ctx, h, file, buf)
+			_ = file.Close()
+			if cerr != nil {
+				return fmt.Errorf("hash %s: %w", fullPath, cerr)
+			}
+
+			actual := hex.EncodeToString(h.Sum(nil))
+			if actual != f.ContentSha256 {
+				mismatched++
+				fmt.Println(warnStyle.Render(fmt.Sprintf(
+					"    content mismatch: %s (expected %s got %s)",
+					f.Relpath, f.ContentSha256[:16], actual[:16],
+				)))
+			}
+		}
+
+		switch {
+		case missing == 0 && mismatched == 0:
+			if doctorRehashInstalls {
+				fmt.Println(okStyle.Render(fmt.Sprintf(
+					"  ✓ %s: %d/%d files present and verified",
+					label, len(files), len(files),
+				)))
+			} else {
+				fmt.Println(okStyle.Render(fmt.Sprintf(
+					"  ✓ %s: %d/%d files present",
+					label, len(files), len(files),
+				)))
+			}
+		default:
+			parts := []string{}
+			if missing > 0 {
+				parts = append(parts, fmt.Sprintf("%d missing", missing))
+			}
+			if mismatched > 0 {
+				parts = append(parts, fmt.Sprintf("%d content mismatch", mismatched))
+			}
+			fmt.Println(warnStyle.Render(fmt.Sprintf(
+				"  ⚠ %s: %d/%d files present (%s)",
+				label, len(files)-missing, len(files),
+				strings.Join(parts, ", "),
+			)))
+		}
+	}
+
+	fmt.Println()
 	return nil
 }
