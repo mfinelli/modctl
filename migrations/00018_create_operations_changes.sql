@@ -49,10 +49,24 @@ CREATE TABLE operation_changes
   -- If this operation captured or used a backup blob for this path
   backup_blob_sha256 TEXT REFERENCES blobs(sha256) ON UPDATE CASCADE ON DELETE SET NULL,
 
+  -- If this operation wrote content sourced from an override
+  owner_override_id INTEGER REFERENCES overrides(id) ON UPDATE CASCADE ON DELETE SET NULL,
+
   -- Optional freeform notes (errors, decisions, conflict winner info, etc.)
   notes TEXT,
 
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+
+  -- The three-way CHECK rather than strict mutual exclusivity is intentional:
+  -- restore_backup and remove actions have neither a mod version nor an
+  -- override as source, so both being NULL is valid.
+  CHECK (
+    (mod_file_version_id IS NOT NULL AND owner_override_id IS NULL)
+    OR
+    (mod_file_version_id IS NULL AND owner_override_id IS NOT NULL)
+    OR
+    (mod_file_version_id IS NULL AND owner_override_id IS NULL)
+  )
 ) STRICT;
 -- +goose StatementEnd
 
@@ -66,6 +80,10 @@ CREATE INDEX idx_operation_changes_game ON operation_changes(game_install_id);
 
 -- +goose StatementBegin
 CREATE INDEX idx_operation_changes_target ON operation_changes(target_id);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE INDEX idx_operation_changes_owner_override_id ON operation_changes(owner_override_id);
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -140,6 +158,10 @@ DROP INDEX idx_operation_changes_mod_file;
 
 -- +goose StatementBegin
 DROP INDEX idx_operation_changes_path;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+DROP INDEX idx_operation_changes_owner_override_id;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
