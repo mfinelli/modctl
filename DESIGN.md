@@ -1011,6 +1011,7 @@ file is optional: if it does not exist, all built-in defaults are used.
 | `database`     | `$XDG_DATA_HOME/modctl/modctl.db`        | Path to the SQLite database              |
 | `archives_dir` | `$XDG_DATA_HOME/modctl/archives`         | Blob store for mod archives              |
 | `backups_dir`  | `$XDG_DATA_HOME/modctl/backups`          | Blob store for pre-existing file backups |
+| `cache_dir`    | `$XDG_CACHE_HOME/modctl`                 | Local caches (e.g., nexus api responses) |
 | `overrides_dir`| `$XDG_DATA_HOME/modctl/overrides`        | Blob store for user overrides            |
 | `locks_dir`    | `$XDG_STATE_HOME/modctl/locks`           | Per-game lockfiles                       |
 | `tmp_dir`      | `$XDG_RUNTIME_DIR/modctl`                | Staging directory for extraction         |

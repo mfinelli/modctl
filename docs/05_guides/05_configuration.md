@@ -17,6 +17,7 @@ preserved.
 | `bsdtar`        | `bsdtar`                                  | Name or path of the bsdtar binary                |
 | `database`      | `$XDG_DATA_HOME/modctl/modctl.db`         | Path to the SQLite database                      |
 | `archives_dir`  | `$XDG_DATA_HOME/modctl/archives`          | Blob store for mod archives                      |
+| `cache_dir`     | `$XDG_CACHE_HOME/modctl`                  | Local caches (e.g., Nexus API responses)         |
 | `backups_dir`   | `$XDG_DATA_HOME/modctl/backups`           | Blob store for pre-existing file backups         |
 | `overrides_dir` | `$XDG_DATA_HOME/modctl/overrides`         | Blob store for user overrides                    |
 | `locks_dir`     | `$XDG_STATE_HOME/modctl/locks`            | Per-game lockfiles                               |

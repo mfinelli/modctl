@@ -43,7 +43,7 @@ will rewrite the config file, which will remove any comments or custom
 formatting you may have added by hand.
 
 Valid keys:
-  bsdtar, database, archives_dir, backups_dir, overrides_dir,
+  bsdtar, database, archives_dir, backups_dir, cache_dir, overrides_dir,
   locks_dir, tmp_dir, nexus.apikey`,
 	Args:         cobra.ExactArgs(2),
 	SilenceUsage: true,

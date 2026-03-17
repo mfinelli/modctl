@@ -52,6 +52,11 @@ multiple times and will not overwrite existing data.`,
 			return fmt.Errorf("error creating backups directory: %w", err)
 		}
 
+		err = os.MkdirAll(viper.GetString("cache_dir"), 0o0755)
+		if err != nil {
+			return fmt.Errorf("error creating cache directory: %w", err)
+		}
+
 		err = os.MkdirAll(viper.GetString("locks_dir"), 0o0755)
 		if err != nil {
 			return fmt.Errorf("error creating locks directory: %w", err)

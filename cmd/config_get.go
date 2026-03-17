@@ -36,7 +36,7 @@ Shows the current effective value and whether it comes from the config
 file or is the built-in default.
 
 Valid keys:
-  bsdtar, database, archives_dir, backups_dir, overrides_dir,
+  bsdtar, database, archives_dir, backups_dir, cache_dir, overrides_dir,
   locks_dir, tmp_dir, nexus.apikey`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,

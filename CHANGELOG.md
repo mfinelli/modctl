@@ -18,6 +18,7 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 - Update import to allow importing a single game from a full export bundle.
 - Implement SSO login for Nexus mods.
 - Update `doctor` to check/verify installed files.
+- Make cache directory configurable.
 
 ## v0.2.0 - 2026-03-15
 

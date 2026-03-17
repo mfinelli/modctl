@@ -37,8 +37,9 @@ var knownConfigKeys = []string{
 	"database",
 	"archives_dir",
 	"backups_dir",
-	"overrides_dir",
+	"cache_dir",
 	"locks_dir",
+	"overrides_dir",
 	"tmp_dir",
 	"nexus.apikey",
 }
