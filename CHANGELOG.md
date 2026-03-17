@@ -13,6 +13,11 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
   `--prune-dirs` is passed.
 - Add `profiles remap preview` command to preview remap rule behavior without
   a full planner dry-run.
+- Rework import/export to presume full export is used on a new machine (pass
+  `--same-machine` for old behavior).
+- Update import to allow importing a single game from a full export bundle.
+- Implement SSO login for Nexus mods.
+- Update `doctor` to check/verify installed files.
 
 ## v0.2.0 - 2026-03-15
 
