@@ -656,7 +656,8 @@ profiles overrides list
 profiles overrides status [<path>]
 profiles overrides copy <src-profile> [--force]
 profiles overrides patch <path> set <key> <value> [--section <section>] [--type ini|yaml|json]
-profiles overrides patch <path> unset <key> [--section <section>]
+profiles overrides patch <path> unset <key> [--section <section>] [--type ini|yaml|json]
+profiles overrides patch <path> remove <key> [--section <section>]
 profiles overrides patch <path> list
 profiles overrides patch <path> preview
 ```
@@ -714,13 +715,24 @@ staleness detection works correctly in the destination profile. Errors if the
 active profile already has overrides at any of the same paths unless `--force`
 is passed, in which case conflicting overrides are replaced.
 
-#### `profiles overrides patch <path> set|unset|list|preview`
+#### `profiles overrides patch <path> set|unset|remove|list|preview`
 
-v2 commands. `set` and `unset` add/remove patch entries. `list` shows current
-entries for that path. `preview` extracts the base file from the current
-winning mod's archive, applies the patch entries in memory, and displays a diff
-against the currently installed file or the base file. `preview` requires
-archive extraction and may be slow for large archives.
+v2 commands. `set` and `unset` add patch entries (unset being used to explicitly
+delete a key). `remove` deletes patch entries. `list` shows current entries for
+that path. `preview` extracts the base file from the current winning mod's
+archive, applies the patch entries in memory, and displays a diff against the
+currently installed file or the base file. `preview` requires archive extraction
+and may be slow for large archives.
+
+`patch set` creates or updates a key-value mutation. `patch unset` marks
+a key for removal from the file on apply. `patch remove` removes the patch
+entry entirely so modctl no longer patches that key.
+
+JSON patch values are interpreted as JSON literals. To set a string value,
+the value from an input that would otherwise be parsed it must be passed with
+quotes (e.g., `'"42"'` or `'"true"'`). Unquoted values are interpreted as their
+JSON type: `true`/`false` for booleans, numeric strings for numbers, `null` for
+null.
 
 ### Apply pipeline
 
@@ -999,7 +1011,7 @@ This preserves a clean v1 while allowing richer v2.
   a mod). Use `preview` to see how the rules would apply without a full dry
   run.
 - `profiles overrides set|edit|status|unset|list|copy` - manage mod overrides
-- `profiles overrides patch set|unset|list|preview` - manage structured mod overrides
+- `profiles overrides patch set|unset|remove|list|preview` - manage structured mod overrides
 - `policy set` (future: merge/manual policy)
 - `status` (conflicts, drift, missing)
 - `apply` (top-level) - apply the active profile to the game directory.

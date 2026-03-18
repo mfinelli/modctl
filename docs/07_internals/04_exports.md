@@ -16,6 +16,7 @@ manifest.json
 modctl.db
 archives/<xx>/<sha256>
 backups/<xx>/<sha256>
+overrides/<xx>/<sha256>
 ```
 
 `manifest.json` contains metadata about the bundle. `modctl.db` is a snapshot

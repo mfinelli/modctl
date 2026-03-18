@@ -278,6 +278,35 @@ Set the active game:
 	Errors if the active profile already has overrides at any of the same paths
 	unless --force is passed, in which case conflicting overrides are replaced.
 
+*modctl profiles overrides patch set* [--section <section>] [--type ini|yaml|json] <path> <key> <value>
+	Set a patch entry for a file override in the active profile. The patch type
+	is inferred from the file extension (.ini, .yaml/.yml, .json) or can be
+	specified explicitly with --type on first use. If a patch entry already
+	exists for the same key (and section for ini patches), its value is updated
+	in place. Otherwise a new entry is appended.
+
+*modctl profiles overrides patch unset* [--section <section>] [--type ini|yaml|json] <path> <key>
+	Mark a key for removal in a patch override in the active profile.
+	When the override is applied, the specified key will be removed from
+	the file. If a set entry already exists for this key it is
+	converted to an unset entry. To stop patching a key entirely, use
+	'profiles overrides patch remove'.
+
+*modctl profiles overrides patch remove* [--section <section>] <path> <key>
+	Remove a patch entry from a file override entirely. This is different
+	from 'patch unset' which marks the key for removal from the file on
+	apply.
+
+*modctl profiles overrides patch list* <path>
+	List all patch entries for a file override in the active profile.
+
+*modctl profiles overrides patch preview* <path>
+	Preview the result of applying the current patch entries to the base
+	file without performing a full apply. Extracts the base file from the
+	current winning mod's archive and applies the patch entries in memory,
+	displaying the result as a diff. Requires archive extraction which may
+	be slow for large archives.
+
 ## Apply
 
 *modctl apply* [--dry-run] [--no-recheck] [--print-ops] [--keep-staging] [--prune-dirs]
