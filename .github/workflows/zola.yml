@@ -46,7 +46,7 @@ jobs:
       - run: just zola-build
         env:
           SIXTYFOUR_PATH: /usr/share/fonts/truetype/sixtyfour/C-64-Regular.ttf
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: web
           path: www/public/**/*
