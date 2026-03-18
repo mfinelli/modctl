@@ -2010,3 +2010,21 @@ INSERT INTO override_patch_entries (
     override_id, position, patch_type,
     entry_section, entry_key, entry_value
 ) VALUES (?, ?, ?, ?, ?, ?);
+
+-- name: GetOverridePatchEntryByKey :one
+-- Find an existing patch entry by override, key, and section (for upsert logic).
+SELECT * FROM override_patch_entries
+WHERE override_id    = ?1
+  AND entry_key      = ?2
+  AND (entry_section = ?3 OR (entry_section IS NULL AND ?3 IS NULL));
+
+-- name: UpdateOverridePatchEntryValue :exec
+UPDATE override_patch_entries
+SET entry_value = ?
+WHERE id = ?;
+
+-- name: UpdateOverridePatchEntryTypeAndValue :exec
+UPDATE override_patch_entries
+SET patch_type  = ?,
+    entry_value = ?
+WHERE id = ?;
