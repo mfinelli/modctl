@@ -24,7 +24,7 @@ import "fmt"
 
 // Entry represents a single patch operation to apply
 type Entry struct {
-	PatchType    string // ini_set, ini_unset, yaml_set, yaml_unset, json_set, json_unset
+	PatchType    string // ini_set, ini_unset, yaml_set, yaml_unset, json_set, json_unset, xml_clear, xml_set, xml_unset
 	EntrySection string // ini only, may be empty
 	EntryKey     string
 	EntryValue   string // empty for unset operations
@@ -39,7 +39,7 @@ type Result struct {
 
 // Apply applies the given patch entries to the input content and returns
 // the patched result. All entries must be of the same patch family
-// (ini, yaml, or json) (this is enforced by the override_type on the
+// (ini, json, yaml, or xml) (this is enforced by the override_type on the
 // overrides row upstream)
 func Apply(entries []Entry, input []byte) (Result, error) {
 	if len(entries) == 0 {
@@ -50,10 +50,12 @@ func Apply(entries []Entry, input []byte) (Result, error) {
 	switch family(entries[0].PatchType) {
 	case "ini":
 		return applyINI(entries, input)
-	case "yaml":
-		return applyYAML(entries, input)
 	case "json":
 		return applyJSON(entries, input)
+	case "yaml":
+		return applyYAML(entries, input)
+	case "xml":
+		return applyXML(entries, input)
 	default:
 		return Result{}, fmt.Errorf("unknown patch type family: %s", entries[0].PatchType)
 	}
@@ -63,10 +65,12 @@ func family(patchType string) string {
 	switch patchType {
 	case "ini_set", "ini_unset":
 		return "ini"
-	case "yaml_set", "yaml_unset":
-		return "yaml"
 	case "json_set", "json_unset":
 		return "json"
+	case "yaml_set", "yaml_unset":
+		return "yaml"
+	case "xml_set", "xml_unset", "xml_clear":
+		return "xml"
 	default:
 		return ""
 	}

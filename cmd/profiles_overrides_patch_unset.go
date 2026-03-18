@@ -37,6 +37,7 @@ var (
 	profilesOverridesPatchUnsetProfile string
 	profilesOverridesPatchUnsetSection string
 	profilesOverridesPatchUnsetType    string
+	profilesOverridesPatchUnsetClear   bool
 )
 
 var profilesOverridesPatchUnsetCmd = &cobra.Command{
@@ -52,7 +53,10 @@ If a set entry already exists for this key it is converted to an unset
 entry. To remove the patch entry entirely (stop patching this key),
 use 'profiles overrides patch remove'.
 
-For ini patches, use --section to target a key in a specific section.`,
+For ini patches, use --section to target a key in a specific section.
+
+For xml patches, use --clear to empty the node's content rather than
+removing the node entirely.`,
 	Args:         cobra.ExactArgs(2),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -157,7 +161,7 @@ For ini patches, use --section to target a key in a specific section.`,
 		} else {
 			if existing.OverrideType == "full_file" {
 				return fmt.Errorf(
-					"override for %q is a full-file override — use 'profiles overrides unset' to remove it",
+					"override for %q is a full-file override; use 'profiles overrides unset' to remove it",
 					relpath,
 				)
 			}
@@ -172,7 +176,7 @@ For ini patches, use --section to target a key in a specific section.`,
 			}
 			if expectedType != existing.OverrideType {
 				return fmt.Errorf(
-					"override for %q is type %s, not %s — remove --type or use the correct type",
+					"override for %q is type %s, not %s; remove --type or use the correct type",
 					relpath, formatOverrideType(existing.OverrideType),
 					formatOverrideType(expectedType),
 				)
@@ -188,7 +192,16 @@ For ini patches, use --section to target a key in a specific section.`,
 		}
 
 		// determine unset patch type: "ini_patch" -> "ini_unset" etc.
-		unsetPatchType := overrideType[:len(overrideType)-len("_patch")] + "_unset"
+		var unsetPatchType string
+		if profilesOverridesPatchUnsetClear {
+			if overrideType != "xml_patch" {
+				return fmt.Errorf("--clear is only valid for xml patch overrides")
+			}
+			unsetPatchType = "xml_clear"
+		} else {
+			// "ini_patch" -> "ini_unset", "xml_patch" -> "xml_unset", etc.
+			unsetPatchType = overrideType[:len(overrideType)-len("_patch")] + "_unset"
+		}
 
 		tx, err := db.BeginTx(ctx, nil)
 		if err != nil {
@@ -204,7 +217,7 @@ For ini patches, use --section to target a key in a specific section.`,
 		})
 
 		if entryErr != nil {
-			// no existing entry — append new unset entry
+			// no existing entry: append new unset entry
 			maxPos, err := qtx.GetMaxOverridePatchPosition(ctx, overrideID)
 			if err != nil {
 				return fmt.Errorf("get max position: %w", err)
@@ -222,7 +235,7 @@ For ini patches, use --section to target a key in a specific section.`,
 			fmt.Printf("marked key %q for removal in override for %q in profile %q\n",
 				entryKey, relpath, p.Name)
 		} else {
-			// existing entry — update type to unset and clear value
+			// existing entry: update type to unset and clear value
 			if err := qtx.UpdateOverridePatchEntryTypeAndValue(ctx, dbq.UpdateOverridePatchEntryTypeAndValueParams{
 				PatchType:  unsetPatchType,
 				EntryValue: sql.NullString{},
@@ -259,8 +272,10 @@ func init() {
 			return completion.ProfileNames(cmd, toComplete)
 		})
 
+	profilesOverridesPatchUnsetCmd.Flags().BoolVar(&profilesOverridesPatchUnsetClear, "clear", false,
+		"Clear node content instead of removing it (xml patches only)")
 	profilesOverridesPatchUnsetCmd.Flags().StringVar(&profilesOverridesPatchUnsetSection, "section", "",
 		"Section name (ini patches only)")
 	profilesOverridesPatchUnsetCmd.Flags().StringVar(&profilesOverridesPatchUnsetType, "type", "",
-		"Patch type: ini, yaml, or json (inferred from file extension if not specified)")
+		"Patch type: ini, json, xml, or yaml (inferred from file extension if not specified)")
 }

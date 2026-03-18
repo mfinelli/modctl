@@ -278,19 +278,21 @@ Set the active game:
 	Errors if the active profile already has overrides at any of the same paths
 	unless --force is passed, in which case conflicting overrides are replaced.
 
-*modctl profiles overrides patch set* [--section <section>] [--type ini|yaml|json] <path> <key> <value>
+*modctl profiles overrides patch set* [--section <section>] [--type ini|json|xml|yaml] <path> <key> <value>
 	Set a patch entry for a file override in the active profile. The patch type
-	is inferred from the file extension (.ini, .yaml/.yml, .json) or can be
+	is inferred from the file extension (.ini, .json, .yaml/.yml, .xml) or can be
 	specified explicitly with --type on first use. If a patch entry already
 	exists for the same key (and section for ini patches), its value is updated
-	in place. Otherwise a new entry is appended.
+	in place. Otherwise a new entry is appended. For xml patches, <key> is an
+	XPath expression targeting element text content or attributes.
 
-*modctl profiles overrides patch unset* [--section <section>] [--type ini|yaml|json] <path> <key>
+*modctl profiles overrides patch unset* [--clear] [--section <section>] [--type ini|json|xml|yaml] <path> <key>
 	Mark a key for removal in a patch override in the active profile.
 	When the override is applied, the specified key will be removed from
 	the file. If a set entry already exists for this key it is
 	converted to an unset entry. To stop patching a key entirely, use
-	'profiles overrides patch remove'.
+	'profiles overrides patch remove'. For xml patches, --clear empties the
+	node's text content or attribute value instead of removing the node entirely.
 
 *modctl profiles overrides patch remove* [--section <section>] <path> <key>
 	Remove a patch entry from a file override entirely. This is different

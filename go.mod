@@ -5,6 +5,7 @@ go 1.26.1
 require (
 	github.com/adrg/xdg v0.5.3
 	github.com/andygrunwald/vdf v1.1.0
+	github.com/beevik/etree v1.6.0
 	github.com/brianvoe/gofakeit/v7 v7.14.1
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/coder/websocket v1.8.14

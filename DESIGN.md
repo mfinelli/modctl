@@ -624,8 +624,8 @@ Overrides are stored in the `overrides` table:
   content-addressed store via `blob_sha256`
 - Patch overrides have `blob_sha256 = NULL`; their mutations are stored as
   rows in `override_patch_entries`
-- `override_type` is `full_file` in v1; `ini_patch`, `yaml_patch`, and
-  `json_patch` are reserved for v2
+- `override_type` is `full_file` in v1; `ini_patch`, `yaml_patch`,
+  `json_patch`, and `xml_patch` are reserved for v2
 - Only the latest override is stored per path; updating an override replaces
   the row (and the old blob becomes eligible for garbage collection)
 
@@ -640,9 +640,11 @@ CHECK (
 
 Patch entries are stored in `override_patch_entries`, ordered by `position`,
 with `patch_type` values of `ini_set`, `ini_unset`, `yaml_set`, `yaml_unset`,
-`json_set`, `json_unset`. The `entry_section` field is only meaningful for
-`ini_*` types. CHECK constraints enforce that set operations have a value and
-unset operations do not, and that `entry_section` is NULL for non-ini types.
+`json_set`, `json_unset`, `xml_set`, `xml_unset`, `xml_clear`. The
+`entry_section` field is only meaningful for `ini_*` types. For `xml_*` types,
+`entry_key` is an XPath expression. CHECK constraints enforce that set
+operations have a value and unset/clear operations do not, and that
+`entry_section` is NULL for non-ini types.
 
 ### Commands
 
@@ -655,8 +657,8 @@ profiles overrides unset <path>
 profiles overrides list
 profiles overrides status [<path>]
 profiles overrides copy <src-profile> [--force]
-profiles overrides patch <path> set <key> <value> [--section <section>] [--type ini|yaml|json]
-profiles overrides patch <path> unset <key> [--section <section>] [--type ini|yaml|json]
+profiles overrides patch <path> set <key> <value> [--section <section>] [--type ini|yaml|json|xml]
+profiles overrides patch <path> unset <key> [--clear] [--section <section>] [--type ini|yaml|json|xml]
 profiles overrides patch <path> remove <key> [--section <section>]
 profiles overrides patch <path> list
 profiles overrides patch <path> preview
@@ -669,6 +671,13 @@ The path is relative to the game directory. The file is ingested into the
 override blob store. The source anchor is captured automatically from the
 current conflict winner for that path in the active profile. If no mod provides
 that path the anchor fields are NULL and the override writes a net-new file.
+
+XML patch keys are XPath expressions (e.g. `//Settings/Window/@width`,
+`//Graphics/Resolution`). `xml_set` sets the text content or attribute value of
+all matched nodes. `xml_unset` removes matched nodes entirely. `xml_clear`
+empties the text content or attribute value of matched nodes without removing
+them. `--clear` on the unset subcommand selects `xml_clear` behavior and is
+only valid for xml overrides. `--section` is only valid for ini overrides.
 
 #### `profiles overrides edit <path> [--reset]`
 

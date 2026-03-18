@@ -7,7 +7,7 @@ CREATE TABLE overrides (
   relpath TEXT NOT NULL CHECK (LENGTH(relpath) > 0),
   -- only latest override stored
   blob_sha256 TEXT REFERENCES blobs(sha256) ON UPDATE CASCADE ON DELETE RESTRICT,
-  override_type TEXT NOT NULL CHECK (override_type IN ('full_file', 'ini_patch', 'json_patch', 'yaml_patch')),
+  override_type TEXT NOT NULL CHECK (override_type IN ('full_file', 'ini_patch', 'json_patch', 'yaml_patch', 'xml_patch')),
   notes TEXT,
 
   -- source anchor columns

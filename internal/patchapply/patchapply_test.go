@@ -40,8 +40,8 @@ func TestApply_UnknownPatchType(t *testing.T) {
 	t.Parallel()
 
 	entries := []Entry{
-		{PatchType: "xml_set", EntryKey: "key", EntryValue: "value"},
+		{PatchType: "toml_set", EntryKey: "key", EntryValue: "value"},
 	}
-	_, err := Apply(entries, []byte("<root/>"))
+	_, err := Apply(entries, []byte("key = \"value\""))
 	assert.Error(t, err)
 }

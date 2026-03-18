@@ -46,8 +46,8 @@ var profilesOverridesPatchSetCmd = &cobra.Command{
 	Long: `Set a patch entry for a file override in the active profile.
 
 If no patch override exists for this path, one is created automatically.
-The patch type is inferred from the file extension (.ini, .yaml/.yml, .json)
-or can be specified explicitly with --type on first use.
+The patch type is inferred from the file extension (.ini, .json, .xml,
+.yaml/.yml) or can be specified explicitly with --type on first use.
 
 If a patch entry already exists for the same key (and section for ini
 patches), its value is updated in place. Otherwise a new entry is appended.
@@ -122,7 +122,7 @@ Examples:
 		var overrideType string
 
 		if existingErr != nil {
-			// no override exists — create one
+			// no override exists - create one
 			// determine patch type from --type flag or file extension
 			overrideType, err = resolvePatchType(relpath, profilesOverridesPatchSetType)
 			if err != nil {
@@ -161,10 +161,10 @@ Examples:
 			overrideID = newOverride.ID
 
 		} else {
-			// override exists — validate type
+			// override exists, validate type
 			if existing.OverrideType == "full_file" {
 				return fmt.Errorf(
-					"override for %q is a full-file override — use 'profiles overrides edit' or 'profiles overrides set'",
+					"override for %q is a full-file override; use 'profiles overrides edit' or 'profiles overrides set'",
 					relpath,
 				)
 			}
@@ -175,7 +175,7 @@ Examples:
 				}
 				if expectedType != existing.OverrideType {
 					return fmt.Errorf(
-						"override for %q is type %s, not %s — remove --type or use the correct type",
+						"override for %q is type %s, not %s; remove --type or use the correct type",
 						relpath, formatOverrideType(existing.OverrideType),
 						formatOverrideType(expectedType),
 					)
@@ -185,10 +185,10 @@ Examples:
 			overrideType = existing.OverrideType
 		}
 
-		// resolve section
+		// resolve section (ini only)
 		var entrySection sql.NullString
 		if profilesOverridesPatchSetSection != "" {
-			if !strings.HasSuffix(overrideType, "_patch") || overrideType == "yaml_patch" || overrideType == "json_patch" {
+			if overrideType != "ini_patch" {
 				return fmt.Errorf("--section is only valid for ini patch overrides")
 			}
 			entrySection = sql.NullString{String: profilesOverridesPatchSetSection, Valid: true}
@@ -233,7 +233,7 @@ Examples:
 			fmt.Printf("added patch entry %q to override for %q in profile %q\n",
 				entryKey, relpath, p.Name)
 		} else {
-			// existing entry — update value in place
+			// existing entry: update value in place
 			if err := qtx.UpdateOverridePatchEntryValue(ctx, dbq.UpdateOverridePatchEntryValueParams{
 				EntryValue: sql.NullString{String: entryValue, Valid: true},
 				ID:         existingEntry.ID,
@@ -273,7 +273,7 @@ func init() {
 	profilesOverridesPatchSetCmd.Flags().StringVar(&profilesOverridesPatchSetSection, "section", "",
 		"Section name (ini patches only)")
 	profilesOverridesPatchSetCmd.Flags().StringVar(&profilesOverridesPatchSetType, "type", "",
-		"Patch type: ini, yaml, or json (inferred from file extension if not specified)")
+		"Patch type: ini, json, xml, or yaml (inferred from file extension if not specified)")
 }
 
 // resolvePatchType determines the override_type from the --type flag or
@@ -283,12 +283,14 @@ func resolvePatchType(relpath, flagType string) (string, error) {
 		switch strings.ToLower(flagType) {
 		case "ini":
 			return "ini_patch", nil
-		case "yaml":
-			return "yaml_patch", nil
 		case "json":
 			return "json_patch", nil
+		case "xml":
+			return "xml_patch", nil
+		case "yaml":
+			return "yaml_patch", nil
 		default:
-			return "", fmt.Errorf("unknown patch type %q: valid types are ini, yaml, json", flagType)
+			return "", fmt.Errorf("unknown patch type %q: valid types are ini, json, xml, yaml", flagType)
 		}
 	}
 
@@ -296,13 +298,15 @@ func resolvePatchType(relpath, flagType string) (string, error) {
 	switch ext {
 	case ".ini":
 		return "ini_patch", nil
-	case ".yaml", ".yml":
-		return "yaml_patch", nil
 	case ".json":
 		return "json_patch", nil
+	case ".xml":
+		return "xml_patch", nil
+	case ".yaml", ".yml":
+		return "yaml_patch", nil
 	default:
 		return "", fmt.Errorf(
-			"cannot infer patch type from extension %q; use --type ini, --type yaml, or --type json",
+			"cannot infer patch type from extension %q; use --type ini, --type json, --type xml, or --type yaml",
 			ext,
 		)
 	}

@@ -112,7 +112,7 @@ Entries are shown in the order they will be applied.`,
 
 		if override.OverrideType == "full_file" {
 			return fmt.Errorf(
-				"override for %q is a full-file override — use 'profiles overrides list' instead",
+				"override for %q is a full-file override; use 'profiles overrides list' instead",
 				relpath,
 			)
 		}
@@ -163,8 +163,8 @@ func init() {
 
 func formatPatchEntry(e dbq.OverridePatchEntry) string {
 	var b strings.Builder
-	switch {
-	case e.PatchType == "ini_set" || e.PatchType == "ini_unset":
+	switch e.PatchType {
+	case "ini_set", "ini_unset":
 		if e.EntrySection.Valid {
 			b.WriteString(fmt.Sprintf("  [%d] [%s] %s", e.Position, e.EntrySection.String, e.EntryKey))
 		} else {
@@ -180,14 +180,14 @@ func formatPatchEntry(e dbq.OverridePatchEntry) string {
 		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render(" (unset)"))
 	}
 
-	opStr := ""
 	switch e.PatchType {
-	case "ini_unset", "yaml_unset", "json_unset":
-		opStr = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render(" [-]")
-	case "ini_set", "yaml_set", "json_set":
-		opStr = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render(" [+]")
+	case "ini_unset", "yaml_unset", "json_unset", "xml_unset":
+		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render(" [-]"))
+	case "ini_set", "yaml_set", "json_set", "xml_set":
+		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render(" [+]"))
+	case "xml_clear":
+		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render(" [~]"))
 	}
-	b.WriteString(opStr)
 
 	return b.String()
 }
