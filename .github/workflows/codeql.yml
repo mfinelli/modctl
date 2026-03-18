@@ -1,0 +1,51 @@
+---
+name: CodeQL
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  schedule:
+    - cron: '29 3 * * 1'  # 03.29 UTC on monday
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+      packages: read
+
+    strategy:
+      fail-fast: false
+      include:
+        - language: actions
+          build-mode: none
+        - language: go
+          build-mode: manual
+        - language: javascript-typescript  # documentation website javascript
+          build-mode: none
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          cache: true
+          go-version-file: go.mod
+      - uses: sqlc-dev/setup-sqlc@v4
+        with:
+          sqlc-version: 1.30.0
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - run: |
+          go mod download
+          make
+        if: matrix.build-mode == 'manual'
+
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
