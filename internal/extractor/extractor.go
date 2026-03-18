@@ -34,6 +34,7 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/patchapply"
 	"github.com/mfinelli/modctl/internal/planner"
 )
 
@@ -63,6 +64,15 @@ type RemoveFileResult struct {
 // RestoreFileResult is the outcome of restoring a backup during apply
 type RestoreFileResult struct {
 	DestPath string
+}
+
+// DeployOverrideFileResult is the outcome of deploying an override file.
+type DeployOverrideFileResult struct {
+	DestPath      string
+	ContentSha256 string
+	SizeBytes     int64
+	WasBackedUp   bool
+	BackupSha256  string
 }
 
 // StagingPathFor returns the staging directory for a given archive sha256
@@ -406,6 +416,174 @@ func (e Extractor) RestoreFile(
 	}
 
 	return RestoreFileResult{DestPath: op.DestPath}, nil
+}
+
+// DeployOverrideFile deploys a file whose content comes from an override
+// rather than a mod archive. Handles both full_file and patch override types.
+// For full_file overrides, content is read from the override blob store.
+// For patch overrides, the base file is read from staging and patches are
+// applied in memory before writing.
+func (e Extractor) DeployOverrideFile(
+	ctx context.Context,
+	db *sql.DB,
+	q *dbq.Queries,
+	op planner.PlanOp,
+	stagingDir string, // only used for patch overrides
+	targetRoot string,
+	gameInstallID int64,
+	targetID int64,
+	profileID int64,
+	operationID int64,
+	patchEntries []patchapply.Entry, // only used for patch overrides
+) (DeployOverrideFileResult, error) {
+	absDestPath := filepath.Join(targetRoot, op.DestPath)
+
+	var result DeployOverrideFileResult
+	result.DestPath = op.DestPath
+
+	// Back up pre-existing file if needed
+	if op.NeedsBackup {
+		backupResult, err := blobstore.IngestBackup(
+			ctx, db, q, e.BlobStore,
+			absDestPath,
+			gameInstallID, targetID, op.DestPath,
+			sql.NullInt64{Int64: operationID, Valid: true},
+			"",
+		)
+		if err != nil {
+			return DeployOverrideFileResult{}, fmt.Errorf("backup %q: %w", op.DestPath, err)
+		}
+		result.WasBackedUp = true
+		result.BackupSha256 = backupResult.SHA256Hex
+	}
+
+	// Ensure destination directory exists
+	if err := os.MkdirAll(filepath.Dir(absDestPath), 0o755); err != nil {
+		return DeployOverrideFileResult{}, fmt.Errorf("mkdir for %q: %w", op.DestPath, err)
+	}
+
+	var contentSha256 string
+	var sizeBytes int64
+
+	switch op.OverrideType {
+	case "full_file":
+		// Read content directly from the override blob store
+		if !op.OverrideBlobSha256.Valid {
+			return DeployOverrideFileResult{}, fmt.Errorf("full_file override for %q has no blob sha256", op.DestPath)
+		}
+		blobPath, err := e.BlobStore.PathFor(blobstore.KindOverride, op.OverrideBlobSha256.String)
+		if err != nil {
+			return DeployOverrideFileResult{}, fmt.Errorf("resolve override blob path: %w", err)
+		}
+		contentSha256, sizeBytes, err = copyAndHash(ctx, blobPath, absDestPath)
+		if err != nil {
+			return DeployOverrideFileResult{}, fmt.Errorf("deploy full_file override %q: %w", op.DestPath, err)
+		}
+
+	case "ini_patch", "yaml_patch", "json_patch":
+		// Read base file from staging (or use empty content if no base)
+		var baseContent []byte
+		if op.OverrideBaseArchiveSha256.Valid && op.OverrideBaseRawPath.Valid {
+			baseStagingPath := e.StagingPathFor(op.OverrideBaseArchiveSha256.String)
+			baseFilePath := filepath.Join(baseStagingPath, op.OverrideBaseRawPath.String)
+			var err error
+			baseContent, err = os.ReadFile(baseFilePath)
+			if err != nil {
+				return DeployOverrideFileResult{}, fmt.Errorf("read base file for patch override %q: %w", op.DestPath, err)
+			}
+		}
+		// Apply patches
+		patchResult, err := patchapply.Apply(patchEntries, baseContent)
+		if err != nil {
+			return DeployOverrideFileResult{}, fmt.Errorf("apply patch for %q: %w", op.DestPath, err)
+		}
+
+		// Write result to a temp file then copyAndHash into place
+		tmp, err := os.CreateTemp(filepath.Dir(absDestPath), ".patch-override-*")
+		if err != nil {
+			return DeployOverrideFileResult{}, fmt.Errorf("create temp for patch %q: %w", op.DestPath, err)
+		}
+		tmpName := tmp.Name()
+		defer func() {
+			_ = tmp.Close()
+			_ = os.Remove(tmpName)
+		}()
+		if _, err := tmp.Write(patchResult.Output); err != nil {
+			return DeployOverrideFileResult{}, fmt.Errorf("write patch output %q: %w", op.DestPath, err)
+		}
+		if err := tmp.Close(); err != nil {
+			return DeployOverrideFileResult{}, fmt.Errorf("close patch temp %q: %w", op.DestPath, err)
+		}
+		contentSha256, sizeBytes, err = copyAndHash(ctx, tmpName, absDestPath)
+		if err != nil {
+			return DeployOverrideFileResult{}, fmt.Errorf("deploy patch override %q: %w", op.DestPath, err)
+		}
+
+	default:
+		return DeployOverrideFileResult{}, fmt.Errorf("unknown override type %q for %q", op.OverrideType, op.DestPath)
+	}
+
+	result.ContentSha256 = contentSha256
+	result.SizeBytes = sizeBytes
+
+	// DB writes in a single transaction
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return DeployOverrideFileResult{}, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	qtx := q.WithTx(tx)
+
+	// Upsert installed_files with owner_override_id
+	if err := qtx.UpsertInstalledFile(ctx, dbq.UpsertInstalledFileParams{
+		GameInstallID:         gameInstallID,
+		TargetID:              targetID,
+		Relpath:               op.DestPath,
+		ContentSha256:         contentSha256,
+		SizeBytes:             sizeBytes,
+		OwnerModFileVersionID: sql.NullInt64{},
+		OwnerOverrideID:       sql.NullInt64{Int64: op.OverrideID.Int64, Valid: true},
+		OwnerProfileID:        sql.NullInt64{Int64: profileID, Valid: true},
+		LastOperationID:       sql.NullInt64{Int64: operationID, Valid: true},
+	}); err != nil {
+		return DeployOverrideFileResult{}, fmt.Errorf("upsert installed file: %w", err)
+	}
+
+	action := "write"
+	if op.Kind == planner.PlanOpOverwrite {
+		action = "overwrite"
+	}
+
+	var oldSha sql.NullString
+	var oldSize sql.NullInt64
+	if op.NeedsBackup && result.BackupSha256 != "" {
+		oldSha = sql.NullString{String: result.BackupSha256, Valid: true}
+	}
+
+	if err := qtx.InsertOperationChange(ctx, dbq.InsertOperationChangeParams{
+		OperationID:      operationID,
+		GameInstallID:    gameInstallID,
+		TargetID:         targetID,
+		Relpath:          op.DestPath,
+		Action:           action,
+		OldContentSha256: oldSha,
+		OldSizeBytes:     oldSize,
+		NewContentSha256: sql.NullString{String: contentSha256, Valid: true},
+		NewSizeBytes:     sql.NullInt64{Int64: sizeBytes, Valid: true},
+		ModFileVersionID: sql.NullInt64{},
+		OwnerOverrideID:  sql.NullInt64{Int64: op.OverrideID.Int64, Valid: true},
+		BackupBlobSha256: sql.NullString{String: result.BackupSha256, Valid: result.WasBackedUp},
+		Notes:            sql.NullString{},
+	}); err != nil {
+		return DeployOverrideFileResult{}, fmt.Errorf("insert operation change: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return DeployOverrideFileResult{}, fmt.Errorf("commit: %w", err)
+	}
+
+	return result, nil
 }
 
 // copyAndHash copies src to dst atomically via a temp file in dst's directory

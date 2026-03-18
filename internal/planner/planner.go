@@ -94,6 +94,19 @@ type PlanOp struct {
 	// NeedsBackup is true when a pre-existing non-tool-owned file must be
 	// backed up before being overwritten.
 	NeedsBackup bool
+
+	// OverrideID is set when this op's content comes from an override.
+	OverrideID sql.NullInt64
+	// OverrideType is set when OverrideID is valid.
+	// One of: "full_file", "ini_patch", "yaml_patch", "json_patch"
+	OverrideType string
+	// OverrideBlobSha256 is set for full_file override ops.
+	OverrideBlobSha256 sql.NullString
+	// OverrideBaseArchiveSha256 is set for patch override ops: the archive
+	// that must be staged to provide the base file.
+	OverrideBaseArchiveSha256 sql.NullString
+	// OverrideBaseRawPath is the path inside the base archive for patch ops.
+	OverrideBaseRawPath sql.NullString
 }
 
 // Plan is the full computed desired state for a profile apply or unapply.
@@ -106,6 +119,10 @@ type Plan struct {
 	Files         []PlanFile // one per destination path, apply plans only
 	Ops           []PlanOp
 	Warnings      []string
+
+	// PatchBaseArchives is the set of archive sha256s that must be staged
+	// for patch override base files, even if no mod write op requires them.
+	PatchBaseArchives []string
 }
 
 // UninventoriedArchiveError is returned when a profile item references an
@@ -224,7 +241,7 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 				Priority:         item.Priority,
 				ModPageName:      item.ModPageName,
 				FileLabel:        item.FileLabel,
-				VersionString:    item.VersionString.String, // empty string if NULL
+				VersionString:    item.VersionString.String,
 			}
 
 			if idx, exists := winners[destPath]; exists {
@@ -238,6 +255,60 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 				}
 				winners[destPath] = len(plan.Files)
 				plan.Files = append(plan.Files, pf)
+			}
+		}
+	}
+
+	// Load overrides for this profile and overlay them on top of the mod
+	// winner set.
+	overrides, err := q.ListOverridesForApply(ctx, profileID)
+	if err != nil {
+		return Plan{}, fmt.Errorf("load overrides: %w", err)
+	}
+
+	// Track which archives are already going to be staged from mod ops so
+	// we can avoid adding duplicates to PatchBaseArchives.
+	stagedArchives := make(map[string]bool)
+	for _, pf := range plan.Files {
+		stagedArchives[pf.Winner().Entry.ArchiveSha256] = true
+	}
+
+	// overrideByPath holds the override row keyed by relpath for use when
+	// building ops below.
+	type overrideInfo struct {
+		id           int64
+		overrideType string
+		blobSha256   sql.NullString
+		baseArchive  sql.NullString
+		baseRawPath  sql.NullString
+	}
+	overrideMap := make(map[string]overrideInfo, len(overrides))
+
+	for _, o := range overrides {
+		oi := overrideInfo{
+			id:           o.ID,
+			overrideType: o.OverrideType,
+			blobSha256:   o.BlobSha256,
+			baseArchive:  o.SourceArchiveSha256,
+			baseRawPath:  o.SourceRawPath,
+		}
+		overrideMap[o.Relpath] = oi
+
+		if _, exists := winners[o.Relpath]; !exists {
+			// net-new override path — synthesize a PlanFile with no conflicts
+			pf := PlanFile{
+				DestPath:  o.Relpath,
+				Conflicts: []Conflict{},
+			}
+			winners[o.Relpath] = len(plan.Files)
+			plan.Files = append(plan.Files, pf)
+		}
+
+		// For patch overrides, ensure the base archive will be staged.
+		if o.OverrideType != "full_file" && o.SourceArchiveSha256.Valid {
+			if !stagedArchives[o.SourceArchiveSha256.String] {
+				plan.PatchBaseArchives = append(plan.PatchBaseArchives, o.SourceArchiveSha256.String)
+				stagedArchives[o.SourceArchiveSha256.String] = true
 			}
 		}
 	}
@@ -256,21 +327,28 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 		installed[f.Relpath] = f
 	}
 
-	// Build set of mod file version IDs still in the new winner set.
-	winningVersionIDs := make(map[int64]bool)
-	for _, pf := range plan.Files {
-		winningVersionIDs[pf.Winner().ModFileVersionID] = true
-	}
-
-	// For each winner, determine op kind and whether a backup is needed.
+	// Build op for each winner path.
 	for i := range plan.Files {
 		pf := &plan.Files[i]
-		winner := pf.Winner()
 		absPath := filepath.Join(target.RootPath, pf.DestPath)
+
+		oi, hasOverride := overrideMap[pf.DestPath]
 
 		op := PlanOp{
 			DestPath: pf.DestPath,
-			File:     pf,
+		}
+
+		// Only set File for non-net-new paths (paths with a mod winner)
+		if len(pf.Conflicts) > 0 {
+			op.File = pf
+		}
+
+		if hasOverride {
+			op.OverrideID = sql.NullInt64{Int64: oi.id, Valid: true}
+			op.OverrideType = oi.overrideType
+			op.OverrideBlobSha256 = oi.blobSha256
+			op.OverrideBaseArchiveSha256 = oi.baseArchive
+			op.OverrideBaseRawPath = oi.baseRawPath
 		}
 
 		existingInstall, isInstalled := installed[pf.DestPath]
@@ -278,7 +356,11 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 
 		switch {
 		case isInstalled && existsOnDisk:
-			if !skipRecheck {
+			if hasOverride && op.OverrideType != "full_file" {
+				// Patch overrides are never noop'd
+				op.Kind = PlanOpOverwrite
+			} else if hasOverride && !skipRecheck {
+				// Full-file override noop check
 				onDiskHash, err := hashFile(absPath)
 				if err != nil {
 					plan.Warnings = append(plan.Warnings,
@@ -286,11 +368,27 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 					// Fall through to plain overwrite if we can't hash
 					op.Kind = PlanOpOverwrite
 				} else if onDiskHash == existingInstall.ContentSha256 &&
-					existingInstall.OwnerModFileVersionID.Int64 == winner.ModFileVersionID {
 					// File is already correct - noop.
+					existingInstall.OwnerOverrideID.Int64 == oi.id {
+					op.Kind = PlanOpNoop
+				} else {
+					op.Kind = PlanOpOverwrite
+				}
+			} else if hasOverride && skipRecheck {
+				// --no-recheck with override: always reapply
+				op.Kind = PlanOpOverwrite
+			} else if !skipRecheck {
+				// Normal mod-owned file recheck
+				onDiskHash, err := hashFile(absPath)
+				if err != nil {
+					plan.Warnings = append(plan.Warnings,
+						fmt.Sprintf("recheck: could not hash %q: %v", pf.DestPath, err))
+					op.Kind = PlanOpOverwrite
+				} else if onDiskHash == existingInstall.ContentSha256 &&
+					existingInstall.OwnerModFileVersionID.Int64 == pf.Winner().ModFileVersionID {
 					op.Kind = PlanOpNoop
 				} else if onDiskHash != existingInstall.ContentSha256 &&
-					existingInstall.OwnerModFileVersionID.Int64 == winner.ModFileVersionID {
+					existingInstall.OwnerModFileVersionID.Int64 == pf.Winner().ModFileVersionID {
 					// Same owner but content drifted externally - back up new content
 					op.Kind = PlanOpOverwrite
 					op.NeedsBackup = true
@@ -309,19 +407,19 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 
 		case isInstalled && !existsOnDisk:
 			// Tool thought it owned it but it's gone - drift warning, treat
-			// as a fresh write.
+			// as a fresh write
 			op.Kind = PlanOpWrite
 			plan.Warnings = append(plan.Warnings,
-				fmt.Sprintf("drift: %q was installed by mod_file_version %d but is missing from disk",
-					pf.DestPath, existingInstall.OwnerModFileVersionID.Int64))
+				fmt.Sprintf("drift: %q was installed but is missing from disk",
+					pf.DestPath))
 
 		case !isInstalled && existsOnDisk:
-			// Pre-existing file not owned by the tool - backup before writing.
+			// Pre-existing file not owned by the tool - backup before writing
 			op.Kind = PlanOpWrite
 			op.NeedsBackup = true
 
 		default:
-			// Not installed, not on disk - clean write.
+			// Not installed, not on disk - clean write
 			op.Kind = PlanOpWrite
 		}
 
@@ -329,7 +427,7 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 	}
 
 	// For each currently installed path not in the new winner set, determine
-	// whether to remove, restore a backup, or promote a loser.
+	// whether to remove, restore a backup, or promote a loser
 	for relpath, installedFile := range installed {
 		if _, stillWanted := winners[relpath]; stillWanted {
 			continue
@@ -353,7 +451,7 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 
 		if !existsOnDisk {
 			// Already gone - just clean up the DB record, no disk op needed.
-			// We still emit a Remove so apply cleans up installed_files.
+			// We still emit a Remove so apply cleans up installed_files
 			plan.Warnings = append(plan.Warnings,
 				fmt.Sprintf("drift: %q was installed by mod_file_version %d but is already missing from disk",
 					relpath, installedFile.OwnerModFileVersionID.Int64))
@@ -364,7 +462,7 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 			continue
 		}
 
-		// Check if a backup exists to restore.
+		// Check if a backup exists to restore
 		backup, err := q.GetBackupForPath(ctx, dbq.GetBackupForPathParams{
 			GameInstallID: gameInstallID,
 			TargetID:      target.ID,
