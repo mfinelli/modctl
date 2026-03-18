@@ -352,7 +352,7 @@ func renderProfileStatus(
 		}
 	}
 
-	//info section
+	// info section
 	var infos []string
 
 	if overrideCount > 0 {

@@ -19,7 +19,6 @@
 package cmd
 
 import (
-	"database/sql"
 	"fmt"
 	"strconv"
 
@@ -167,9 +166,7 @@ are replaced.`,
 
 		fmt.Printf("copied %d override(s) from profile %q to %q\n",
 			len(srcOverrides), src.Name, dst.Name)
-		if !profilesOverridesCopyForce {
-			_ = sql.ErrNoRows // suppress unused import if needed
-		}
+
 		return nil
 	},
 }

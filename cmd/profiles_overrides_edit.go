@@ -153,16 +153,16 @@ archives.`,
 			})
 			if err != nil {
 				if existingErr != nil {
-					// no override and no base mod — can't edit
+					// no override and no base mod: can't edit
 					return fmt.Errorf(
 						"no override exists for %q and no mod in this profile provides it\n"+
 							"use 'profiles overrides set %s <file>' to create one from scratch",
 						relpath, relpath,
 					)
 				}
-				// --reset but no base mod — also can't reset
+				// --reset but no base mod - also can't reset
 				return fmt.Errorf(
-					"no mod in this profile provides %q — cannot reset to base file",
+					"no mod in this profile provides %q; cannot reset to base file",
 					relpath,
 				)
 			}
@@ -193,7 +193,7 @@ archives.`,
 		} else {
 			// existing override and no --reset: read current override blob
 			if !existing.BlobSha256.Valid {
-				return fmt.Errorf("existing override for %q is a patch override — use 'profiles overrides patch' commands", relpath)
+				return fmt.Errorf("existing override for %q is a patch override; use 'profiles overrides patch' commands", relpath)
 			}
 			blobPath, err := bs.PathFor(blobstore.KindOverride, existing.BlobSha256.String)
 			if err != nil {
