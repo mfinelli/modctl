@@ -6,8 +6,9 @@ SOURCES := $(wildcard *.go cmd/*.go internal/*.go \
 	   internal/blobstore/*.go internal/completion/*.go \
 	   internal/exporter/*.go internal/extractor/*.go \
 	   internal/importer/*.go internal/lock/*.go internal/nexus/*.go \
-	   internal/nexusclient/*.go internal/planner/*.go internal/remap/*.go \
-	   internal/restore/*.go internal/state/*.go migrations/*.sql)
+	   internal/nexusclient/*.go internal/patchapply/*.go \
+	   internal/planner/*.go internal/remap/*.go internal/restore/*.go \
+	   internal/state/*.go migrations/*.sql)
 
 VERSION ?= $(shell grep -P "^\tVersion:" cmd/root.go | awk -F\" '{print $$2}')
 TODAY ?= $(shell date +%Y-%m-%d)

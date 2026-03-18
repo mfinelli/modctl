@@ -39,8 +39,7 @@ func applyYAML(entries []Entry, input []byte) (Result, error) {
 	}
 
 	if len(bytes.TrimSpace(input)) == 0 {
-		// initialize with an empty mapping document
-		file, err = parser.ParseBytes([]byte("{}\n"), parser.ParseComments)
+		file, err = parser.ParseBytes([]byte("{}"), parser.ParseComments)
 		if err != nil {
 			return res, fmt.Errorf("init empty yaml document: %w", err)
 		}
@@ -102,12 +101,36 @@ func appendYAMLKey(file *ast.File, key string, valueNode ast.Node) error {
 		return fmt.Errorf("yaml file has no documents")
 	}
 	doc := file.Docs[0]
+
+	// Handle flow mapping (e.g. "{}") by converting to an empty block mapping
+	if _, ok := doc.Body.(*ast.MappingNode); !ok {
+		emptyFile, err := parser.ParseBytes([]byte("_placeholder: null"), 0)
+		if err != nil || len(emptyFile.Docs) == 0 {
+			return fmt.Errorf("init block mapping: %w", err)
+		}
+		m, ok := emptyFile.Docs[0].Body.(*ast.MappingNode)
+		if !ok {
+			return fmt.Errorf("unexpected AST structure initializing block mapping")
+		}
+		// clear the placeholder entry
+		m.Values = m.Values[:0]
+		file.Docs[0].Body = m
+		doc = file.Docs[0]
+	}
+
 	mapping, ok := doc.Body.(*ast.MappingNode)
 	if !ok {
 		return fmt.Errorf("yaml document root is not a mapping")
 	}
 
-	keyFile, err := parser.ParseBytes([]byte(key+": null"), 0)
+	// Quote the key in the source line if it contains special characters
+	// so the parser produces a string node with the literal key name.
+	keySource := key
+	if strings.ContainsAny(key, ".[]*'") {
+		keySource = `'` + strings.ReplaceAll(key, "'", "''") + `'`
+	}
+
+	keyFile, err := parser.ParseBytes([]byte(keySource+": null"), 0)
 	if err != nil || len(keyFile.Docs) == 0 {
 		return fmt.Errorf("build key node for %q: %w", key, err)
 	}
@@ -168,43 +191,28 @@ func buildYAMLPath(key string) (string, error) {
 }
 
 func setYAMLNode(file *ast.File, p *goyaml.Path, rawKey string, value string) error {
-	// build value node by parsing the value as yaml
 	valueNode, err := parseYAMLValue(value)
 	if err != nil {
 		return fmt.Errorf("build value node: %w", err)
 	}
 
-	// try to replace existing node
-	if err := p.ReplaceWithNode(file, valueNode); err == nil {
+	// Check whether the node exists before attempting replace.
+	// ReplaceWithNode does not reliably error on missing paths in goccy/go-yaml.
+	if nodeExists(file, p) {
+		if err := p.ReplaceWithNode(file, valueNode); err != nil {
+			return fmt.Errorf("replace yaml node: %w", err)
+		}
 		return nil
 	}
 
-	// node doesn't exist — append by rebuilding the document
-	return appendYAMLKeyByRebuild(file, rawKey, value)
+	// Key doesn't exist — append directly via AST mutation.
+	return appendYAMLKey(file, rawKey, valueNode)
 }
 
-// appendYAMLKeyByRebuild appends a key to the document by serializing
-// the current AST back to a string, appending the new key, and re-parsing.
-// This avoids issues with AST token position tracking during direct mutation.
-func appendYAMLKeyByRebuild(file *ast.File, key string, value string) error {
-	current := file.String()
-	// ensure trailing newline
-	if len(current) > 0 && current[len(current)-1] != '\n' {
-		current += "\n"
-	}
-
-	// append the new key: value line
-	// we need to produce valid YAML for the value
-	newDoc := current + fmt.Sprintf("%s: %s\n", key, value)
-
-	newFile, err := parser.ParseBytes([]byte(newDoc), parser.ParseComments)
-	if err != nil {
-		return fmt.Errorf("re-parse after append: %w", err)
-	}
-
-	// replace file contents in place
-	file.Docs = newFile.Docs
-	return nil
+func nodeExists(file *ast.File, p *goyaml.Path) bool {
+	var dst any
+	err := p.Read(file, &dst)
+	return err == nil && dst != nil
 }
 
 func parseYAMLValue(value string) (ast.Node, error) {
