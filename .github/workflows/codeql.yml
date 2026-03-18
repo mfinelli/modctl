@@ -19,13 +19,14 @@ jobs:
 
     strategy:
       fail-fast: false
-      include:
-        - language: actions
-          build-mode: none
-        - language: go
-          build-mode: manual
-        - language: javascript-typescript  # documentation website javascript
-          build-mode: none
+      matrix:
+        include:
+          - language: actions
+            build-mode: none
+          - language: go
+            build-mode: manual
+          - language: javascript-typescript  # documentation website javascript
+            build-mode: none
 
     steps:
       - uses: actions/checkout@v6
