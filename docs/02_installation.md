@@ -148,10 +148,11 @@ directories, and local data directories to function, which requires mounting
 several host paths into the container. For most users a native install is
 significantly more convenient.
 
-If you still want to use the Docker image, it is available at
-`ghcr.io/mfinelli/modctl`. See the
-[GitHub releases page](https://github.com/mfinelli/modctl/releases) for
-available tags.
+If you still want to use the Docker image, it is available from the GitHub
+container registry at `ghcr.io/mfinelli/modctl` or from Docker Hub at
+`mfinelli/modctl`. See the
+[GitHub releases](https://github.com/mfinelli/modctl/pkgs/container/modctl) or
+[Docker Hub](https://hub.docker.com/r/mfinelli/modctl) for available tags.
 
 ## Building from source
 
