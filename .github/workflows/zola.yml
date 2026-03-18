@@ -26,6 +26,8 @@ jobs:
   main:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - run: sudo apt-get update
       - run: sudo apt-get install -y fontforge fonts-sixtyfour
