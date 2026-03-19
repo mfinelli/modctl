@@ -7,6 +7,12 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 
 ## unreleased
 
+**BREAKING CHANGE**: the internal database schema has been modified without
+a corresponding migration. You'll need to unapply any profiles you have active
+and then delete the local database before updating and then initialize it
+again afterwards. I don't expect this to be necessary again, but will can't
+make any promises until we reach a stable 1.0 release.
+
 ### Changes
 
 - `apply` and `unapply` commands now clean up emptied directories if
@@ -19,6 +25,7 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 - Implement SSO login for Nexus mods.
 - Update `doctor` to check/verify installed files.
 - Make cache directory configurable.
+- Implement overrides system (full file and patches)
 
 ## v0.2.0 - 2026-03-15
 

@@ -9,7 +9,7 @@ setup with a friend.
 A bundle is a zstd-compressed tar archive containing:
 
 - a snapshot of the modctl database
-- all referenced mod archives and backup blobs
+- all referenced mod archives, backup, and override blobs
 - a manifest with metadata and integrity checksums
 
 Everything modctl needs to restore your setup is self-contained in the bundle.

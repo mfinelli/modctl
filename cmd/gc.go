@@ -44,6 +44,7 @@ var (
 	gcMinAge       string
 	gcCleanMissing bool
 	gcSkipOrphans  bool
+	gcNoOverrides  bool
 )
 
 var gcCmd = &cobra.Command{
@@ -57,6 +58,7 @@ or --no-backups to restrict which kinds are processed.
 A blob is eligible for collection when no database row references it:
   - Archives: not referenced by any mod_file_versions row
   - Backups:  not referenced by any backups row
+  - Overrides: not referenced by any overrides row
 
 On-disk files with no corresponding database row (orphans) are also removed
 by default. These can appear when an import was interrupted before the
@@ -129,9 +131,12 @@ Use --dry-run to preview what would be removed without making any changes.`,
 		if !gcNoBackups {
 			kinds = append(kinds, blobstore.KindBackup)
 		}
+		if !gcNoOverrides {
+			kinds = append(kinds, blobstore.KindOverride)
+		}
 
 		if len(kinds) == 0 {
-			fmt.Println(subtleStyle.Render("  nothing to do (--no-archives and --no-backups both set)"))
+			fmt.Println(subtleStyle.Render("  nothing to do (--no-archives, --no-backups, and --no-overrides all set)"))
 			return nil
 		}
 
@@ -229,6 +234,8 @@ func init() {
 		"Skip garbage collection of archive blobs")
 	gcCmd.Flags().BoolVar(&gcNoBackups, "no-backups", false,
 		"Skip garbage collection of backup blobs")
+	gcCmd.Flags().BoolVar(&gcNoOverrides, "no-overrides", false,
+		"Skip garbage collection of override blobs")
 	gcCmd.Flags().StringVar(&gcMinAge, "min-age", "",
 		"Skip blobs created more recently than this duration (e.g. 24h, 7d, 2w)")
 	gcCmd.Flags().BoolVar(&gcCleanMissing, "clean-missing", false,

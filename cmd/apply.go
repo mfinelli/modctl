@@ -34,6 +34,7 @@ import (
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/extractor"
 	"github.com/mfinelli/modctl/internal/lock"
+	"github.com/mfinelli/modctl/internal/patchapply"
 	"github.com/mfinelli/modctl/internal/planner"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
@@ -175,9 +176,10 @@ Use --dry-run to preview the plan without making any changes.`,
 		fmt.Println()
 
 		bs := blobstore.Store{
-			ArchivesDir: viper.GetString("archives_dir"),
-			BackupsDir:  viper.GetString("backups_dir"),
-			TmpDir:      viper.GetString("tmp_dir"),
+			ArchivesDir:  viper.GetString("archives_dir"),
+			BackupsDir:   viper.GetString("backups_dir"),
+			OverridesDir: viper.GetString("overrides_dir"),
+			TmpDir:       viper.GetString("tmp_dir"),
 		}
 
 		ext := extractor.Extractor{
@@ -208,24 +210,40 @@ Use --dry-run to preview the plan without making any changes.`,
 		}
 		archiveMap := make(map[string]*archiveGroup)
 		var archiveOrder []string
+		var overrideOps []planner.PlanOp
 		var removeOps []planner.PlanOp
 		var restoreOps []planner.PlanOp
 
 		for _, planOp := range plan.Ops {
 			switch planOp.Kind {
 			case planner.PlanOpWrite, planner.PlanOpOverwrite:
-				sha := planOp.File.Winner().Entry.ArchiveSha256
-				if _, ok := archiveMap[sha]; !ok {
-					archiveMap[sha] = &archiveGroup{sha256: sha}
-					archiveOrder = append(archiveOrder, sha)
+				if planOp.OverrideID.Valid {
+					overrideOps = append(overrideOps, planOp)
+					// For patch overrides, the base archive is handled via
+					// PatchBaseArchives below, not grouped here
+				} else {
+					sha := planOp.File.Winner().Entry.ArchiveSha256
+					if _, ok := archiveMap[sha]; !ok {
+						archiveMap[sha] = &archiveGroup{sha256: sha}
+						archiveOrder = append(archiveOrder, sha)
+					}
+					archiveMap[sha].ops = append(archiveMap[sha].ops, planOp)
 				}
-				archiveMap[sha].ops = append(archiveMap[sha].ops, planOp)
 			case planner.PlanOpRemove:
 				removeOps = append(removeOps, planOp)
 			case planner.PlanOpRestoreBackup:
 				restoreOps = append(restoreOps, planOp)
 			case planner.PlanOpNoop:
 				logger.Debug("skipping noop op", "path", planOp.DestPath)
+			}
+		}
+
+		// Add patch base archives to the staging set if not already present
+		// No ops added; archive is staged for patch base file access only
+		for _, sha := range plan.PatchBaseArchives {
+			if _, ok := archiveMap[sha]; !ok {
+				archiveMap[sha] = &archiveGroup{sha256: sha}
+				archiveOrder = append(archiveOrder, sha)
 			}
 		}
 
@@ -309,6 +327,57 @@ Use --dry-run to preview the plan without making any changes.`,
 				if result.WasBackedUp {
 					countBackedUp++
 				}
+			}
+		}
+
+		// Deploy override ops
+		for _, planOp := range overrideOps {
+			symbol := greenStyle.Render("+")
+			detail := "(override)"
+			if planOp.Kind == planner.PlanOpOverwrite {
+				symbol = yellowStyle.Render("~")
+			}
+			if planOp.NeedsBackup {
+				detail = "(override, backing up original)"
+			}
+			printOp(symbol, planOp.DestPath, detail)
+
+			// Load patch entries if needed
+			var patchEntries []patchapply.Entry
+			if planOp.OverrideType != "full_file" {
+				dbEntries, err := q.ListOverridePatchEntries(ctx, planOp.OverrideID.Int64)
+				if err != nil {
+					countFailed++
+					return markFailed(fmt.Errorf("load patch entries for %q: %w", planOp.DestPath, err))
+				}
+				for _, e := range dbEntries {
+					patchEntries = append(patchEntries, patchapply.Entry{
+						PatchType:    e.PatchType,
+						EntrySection: e.EntrySection.String,
+						EntryKey:     e.EntryKey,
+						EntryValue:   e.EntryValue.String,
+					})
+				}
+			}
+
+			result, err := ext.DeployOverrideFile(
+				ctx, db, q, planOp,
+				ext.StagingPathFor(planOp.OverrideBaseArchiveSha256.String),
+				plan.TargetRoot, gi.ID, plan.TargetID, p.ID, op.ID,
+				patchEntries,
+			)
+			if err != nil {
+				countFailed++
+				return markFailed(fmt.Errorf("deploy override %q: %w", planOp.DestPath, err))
+			}
+
+			if planOp.Kind == planner.PlanOpOverwrite {
+				countOverwrite++
+			} else {
+				countWrite++
+			}
+			if result.WasBackedUp {
+				countBackedUp++
 			}
 		}
 

@@ -84,6 +84,7 @@ Exits non-zero if any integrity issues are found. Version warnings
 		fmt.Println(subtleStyle.Render(fmt.Sprintf("  schema version: %d", bundle.Manifest.SchemaVersion)))
 		fmt.Println(subtleStyle.Render(fmt.Sprintf("  archives:       %d", bundle.Manifest.Counts.Archives)))
 		fmt.Println(subtleStyle.Render(fmt.Sprintf("  backups:        %d", bundle.Manifest.Counts.Backups)))
+		fmt.Println(subtleStyle.Render(fmt.Sprintf("  overrides:      %d", bundle.Manifest.Counts.Overrides)))
 		if bundle.Manifest.Game != nil {
 			fmt.Println(subtleStyle.Render(fmt.Sprintf("  game:           %s (%s:%s)",
 				bundle.Manifest.Game.DisplayName,
@@ -236,7 +237,7 @@ func checkBundleBlobs(ctx context.Context, bundle *restore.Bundle, bq *dbq.Queri
 	}
 	dbBlobs := make(map[string]dbBlob)
 
-	for _, kindStr := range []string{"archive", "backup"} {
+	for _, kindStr := range []string{"archive", "backup", "override"} {
 		rows, err := bq.ListBlobsByKind(ctx, kindStr)
 		if err != nil {
 			return []string{fmt.Sprintf("list blobs kind=%s: %s", kindStr, err)}
@@ -248,8 +249,9 @@ func checkBundleBlobs(ctx context.Context, bundle *restore.Bundle, bq *dbq.Queri
 
 	// build set of all blob files present in bundle
 	kindDirs := map[string]blobstore.Kind{
-		"archives": blobstore.KindArchive,
-		"backups":  blobstore.KindBackup,
+		"archives":  blobstore.KindArchive,
+		"backups":   blobstore.KindBackup,
+		"overrides": blobstore.KindOverride,
 	}
 
 	fileBlobs := make(map[string]struct{})

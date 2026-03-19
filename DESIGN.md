@@ -556,66 +556,307 @@ remap configs, there is no caching of remap results. The planner always derives
 the final destination path set fresh from the active profile's remap rules at
 plan time.
 
-## 9. User overrides / editable files
+## 9. User Overrides / Editable Files
 
 ### Goal
 
-Allow users to apply local modifications to mod-provided config files
-(ini/yaml/json/etc.) without manually editing files after each
-reinstall/profile switch.
+Allow users to apply local modifications to mod-provided files without manually
+editing files after each apply or profile switch. Overrides sit above the mod
+priority layer: they are the final word on a file's content regardless of what
+mods provide.
 
-### Design approach
+Two override types are supported:
 
-Treat overrides as an additional layer applied after base mod deployment:
-- Base layer: files from winning mods
-- Override layer: user-defined changes applied to specific files
+- **Full-file** (`full_file`): the entire file content is replaced with a
+  user-provided blob. Implemented in v1.
+- **Patch** (`ini_patch`, `yaml_patch`, `json_patch`): a set of structured
+  key-value mutations applied on top of the base mod's file content.
+  Implemented in v2.
 
-Two plausible override representations:
-1. **Full-file override**: store the complete desired file content as a blob
-   (simplest, most robust)
-2. **Structured patch override**: store an "ini key/value" or "yaml path =
-   value" patch (nice UX, more parsing logic)
+### Override vs. high-priority mod
 
-Recommendation for readiness:
-- Schema supports both, but you can implement full-file override first.
-- Later add structured patch types.
+A single-file high-priority mod achieves similar results but lacks structural
+identity. The override system provides:
+
+- A staleness signal: "the file this override is shadowing has changed in the
+  base mod"
+- A redundancy signal: "your override matches the base file exactly, it may no
+  longer be necessary"
+- An orphan signal: "no mod in this profile provides the file this override is
+  shadowing"
+- Explicit intent: overrides are self-documenting as "I want this path to be
+  exactly this content"
+
+### Source anchor
+
+Every override records where its base content came from at creation time:
+
+- `source_archive_sha256`: the archive blob the base file was sourced from
+- `source_raw_path`: the path inside that archive
+- `source_content_sha256`: the content hash of the base file at creation time
+
+These fields are NULL when the override was created for a net-new file (no mod
+provides that path). If the source archive is later GC'd,
+`source_archive_sha256` goes NULL via `ON DELETE SET NULL` and staleness
+detection degrades gracefully.
+
+The staleness signal is derived from `source_content_sha256` - since archives
+are content-addressed and immutable, comparing this against the current winning
+mod's inventory entry content hash is sufficient to detect whether the base
+file has changed. `source_archive_sha256` and `source_raw_path` are used for
+display purposes ("this override was created against archive X at path Y").
+
+### Profile scope
+
+Overrides are scoped to `(profile_id, target_id, relpath)`. There is exactly
+one override per path per profile (no priority among overrides). If you want
+different behavior per profile you use different profiles.
+
+Overrides are independent per profile and can diverge freely after being
+copied. To re-sync overrides across profiles, delete and re-copy.
 
 ### Storage
 
 Overrides are stored in the `overrides` table:
-- Scoped to a `(profile_id, target_id, relpath)` triple - one override per path per profile
-- References a blob of `kind='override'` in the content-addressed store
-- `override_type` is always `full_file` in v1; reserved for future structured
-  patch types (ini patches, yaml merges, etc.)
+
+- Scoped to a `(profile_id, target_id, relpath)` triple
+- Full-file overrides reference a blob of `kind='override'` in the
+  content-addressed store via `blob_sha256`
+- Patch overrides have `blob_sha256 = NULL`; their mutations are stored as
+  rows in `override_patch_entries`
+- `override_type` is `full_file` in v1; `ini_patch`, `yaml_patch`,
+  `json_patch`, and `xml_patch` are reserved for v2
 - Only the latest override is stored per path; updating an override replaces
   the row (and the old blob becomes eligible for garbage collection)
 
-### Override ownership and drift
+A CHECK constraint enforces blob/type consistency:
+```sql
+CHECK (
+  (override_type = 'full_file' AND blob_sha256 IS NOT NULL)
+  OR
+  (override_type != 'full_file' AND blob_sha256 IS NULL)
+)
+```
 
-When a file has an override:
-- The tool becomes the "owner" of the final content.
-- Drift detection should indicate:
-  - base file differs from expected mod content
-  - override differs from expected override result
-  - external edits occurred
+Patch entries are stored in `override_patch_entries`, ordered by `position`,
+with `patch_type` values of `ini_set`, `ini_unset`, `yaml_set`, `yaml_unset`,
+`json_set`, `json_unset`, `xml_set`, `xml_unset`, `xml_clear`. The
+`entry_section` field is only meaningful for `ini_*` types. For `xml_*` types,
+`entry_key` is an XPath expression. CHECK constraints enforce that set
+operations have a value and unset/clear operations do not, and that
+`entry_section` is NULL for non-ini types.
 
-### Apply ordering
+### Commands
 
-During apply:
-1. deploy base mod files (priority winner)
-2. apply overrides (write final file content)
-3. hash and record final file hashes in installed_files
+All override commands are under `profiles` since overrides are profile-scoped,
+consistent with `profiles remap`.
+```
+profiles overrides set <path> <file>
+profiles overrides edit <path> [--reset]
+profiles overrides unset <path>
+profiles overrides list
+profiles overrides status [<path>]
+profiles overrides copy <src-profile> [--force]
+profiles overrides patch <path> set <key> <value> [--section <section>] [--type ini|yaml|json|xml]
+profiles overrides patch <path> unset <key> [--clear] [--section <section>] [--type ini|yaml|json|xml]
+profiles overrides patch <path> remove <key> [--section <section>]
+profiles overrides patch <path> list
+profiles overrides patch <path> preview
+```
 
-`installed_files` tracks ownership via mutually exclusive columns:
-- `owner_mod_file_version_id` - set when a mod version owns the file
-- `owner_override_id` - set when an override owns the file
-Exactly one must be non-NULL (enforced by CHECK constraint).
+#### `profiles overrides set <path> <file>`
 
-### Drift Detection
+Creates or replaces a full-file override for `<path>` in the active profile.
+The path is relative to the game directory. The file is ingested into the
+override blob store. The source anchor is captured automatically from the
+current conflict winner for that path in the active profile. If no mod provides
+that path the anchor fields are NULL and the override writes a net-new file.
 
-When a file has an active override, drift detection distinguishes:
-- Base file differs from expected mod content (mod was changed externally)
-- Override result differs from expected hash (override was changed externally)
+XML patch keys are XPath expressions (e.g. `//Settings/Window/@width`,
+`//Graphics/Resolution`). `xml_set` sets the text content or attribute value of
+all matched nodes. `xml_unset` removes matched nodes entirely. `xml_clear`
+empties the text content or attribute value of matched nodes without removing
+them. `--clear` on the unset subcommand selects `xml_clear` behavior and is
+only valid for xml overrides. `--section` is only valid for ini overrides.
+
+#### `profiles overrides edit <path> [--reset]`
+
+Opens the override content in `$VISUAL` or `$EDITOR` (fallback: `vi`).
+
+- If no override exists: extracts the base file content from the current
+  winning mod's archive, writes to a temp file, opens editor. On save, creates
+  a new override with source anchor captured.
+- If an override exists: extracts the current override blob, opens editor. On
+  save, updates the blob. Source anchor is preserved from original creation.
+- `--reset`: discards the existing override and starts fresh from the current
+  base file, re-capturing the source anchor. Requires confirmation unless
+  `--force`.
+- If the file is unchanged after editing, no-ops with a message.
+- If no mod provides the path and no override exists, errors with a suggestion
+  to use `profiles overrides set`.
+
+Note: `edit` requires archive extraction, which may be slow for large archives.
+This is an intentional exception to the rule that read-only commands do not
+extract: it is user-initiated and explicit.
+
+#### `profiles overrides unset <path>`
+
+Removes the override. The blob becomes eligible for GC. If the override was
+the applied owner of that path, the next apply will reconcile (either restoring
+the mod winner or removing the file if no mod provides it).
+
+#### `profiles overrides list`
+
+Lists all overrides for the active profile with a summary staleness status.
+Run `profiles overrides status` for full detail.
+
+#### `profiles overrides status [<path>]`
+
+Full staleness detail for all overrides or a specific path. Shows override
+type, source anchor info, current base mod if any, and staleness state with a
+human-readable explanation.
+
+#### `profiles overrides copy <src-profile> [--force]`
+
+Copies all overrides from `<src-profile>` into the active profile. Blob dedup
+means no file I/O (just new rows). Source anchor fields are copied verbatim so
+staleness detection works correctly in the destination profile. Errors if the
+active profile already has overrides at any of the same paths unless `--force`
+is passed, in which case conflicting overrides are replaced.
+
+#### `profiles overrides patch <path> set|unset|remove|list|preview`
+
+v2 commands. `set` and `unset` add patch entries (unset being used to explicitly
+delete a key). `remove` deletes patch entries. `list` shows current entries for
+that path. `preview` extracts the base file from the current winning mod's
+archive, applies the patch entries in memory, and displays a diff against the
+currently installed file or the base file. `preview` requires archive extraction
+and may be slow for large archives.
+
+`patch set` creates or updates a key-value mutation. `patch unset` marks
+a key for removal from the file on apply. `patch remove` removes the patch
+entry entirely so modctl no longer patches that key.
+
+JSON patch values are interpreted as JSON literals. To set a string value,
+the value from an input that would otherwise be parsed it must be passed with
+quotes (e.g., `'"42"'` or `'"true"'`). Unquoted values are interpreted as their
+JSON type: `true`/`false` for booleans, numeric strings for numbers, `null` for
+null.
+
+### Apply pipeline
+
+The override layer is applied after mod conflict resolution:
+
+1. Plan: resolve conflict winners per path across enabled mod file versions
+2. Override layer: for any path with an active override in the active profile,
+   the override becomes the content source. The mod winner is retained
+   internally as the "base" for staleness tracking but is not written to disk.
+3. Stage: extract winning mod archives to staging. For patch overrides, the
+   archive containing the base file must be staged even if the mod-level winner
+   for that path would otherwise be a noop.
+4. Execute: write files to disk. Full-file overrides read from the blob store.
+   Patch overrides read the base file from staging, apply patch entries in
+   memory, write result.
+5. Record: `installed_files` rows use `owner_override_id` for override-owned
+   paths. `content_sha256` records the hash of the final content written.
+
+### Backup logic
+
+Override-written files follow the same backup logic as mod-written files. If
+the destination path is not currently tool-owned, the existing file is backed
+up before being overwritten. `operation_changes` uses existing action types
+(`write`, `overwrite`). The override as source is identified by
+`owner_override_id` on the resulting `installed_files` row and
+`operation_changes` row.
+
+### Noop behavior
+
+- **Full-file overrides**: true noop check is possible. If
+  `installed_files.owner_override_id` matches the current override and
+  `content_sha256` matches the override blob's hash, the file is skipped.
+- **Patch overrides**: never noop'd. Patch overrides are always re-applied.
+  Patch application is a cheap in-memory operation and not expected to be a
+  hot path.
+
+### Dry-run behavior
+
+The planner performs static analysis only for patch overrides (no archive
+extraction during dry-run). Four plan states are possible for a path with a
+patch override:
+
+- **apply override**: patch will be applied, base file exists in inventory
+- **override unchanged** (noop, hidden): same override + same base archive as
+  last apply, and installed file is already owned by this override (full-file
+  only)
+- **override may be stale**: source anchor differs from current winning mod's
+  archive; will still attempt to apply but warns the user
+- **override inapplicable**: no mod provides the base file and anchor is
+  non-null; apply refuses this path unless `--force`
+
+### Staleness detection
+
+Staleness is evaluated at `profiles overrides status` time and as a lightweight
+heuristic at `profiles status` time.
+
+#### Six staleness states
+
+- **base_unchanged**: source anchor is non-NULL, current winning mod's version
+  of this file has the same content hash as `source_content_sha256`. Override
+  is current.
+- **stale**: source anchor is non-NULL, current winning mod's version of this
+  file has a different content hash than `source_content_sha256`. Base file has
+  changed - user should review the override.
+- **redundant**: override blob content matches the current base file content
+  exactly. Override may no longer be necessary. Computed in Go after fetching
+  query results, not in SQL.
+- **no_base**: no enabled mod in the profile provides this path. Override is
+  writing a net-new file, or the base mod was removed from the profile.
+- **anchor_lost**: source anchor is NULL but a mod does provide this path.
+  Archive was GC'd after override creation. Staleness unknown.
+- **net_new_no_anchor**: source anchor is NULL and no mod provides this path.
+  Override was created for a file no mod owns. No staleness concept applies.
+
+#### `profiles status` heuristic
+
+`profiles status` does not run full staleness evaluation. It surfaces:
+
+- "N override(s) active" in the Info section when any overrides exist
+- "X override(s) may be stale" warning when the heuristic detects that the
+  current base archive differs from `source_archive_sha256`
+- "X override(s) have no base mod" warning for `no_base` state
+- "X override(s) have lost their source anchor" warning for `anchor_lost` state
+
+The heuristic is a lightweight query (no content hashing, no remap evaluation).
+Remap rules are not evaluated; in edge cases where remaps affect which mod
+provides a path the staleness result may be imprecise. Full accuracy requires
+`profiles overrides status`.
+
+#### Override rows after profile item removal
+
+When a mod is removed from a profile, override rows for paths that mod provided
+are not deleted. They transition to `no_base` state and surface as warnings in
+`profiles status`. The user cleans them up explicitly with
+`profiles overrides unset`.
+
+### GC interaction
+
+Override blobs (`kind='override'`) are eligible for collection when no
+`overrides` row references them. Patch overrides have no blob so GC skips them
+naturally. The `source_archive_sha256` anchor on override rows does not pin the
+source archive blob; source archives are kept alive by
+`mod_file_versions.archive_sha256`. If the source archive is GC'd the anchor
+goes NULL via `ON DELETE SET NULL`.
+
+### Export/import
+
+Override blobs are included in both full and game-scoped export bundles.
+Overrides describe desired state (not on-disk state) and are meaningful on the
+destination machine. `override_patch_entries` rows travel as database rows and
+are included automatically in both export types.
+
+For game-scoped import, `overrides` and `override_patch_entries` are added to
+the ID remapping table. `overrides copy` copies override rows and patch entries
+in a single transaction, preserving source anchor fields verbatim.
 
 ## 10. Mod Incompatibilities
 
@@ -778,7 +1019,8 @@ This preserves a clean v1 while allowing richer v2.
   transfer remap rules from one mod version to another (e.g. when upgrading
   a mod). Use `preview` to see how the rules would apply without a full dry
   run.
-- `overrides set|unset|list` (v2 behavior; schema ready in v1)
+- `profiles overrides set|edit|status|unset|list|copy` - manage mod overrides
+- `profiles overrides patch set|unset|remove|list|preview` - manage structured mod overrides
 - `policy set` (future: merge/manual policy)
 - `status` (conflicts, drift, missing)
 - `apply` (top-level) - apply the active profile to the game directory.

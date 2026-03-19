@@ -196,6 +196,13 @@ func renderOperationDetail(
 				truncateSha(c.BackupBlobSha256.String)))
 		}
 
+		// Override reference
+		if c.OwnerOverrideID.Valid {
+			b.WriteString(fmt.Sprintf("      %s %s\n",
+				subtleStyle.Render("override:"),
+				subtleStyle.Render(fmt.Sprintf("(id %d)", c.OwnerOverrideID.Int64))))
+		}
+
 		// Notes
 		if c.Notes.Valid && strings.TrimSpace(c.Notes.String) != "" {
 			b.WriteString(fmt.Sprintf("      %s %s\n",

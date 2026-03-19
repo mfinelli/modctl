@@ -76,12 +76,13 @@ func Full(
 
 	// Import blobs first - do this before replacing the DB so that if
 	// blob ingestion fails we haven't touched the database yet
-	archiveCount, backupCount, err := importBlobs(ctx, bundle, bs)
+	archiveCount, backupCount, overrideCount, err := importBlobs(ctx, bundle, bs)
 	if err != nil {
 		return res, fmt.Errorf("import blobs: %w", err)
 	}
 	res.Archives = archiveCount
 	res.Backups = backupCount
+	res.Overrides = overrideCount
 
 	// Replace the database by copying the bundle DB into place
 	bundleDBPath := filepath.Join(bundle.BundleDir, exporter.DatabaseFilename)

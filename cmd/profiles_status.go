@@ -143,6 +143,20 @@ on the same path - run 'modctl apply --dry-run' for a precise diff.`,
 		// pass cacheReader (possibly nil) to the nexusInfo builder
 		nexusInfo := buildNexusInfo(ctx, items, cacheReader)
 
+		// fetch override count and staleness heuristic
+		overrideCount, err := q.CountOverridesByProfile(ctx, p.ID)
+		if err != nil {
+			return fmt.Errorf("loading override count: %w", err)
+		}
+
+		var staleOverrides []dbq.GetStalenessHeuristicForProfileRow
+		if overrideCount > 0 {
+			staleOverrides, err = q.GetStalenessHeuristicForProfile(ctx, p.ID)
+			if err != nil {
+				return fmt.Errorf("loading override staleness: %w", err)
+			}
+		}
+
 		fmt.Println(renderProfileStatus(
 			p,
 			gi,
@@ -151,6 +165,8 @@ on the same path - run 'modctl apply --dry-run' for a precise diff.`,
 			incompatibilities,
 			nexusInfo,
 			hasPendingChanges,
+			overrideCount,
+			staleOverrides,
 		))
 
 		return nil
@@ -190,6 +206,8 @@ func renderProfileStatus(
 	incompatibilities []dbq.GetIncompatibleModPairsForProfileRow,
 	nexusInfo map[int64]*nexusVersionInfo,
 	hasPendingChanges bool,
+	overrideCount int64,
+	staleOverrides []dbq.GetStalenessHeuristicForProfileRow,
 ) string {
 	// styles TODO extract somewhere...
 	cardBorder := lipgloss.NewStyle().
@@ -209,6 +227,7 @@ func renderProfileStatus(
 		Foreground(lipgloss.Color("8"))
 	subtleStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("245"))
+	infoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
 	warnStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("3"))
 	warningBanner := lipgloss.NewStyle().
@@ -320,6 +339,37 @@ func renderProfileStatus(
 		}
 	}
 
+	// categorize stale overrides
+	var staleCount, noBaseCount, anchorLostCount int
+	for _, s := range staleOverrides {
+		switch s.Staleness {
+		case "stale":
+			staleCount++
+		case "no_base":
+			noBaseCount++
+		case "anchor_lost":
+			anchorLostCount++
+		}
+	}
+
+	// info section
+	var infos []string
+
+	if overrideCount > 0 {
+		infos = append(infos, fmt.Sprintf(
+			"ℹ  %d override(s) active - run 'profiles overrides list' for details",
+			overrideCount,
+		))
+	}
+
+	if len(infos) > 0 {
+		b.WriteString(sectionTitleStyle.Render("Info") + "\n")
+		for _, info := range infos {
+			b.WriteString(infoStyle.Render(info) + "\n")
+		}
+		b.WriteString("\n")
+	}
+
 	// warnings section
 	var warnings []string
 
@@ -345,6 +395,27 @@ func renderProfileStatus(
 	if updatesAvailable > 0 {
 		warnings = append(warnings, fmt.Sprintf(
 			"⚠  %d mod(s) have updates available", updatesAvailable,
+		))
+	}
+
+	if staleCount > 0 {
+		warnings = append(warnings, fmt.Sprintf(
+			"⚠  %d override(s) may be stale - run 'profiles overrides status' for details",
+			staleCount,
+		))
+	}
+
+	if noBaseCount > 0 {
+		warnings = append(warnings, fmt.Sprintf(
+			"⚠  %d override(s) have no base mod - run 'profiles overrides status' for details",
+			noBaseCount,
+		))
+	}
+
+	if anchorLostCount > 0 {
+		warnings = append(warnings, fmt.Sprintf(
+			"⚠  %d override(s) have lost their source anchor - run 'profiles overrides status' for details",
+			anchorLostCount,
 		))
 	}
 

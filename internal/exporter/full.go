@@ -55,6 +55,13 @@ func Full(
 		for _, b := range backupBlobs {
 			toVerify = append(toVerify, blobToVerify{b.Sha256, blobstore.KindBackup})
 		}
+		overrideBlobs, err := q.ListBlobsByKind(ctx, string(blobstore.KindOverride))
+		if err != nil {
+			return fmt.Errorf("list override blobs: %w", err)
+		}
+		for _, b := range overrideBlobs {
+			toVerify = append(toVerify, blobToVerify{b.Sha256, blobstore.KindOverride})
+		}
 		if err := verifyBlobs(ctx, q, bs, toVerify); err != nil {
 			return fmt.Errorf("blob verification failed: %w", err)
 		}
@@ -105,6 +112,10 @@ func Full(
 	if err != nil {
 		return fmt.Errorf("list backup blobs: %w", err)
 	}
+	overrideBlobs, err := q.ListBlobsByKind(ctx, string(blobstore.KindOverride))
+	if err != nil {
+		return fmt.Errorf("list override blobs: %w", err)
+	}
 
 	// 4. Write manifest
 	manifest := Manifest{
@@ -115,8 +126,9 @@ func Full(
 		SchemaVersion:       schemaVersion,
 		DBSha256:            dbSha256,
 		Counts: ManifestCounts{
-			Archives: len(archiveBlobs),
-			Backups:  len(backupBlobs),
+			Archives:  len(archiveBlobs),
+			Backups:   len(backupBlobs),
+			Overrides: len(overrideBlobs),
 		},
 	}
 	if err := writeManifest(tw, manifest); err != nil {
@@ -145,6 +157,17 @@ func Full(
 		skip, err := writeBlobToTar(ctx, tw, bs, blobstore.KindBackup, b.Sha256)
 		if err != nil {
 			return fmt.Errorf("write backup blob %s: %w", b.Sha256, err)
+		}
+		if skip {
+			skipped = append(skipped, b.Sha256)
+		}
+	}
+
+	// 8. Write override blobs
+	for _, b := range overrideBlobs {
+		skip, err := writeBlobToTar(ctx, tw, bs, blobstore.KindOverride, b.Sha256)
+		if err != nil {
+			return fmt.Errorf("write override blob %s: %w", b.Sha256, err)
 		}
 		if skip {
 			skipped = append(skipped, b.Sha256)

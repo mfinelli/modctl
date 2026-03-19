@@ -65,8 +65,9 @@ type ManifestGame struct {
 }
 
 type ManifestCounts struct {
-	Archives int `json:"archives"`
-	Backups  int `json:"backups"`
+	Archives  int `json:"archives"`
+	Backups   int `json:"backups"`
+	Overrides int `json:"overrides"`
 }
 
 type Manifest struct {
