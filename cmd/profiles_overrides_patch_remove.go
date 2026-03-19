@@ -191,7 +191,7 @@ For ini patches, use --section to identify entries in a specific section.`,
 }
 
 func init() {
-	profilesOverridesCmd.AddCommand(profilesOverridesPatchRemoveCmd)
+	profilesOverridesPatchCmd.AddCommand(profilesOverridesPatchRemoveCmd)
 
 	profilesOverridesPatchRemoveCmd.Flags().StringVarP(&profilesOverridesPatchRemoveGame, "game", "g", "",
 		"Override the currently active game")
