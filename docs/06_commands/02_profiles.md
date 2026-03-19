@@ -223,3 +223,131 @@ been scanned yet, run `modctl mods scan-inventory` first.
 | Flag              | Description                                                            |
 |-------------------|------------------------------------------------------------------------|
 | `--show-filtered` | Show entries excluded by rules alongside the reason they were filtered |
+
+## Overrides
+
+For a full explanation of overrides see [Overrides](../../guides/overrides).
+
+### profiles overrides set
+
+Create or replace a full-file override for a path in the active profile. The
+path is relative to the game directory. The file is ingested into modctl's
+override store so you can delete the original afterwards, if you'd like.
+```bash
+modctl profiles overrides set textures/ui/crosshair.dds my-crosshair.dds
+```
+
+### profiles overrides edit
+
+Open an override's content in your editor (`$VISUAL` or `$EDITOR`, falling
+back to `vi`). If no override exists for the path, modctl extracts the base
+file from the current winning mod's archive and opens that instead; saving
+creates a new override. If an override already exists, its current content is
+opened for editing.
+```bash
+modctl profiles overrides edit textures/ui/crosshair.dds
+```
+
+| Flag      | Description                                                              |
+|-----------|--------------------------------------------------------------------------|
+| `--reset` | Discard the existing override and start fresh from the current base file |
+
+### profiles overrides unset
+
+Remove an override for a path. The next apply will restore whatever the
+winning mod provides, or remove the file if no mod claims the path.
+```bash
+modctl profiles overrides unset textures/ui/crosshair.dds
+```
+
+### profiles overrides list
+
+List all overrides for the active profile with a summary staleness status.
+```bash
+modctl profiles overrides list
+```
+
+### profiles overrides status
+
+Show full staleness detail for all overrides in the active profile, or for a
+specific path. Includes source anchor information and a human-readable
+explanation of each override's state.
+```bash
+modctl profiles overrides status
+modctl profiles overrides status textures/ui/crosshair.dds
+```
+
+### profiles overrides copy
+
+Copy all overrides from another profile into the active profile. Source anchor
+fields are preserved so staleness detection works correctly after copying.
+```bash
+modctl profiles overrides copy "Other Profile"
+```
+
+| Flag      | Description                                         |
+|-----------|-----------------------------------------------------|
+| `--force` | Replace conflicting overrides in the active profile |
+
+### profiles overrides patch set
+
+Add or update a patch entry for a path in the active profile. The patch type
+is inferred from the file extension or can be specified with `--type`. If no
+patch override exists for the path yet, one is created automatically.
+```bash
+modctl profiles overrides patch set settings.ini MaxFramerate 60 --section Display
+modctl profiles overrides patch set config.yaml graphics.quality ultra
+modctl profiles overrides patch set config.json renderDistance 128
+modctl profiles overrides patch set config.xml "//Display/Resolution" 1440
+```
+
+| Flag               | Description                                                                            |
+|--------------------|----------------------------------------------------------------------------------------|
+| `--section <name>` | Section to target (INI overrides only)                                                 |
+| `--type <type>`    | Patch type: `ini`, `yaml`, `json`, or `xml` (inferred from extension if not specified) |
+
+### profiles overrides patch unset
+
+Mark a key for removal so it is deleted from the file when the patch is
+applied. If a set entry already exists for this key it is converted to an
+unset entry.
+```bash
+modctl profiles overrides patch unset settings.ini SomeKey --section Display
+modctl profiles overrides patch unset config.xml "//Window/@legacy" --clear
+```
+
+| Flag               | Description                                                                            |
+|--------------------|----------------------------------------------------------------------------------------|
+| `--section <name>` | Section to target (INI overrides only)                                                 |
+| `--type <type>`    | Patch type: `ini`, `yaml`, `json`, or `xml` (inferred from extension if not specified) |
+| `--clear`          | Empty the node's content instead of removing it (XML overrides only)                   |
+
+### profiles overrides patch remove
+
+Remove a patch entry entirely so modctl no longer patches that key. Different
+from `patch unset`, which marks the key for removal from the file on apply.
+If no patch entries remain after removal, the override itself is also removed.
+```bash
+modctl profiles overrides patch remove settings.ini MaxFramerate --section Display
+```
+
+| Flag               | Description                            |
+|--------------------|----------------------------------------|
+| `--section <name>` | Section to target (INI overrides only) |
+
+### profiles overrides patch list
+
+List all patch entries for a path in the active profile, in the order they
+will be applied.
+```bash
+modctl profiles overrides patch list settings.ini
+```
+
+### profiles overrides patch preview
+
+Extract the base file from the current winning mod's archive, apply all patch
+entries in memory, and display a unified diff of the result. Requires archive
+extraction and may be slow for large archives.
+```bash
+modctl profiles overrides patch preview settings.ini
+```
