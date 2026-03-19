@@ -5,7 +5,10 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 
 `modctl` adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## unreleased
+## v0.3.0 - 2026-03-19
+
+This will hopefully be the final pre-release (barring other bugfixes or issues
+that turn up during testing) before cutting a stable release.
 
 **BREAKING CHANGE**: the internal database schema has been modified without
 a corresponding migration. You'll need to unapply any profiles you have active

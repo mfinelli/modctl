@@ -14,5 +14,5 @@ index_format = "elasticlunr_json"
 theme = "catppuccin-mocha"
 
 [extra]
-current_version = "v0.2.0"
-release_url = "https://github.com/mfinelli/modctl/releases/tag/v0.2.0"
+current_version = "v0.3.0"
+release_url = "https://github.com/mfinelli/modctl/releases/tag/v0.3.0"
