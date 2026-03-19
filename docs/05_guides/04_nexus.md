@@ -140,5 +140,6 @@ API call to check.
 
 ---
 
-Next up is the [Configuration reference](../configuration), which covers all
-available configuration keys and their defaults.
+Now that you know about the Nexus Mods integration the next topic worth
+investigating is the [Overrides system](../overrides) which let you set
+specific files during apply regardless of load order.
