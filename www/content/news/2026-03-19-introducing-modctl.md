@@ -73,7 +73,9 @@ It's worth noting that right now modctl only supports Steam, because that's
 where I do most of my gaming, but I'm hoping to add support for other stores in
 the future.
 
-Anyway, this is a "here's what I've been working on" post not a "it shipped"
+## Get involved
+
+Anyway, this is a "here's what I've been working on" post not an "it shipped"
 post (but I'll write one of those when I do finally release 1.0). I hope you'll
 give it a try and let me know what you think as I work towards a stable
 release.
