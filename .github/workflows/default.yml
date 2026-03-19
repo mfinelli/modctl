@@ -35,7 +35,7 @@ jobs:
         with:
           install-go: false
       - run: make modctl.1
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: build
           path: modctl
@@ -134,12 +134,12 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
       - run: go mod vendor
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: deb
           path: pkg/*.deb
           retention-days: 1
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: rpm
           path: pkg/rpmbuild/RPMS/**/*.rpm
@@ -196,7 +196,7 @@ jobs:
           CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: arch
           path: |
@@ -252,7 +252,7 @@ jobs:
           } >> $GITHUB_OUTPUT
         id: changelog
       - run: ./pkg/release.bash
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: release
           path: |
