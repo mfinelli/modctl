@@ -183,7 +183,7 @@ Use --force to proceed even if the operation would exhaust your API quota.`,
 			var filesResp *nexusclient.ModFilesResponse
 
 			if needsFetch[mp.ModPageID] {
-				fresh, err := client.GetModFiles(mp.NexusGameDomain.String, int(mp.NexusModID.Int64))
+				fresh, err := client.GetModFiles(mp.NexusGameDomain.String, mp.NexusModID.Int64)
 				if err != nil {
 					fmt.Println(warnStyle.Render(fmt.Sprintf(
 						"  ⚠ failed to fetch file info for mod page %d: %s",
@@ -194,7 +194,7 @@ Use --force to proceed even if the operation would exhaust your API quota.`,
 				}
 				filesResp = fresh
 			} else {
-				cached, err := client.GetModFilesCached(mp.NexusGameDomain.String, int(mp.NexusModID.Int64))
+				cached, err := client.GetModFilesCached(mp.NexusGameDomain.String, mp.NexusModID.Int64)
 				if err != nil {
 					logger.Warn("failed to read cached mod files",
 						"mod_page_id", mp.ModPageID,

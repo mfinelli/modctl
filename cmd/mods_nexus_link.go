@@ -228,7 +228,7 @@ func runManualLink(
 	}
 
 	// Fetch fresh file list
-	filesResp, err := client.GetModFiles(gameDomain, int(modID))
+	filesResp, err := client.GetModFiles(gameDomain, modID)
 	if err != nil {
 		return fmt.Errorf("fetching nexus file list: %w", err)
 	}
@@ -352,7 +352,7 @@ func runAutoLink(
 	failed := 0
 
 	for key, versions := range grouped {
-		filesResp, err := client.GetModFiles(key.domain, int(key.modID))
+		filesResp, err := client.GetModFiles(key.domain, key.modID)
 		if err != nil {
 			fmt.Println(warnStyle.Render(fmt.Sprintf(
 				"  ⚠ failed to fetch file list for %s/mods/%d: %s",

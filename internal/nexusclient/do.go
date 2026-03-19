@@ -34,7 +34,7 @@ const nexusTimeLayout = "2006-01-02 15:04:05 -0700"
 // ModInfo represents the fields we care about from
 // /v1/games/{domain}/mods/{id}.json
 type ModInfo struct {
-	ModID       int    `json:"mod_id"`
+	ModID       int64  `json:"mod_id"`
 	Name        string `json:"name"`
 	Summary     string `json:"summary"`
 	Author      string `json:"author"`
@@ -53,7 +53,7 @@ type ModFilesResponse struct {
 }
 
 type ModFileInfo struct {
-	FileID            int    `json:"file_id"`
+	FileID            int64  `json:"file_id"`
 	Name              string `json:"name"`
 	Version           string `json:"version"`
 	CategoryName      string `json:"category_name"`
@@ -64,8 +64,8 @@ type ModFileInfo struct {
 }
 
 type FileUpdateInfo struct {
-	OldFileID         int    `json:"old_file_id"`
-	NewFileID         int    `json:"new_file_id"`
+	OldFileID         int64  `json:"old_file_id"`
+	NewFileID         int64  `json:"new_file_id"`
 	OldFileName       string `json:"old_file_name"`
 	NewFileName       string `json:"new_file_name"`
 	UploadedTimestamp int64  `json:"uploaded_timestamp"`
@@ -167,7 +167,7 @@ func (c *Client) updateRateLimitState(resp *http.Response) error {
 	})
 }
 
-func (c *Client) GetMod(gameDomain string, modID int) (*ModInfo, error) {
+func (c *Client) GetMod(gameDomain string, modID int64) (*ModInfo, error) {
 	path := fmt.Sprintf("/v1/games/%s/mods/%d.json", gameDomain, modID)
 	var result ModInfo
 	var raw []byte
@@ -181,7 +181,7 @@ func (c *Client) GetMod(gameDomain string, modID int) (*ModInfo, error) {
 	return &result, nil
 }
 
-func (c *Client) GetModFiles(gameDomain string, modID int) (*ModFilesResponse, error) {
+func (c *Client) GetModFiles(gameDomain string, modID int64) (*ModFilesResponse, error) {
 	path := fmt.Sprintf("/v1/games/%s/mods/%d/files.json", gameDomain, modID)
 	var result ModFilesResponse
 	var raw []byte

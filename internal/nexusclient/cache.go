@@ -35,7 +35,7 @@ func (c *Client) cacheModInfo(info *ModInfo) error {
 	q := dbc.New(c.db)
 	err := q.UpsertNexusModInfo(c.ctx, dbc.UpsertNexusModInfoParams{
 		NexusGameDomain: info.DomainName,
-		NexusModID:      int64(info.ModID),
+		NexusModID:      info.ModID,
 		FetchedAt:       time.Now().UTC().Format(time.RFC3339),
 		Name:            sqlNullString(info.Name),
 		Summary:         sqlNullString(info.Summary),
@@ -49,7 +49,7 @@ func (c *Client) cacheModInfo(info *ModInfo) error {
 	return nil
 }
 
-func (c *Client) cacheModFiles(gameDomain string, modID int, resp *ModFilesResponse) error {
+func (c *Client) cacheModFiles(gameDomain string, modID int64, resp *ModFilesResponse) error {
 	fetchedAt := time.Now().UTC().Format(time.RFC3339)
 
 	tx, err := c.db.BeginTx(c.ctx, nil)
@@ -62,13 +62,13 @@ func (c *Client) cacheModFiles(gameDomain string, modID int, resp *ModFilesRespo
 
 	if err := q.DeleteNexusFileInfoForMod(c.ctx, dbc.DeleteNexusFileInfoForModParams{
 		NexusGameDomain: gameDomain,
-		NexusModID:      int64(modID),
+		NexusModID:      modID,
 	}); err != nil {
 		return fmt.Errorf("deleting stale nexus file info cache: %w", err)
 	}
 	if err := q.DeleteNexusFileUpdatesForMod(c.ctx, dbc.DeleteNexusFileUpdatesForModParams{
 		NexusGameDomain: gameDomain,
-		NexusModID:      int64(modID),
+		NexusModID:      modID,
 	}); err != nil {
 		return fmt.Errorf("deleting stale nexus file updates cache: %w", err)
 	}
@@ -76,8 +76,8 @@ func (c *Client) cacheModFiles(gameDomain string, modID int, resp *ModFilesRespo
 	for _, f := range resp.Files {
 		if err := q.UpsertNexusFileInfo(c.ctx, dbc.UpsertNexusFileInfoParams{
 			NexusGameDomain:   gameDomain,
-			NexusModID:        int64(modID),
-			NexusFileID:       int64(f.FileID),
+			NexusModID:        modID,
+			NexusFileID:       f.FileID,
 			FetchedAt:         fetchedAt,
 			Name:              sqlNullString(f.Name),
 			Version:           sqlNullString(f.Version),
@@ -95,9 +95,9 @@ func (c *Client) cacheModFiles(gameDomain string, modID int, resp *ModFilesRespo
 	for _, u := range resp.FileUpdates {
 		if err := q.UpsertNexusFileUpdate(c.ctx, dbc.UpsertNexusFileUpdateParams{
 			NexusGameDomain:   gameDomain,
-			NexusModID:        int64(modID),
-			OldFileID:         int64(u.OldFileID),
-			NewFileID:         int64(u.NewFileID),
+			NexusModID:        modID,
+			OldFileID:         u.OldFileID,
+			NewFileID:         u.NewFileID,
 			UploadedTimestamp: u.UploadedTimestamp,
 			FetchedAt:         fetchedAt,
 		}); err != nil {

@@ -27,12 +27,12 @@ import (
 	"github.com/mfinelli/modctl/internal/nexusclient/dbc"
 )
 
-func (c *Client) GetModCached(gameDomain string, modID int) (*ModInfo, error) {
+func (c *Client) GetModCached(gameDomain string, modID int64) (*ModInfo, error) {
 	q := dbc.New(c.db)
 
 	row, err := q.GetNexusModInfo(c.ctx, dbc.GetNexusModInfoParams{
 		NexusGameDomain: gameDomain,
-		NexusModID:      int64(modID),
+		NexusModID:      modID,
 	})
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("reading nexus mod info cache: %w", err)
@@ -67,12 +67,12 @@ func (c *Client) GetModCached(gameDomain string, modID int) (*ModInfo, error) {
 	return info, nil
 }
 
-func (c *Client) GetModFilesCached(gameDomain string, modID int) (*ModFilesResponse, error) {
+func (c *Client) GetModFilesCached(gameDomain string, modID int64) (*ModFilesResponse, error) {
 	q := dbc.New(c.db)
 
 	rows, err := q.GetNexusFileInfoForMod(c.ctx, dbc.GetNexusFileInfoForModParams{
 		NexusGameDomain: gameDomain,
-		NexusModID:      int64(modID),
+		NexusModID:      modID,
 	})
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("reading nexus file info cache: %w", err)
@@ -91,7 +91,7 @@ func (c *Client) GetModFilesCached(gameDomain string, modID int) (*ModFilesRespo
 			)
 			updateRows, err := q.GetNexusFileUpdatesForMod(c.ctx, dbc.GetNexusFileUpdatesForModParams{
 				NexusGameDomain: gameDomain,
-				NexusModID:      int64(modID),
+				NexusModID:      modID,
 			})
 			if err != nil && !errors.Is(err, sql.ErrNoRows) {
 				return nil, fmt.Errorf("reading nexus file updates cache: %w", err)
@@ -120,7 +120,7 @@ func (c *Client) GetModFilesCached(gameDomain string, modID int) (*ModFilesRespo
 // modInfoFromRow converts a dbc.NexusModInfo row back to a ModInfo struct
 func modInfoFromRow(row dbc.NexusModInfo) *ModInfo {
 	return &ModInfo{
-		ModID:       int(row.NexusModID),
+		ModID:       row.NexusModID,
 		Name:        row.Name.String,
 		Summary:     row.Summary.String,
 		Author:      row.Author.String,
@@ -135,7 +135,7 @@ func modFilesResponseFromRows(fileRows []dbc.NexusFileInfo, updateRows []dbc.Nex
 	files := make([]ModFileInfo, 0, len(fileRows))
 	for _, r := range fileRows {
 		files = append(files, ModFileInfo{
-			FileID:            int(r.NexusFileID),
+			FileID:            r.NexusFileID,
 			Name:              r.Name.String,
 			Version:           r.Version.String,
 			CategoryName:      r.CategoryName.String,
@@ -149,8 +149,8 @@ func modFilesResponseFromRows(fileRows []dbc.NexusFileInfo, updateRows []dbc.Nex
 	updates := make([]FileUpdateInfo, 0, len(updateRows))
 	for _, r := range updateRows {
 		updates = append(updates, FileUpdateInfo{
-			OldFileID:         int(r.OldFileID),
-			NewFileID:         int(r.NewFileID),
+			OldFileID:         r.OldFileID,
+			NewFileID:         r.NewFileID,
 			UploadedTimestamp: r.UploadedTimestamp,
 		})
 	}

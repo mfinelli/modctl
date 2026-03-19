@@ -23,7 +23,7 @@ import "net/http"
 // UserInfo contains the fields from /v1/users/validate.json that we surface.
 // The validate endpoint does not count against the Nexus rate limit.
 type UserInfo struct {
-	UserID int    `json:"user_id"`
+	UserID int64  `json:"user_id"`
 	Name   string `json:"name"`
 	// IsPremium and IsSupporter are present in two forms in the API response
 	// ("is_premium?" and "is_premium"). We decode both and prefer the

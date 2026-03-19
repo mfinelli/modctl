@@ -481,7 +481,7 @@ func attemptNexusLink(
 	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 
 	// Always try to fetch mod info - useful for name even if file ID fails
-	modInfo, err := client.GetModCached(p.gameDomain, int(p.modID))
+	modInfo, err := client.GetModCached(p.gameDomain, p.modID)
 	if err != nil {
 		return fmt.Errorf("fetching nexus mod info: %w", err)
 	}
@@ -498,7 +498,7 @@ func attemptNexusLink(
 	}
 
 	// Fetch file list for identification
-	filesResp, err := client.GetModFiles(p.gameDomain, int(p.modID))
+	filesResp, err := client.GetModFiles(p.gameDomain, p.modID)
 	if err != nil {
 		return fmt.Errorf("fetching nexus file list: %w", err)
 	}
