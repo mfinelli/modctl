@@ -205,7 +205,7 @@ func setYAMLNode(file *ast.File, p *goyaml.Path, rawKey string, value string) er
 		return nil
 	}
 
-	// Key doesn't exist — append directly via AST mutation.
+	// key doesn't exist, append directly via AST mutation
 	return appendYAMLKey(file, rawKey, valueNode)
 }
 

@@ -116,7 +116,7 @@ For ini patches, use --section to identify entries in a specific section.`,
 
 		if override.OverrideType == "full_file" {
 			return fmt.Errorf(
-				"override for %q is a full-file override — use 'profiles overrides unset' to remove it",
+				"override for %q is a full-file override; use 'profiles overrides unset' to remove it",
 				relpath,
 			)
 		}

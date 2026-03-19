@@ -231,16 +231,16 @@ func formatStalenessState(state string) (display, explanation string) {
 			"base file has not changed since override was created"
 	case "stale":
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("⚠ may be stale"),
-			"base file has changed — review your override"
+			"base file has changed; review your override"
 	case "redundant":
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("~ redundant"),
-			"override content matches the base file — it may no longer be necessary"
+			"override content matches the base file (it may no longer be necessary)"
 	case "no_base":
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("⚠ no base mod"),
 			"no mod in this profile provides this path"
 	case "anchor_lost":
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("⚠ anchor lost"),
-			"source archive was removed — staleness cannot be determined"
+			"source archive was removed, staleness cannot be determined"
 	case "net_new_no_anchor":
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("net-new"),
 			"override writes a file not provided by any mod"

@@ -260,7 +260,7 @@ func TestApply_XML(t *testing.T) {
 		}
 		result, err := Apply(entries, []byte{})
 		require.NoError(t, err)
-		// no match on empty doc — skipped, but no error and output is valid
+		// no match on empty doc: skipped, but no error and output is valid
 		assert.Equal(t, 0, result.Applied)
 		assert.Equal(t, 1, result.Skipped)
 		assert.NotEmpty(t, result.Output)

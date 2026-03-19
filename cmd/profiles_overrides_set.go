@@ -115,7 +115,7 @@ winner for this path in the active profile.`,
 			})
 			if err == nil {
 				return fmt.Errorf(
-					"override already exists for %q in profile %q — pass --force to replace it",
+					"override already exists for %q in profile %q; pass --force to replace it",
 					relpath, p.Name,
 				)
 			}
@@ -194,7 +194,7 @@ winner for this path in the active profile.`,
 
 		fmt.Printf("override set for %q in profile %q\n", relpath, p.Name)
 		if !srcArchiveSha256.Valid {
-			fmt.Println("  note: no mod in this profile provides this path — override will write a net-new file")
+			fmt.Println("  note: no mod in this profile provides this path; override will write a net-new file")
 		}
 
 		return nil

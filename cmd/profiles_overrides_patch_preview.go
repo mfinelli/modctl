@@ -172,7 +172,7 @@ Note: requires archive extraction which may be slow for large archives.`,
 			StagingDir: viper.GetString("tmp_dir"),
 		}
 
-		// fetch base file content — extract from winning mod if available
+		// fetch base file content (extract from winning mod if available)
 		var baseContent []byte
 		var baseLabel string
 		noBase := false
@@ -217,7 +217,7 @@ Note: requires archive extraction which may be slow for large archives.`,
 		fmt.Println()
 
 		if noBase {
-			fmt.Println(warnStyle.Render("  ⚠ no mod in this profile provides this path — showing result against empty document"))
+			fmt.Println(warnStyle.Render("  ⚠ no mod in this profile provides this path; showing result against empty document"))
 			fmt.Println()
 		}
 

@@ -220,7 +220,7 @@ Use --dry-run to preview the plan without making any changes.`,
 				if planOp.OverrideID.Valid {
 					overrideOps = append(overrideOps, planOp)
 					// For patch overrides, the base archive is handled via
-					// PatchBaseArchives below — not grouped here.
+					// PatchBaseArchives below, not grouped here
 				} else {
 					sha := planOp.File.Winner().Entry.ArchiveSha256
 					if _, ok := archiveMap[sha]; !ok {
@@ -238,13 +238,13 @@ Use --dry-run to preview the plan without making any changes.`,
 			}
 		}
 
-		// Add patch base archives to the staging set if not already present.
+		// Add patch base archives to the staging set if not already present
+		// No ops added; archive is staged for patch base file access only
 		for _, sha := range plan.PatchBaseArchives {
 			if _, ok := archiveMap[sha]; !ok {
 				archiveMap[sha] = &archiveGroup{sha256: sha}
 				archiveOrder = append(archiveOrder, sha)
 			}
-			// No ops added — archive is staged for patch base file access only.
 		}
 
 		// Counters for summary

@@ -295,7 +295,7 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 		overrideMap[o.Relpath] = oi
 
 		if _, exists := winners[o.Relpath]; !exists {
-			// net-new override path — synthesize a PlanFile with no conflicts
+			// net-new override path (synthesize a PlanFile with no conflicts)
 			pf := PlanFile{
 				DestPath:  o.Relpath,
 				Conflicts: []Conflict{},
