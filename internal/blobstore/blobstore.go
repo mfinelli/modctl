@@ -27,6 +27,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"syscall"
 )
 
 type Kind string
@@ -155,7 +156,7 @@ func (s Store) IngestFile(ctx context.Context, kind Kind, srcPath string) (Inges
 	}
 
 	// Move into place.
-	if err := os.Rename(tmpName, finalPath); err != nil {
+	if err := replaceFile(tmpName, finalPath); err != nil {
 		// If we raced and it appeared, treat as dedupe.
 		if st, statErr := os.Stat(finalPath); statErr == nil {
 			if st.Size() != n {
@@ -257,4 +258,49 @@ func fsyncDir(dir string) error {
 	}
 	defer f.Close()
 	return f.Sync()
+}
+
+// replaceFile atomically moves src to dst using rename. If src and dst are on
+// different filesystems (EXDEV), it falls back to a copy-then-delete.
+func replaceFile(src, dst string) error {
+	err := os.Rename(src, dst)
+	if err == nil {
+		return nil
+	}
+	if !isExdev(err) {
+		return err
+	}
+	// Cross-device fallback: copy then remove src.
+	if err := copyFile(src, dst); err != nil {
+		return err
+	}
+	return os.Remove(src)
+}
+
+func isExdev(err error) bool {
+	var linkErr *os.LinkError
+	if errors.As(err, &linkErr) {
+		return errors.Is(linkErr.Err, syscall.EXDEV)
+	}
+	return false
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("open src: %w", err)
+	}
+	defer in.Close()
+
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		return fmt.Errorf("create dst: %w", err)
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, in); err != nil {
+		os.Remove(dst) // best-effort cleanup
+		return fmt.Errorf("copy: %w", err)
+	}
+	return out.Sync()
 }
