@@ -710,9 +710,9 @@ INSERT INTO mod_incompatibilities (
     source
 ) VALUES (
     -- enforce canonical ordering so (A,B) and (B,A) are always the same row
-    MIN(sqlc.arg(mod_page_id_a), sqlc.arg(mod_page_id_b)),
-    MAX(sqlc.arg(mod_page_id_a), sqlc.arg(mod_page_id_b)),
-    ?,
+    MIN(CAST(sqlc.arg(mod_page_id_a) AS INTEGER), CAST(sqlc.arg(mod_page_id_b) AS INTEGER)),
+    MAX(CAST(sqlc.arg(mod_page_id_a) AS INTEGER), CAST(sqlc.arg(mod_page_id_b) AS INTEGER)),
+    sqlc.arg(reason),
     'user'
 );
 
