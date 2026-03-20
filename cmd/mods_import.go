@@ -209,6 +209,35 @@ has been safely stored and the database has been updated successfully.`,
 			opts.FileLabel = &modsImportLabel
 		}
 
+		// If we have a nexus URL and an API key, pre-fetch the file list to identify
+		// the correct label before creating the mod_file row
+		if modsImportNexusUrl != "" && !modsImportSkipNexusLink {
+			apiKey := viper.GetString("nexus.apikey")
+			if apiKey != "" {
+				client, err := nexusclient.New(ctx, apiKey, logger, rootCmd.Version)
+				if err != nil {
+					fmt.Println(warnStyle.Render(fmt.Sprintf("  ⚠ failed to initialize nexus client: %s", err)))
+				} else {
+					defer client.Close()
+					filesResp, err := client.GetModFiles(*gameDomain, *modID)
+					if err != nil {
+						fmt.Println(warnStyle.Render(fmt.Sprintf("  ⚠ failed to fetch nexus file list: %s", err)))
+					} else {
+						match, _, _ := nexus.IdentifyNexusFile(
+							filepath.Base(inputPath),
+							info.Size(),
+							modsImportLabel,
+							modsImportFileVersion,
+							filesResp.Files,
+						)
+						if match != nil && modsImportLabel == "" {
+							opts.FileLabel = &match.File.Name
+						}
+					}
+				}
+			}
+		}
+
 		pageID, fileID, versionID, sha, size, err := importer.ImportArchive(ctx, db, q, bs, opts)
 		if err != nil {
 			return err
