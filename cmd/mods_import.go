@@ -223,6 +223,8 @@ has been safely stored and the database has been updated successfully.`,
 					if err != nil {
 						fmt.Println(warnStyle.Render(fmt.Sprintf("  ⚠ failed to fetch nexus file list: %s", err)))
 					} else {
+						// discard warnings/errors in this pre-fetch pass since we'll surface
+						// them again in the post import pass
 						match, _, _ := nexus.IdentifyNexusFile(
 							filepath.Base(inputPath),
 							info.Size(),
