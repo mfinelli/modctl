@@ -256,9 +256,6 @@ modctl profiles overrides edit textures/ui/crosshair.dds
 
 Remove an override for a path. The next apply will restore whatever the
 winning mod provides, or remove the file if no mod claims the path.
-
-If the profile is currently applied, unapply it first before removing the
-override.
 ```bash
 modctl profiles overrides unset textures/ui/crosshair.dds
 ```

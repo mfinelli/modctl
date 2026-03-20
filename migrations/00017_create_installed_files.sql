@@ -20,8 +20,8 @@ CREATE TABLE installed_files
   size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0),
   -- owner: exactly one of these is set
   -- who "owns" this file in the plan (the winner that supplied it)
-  owner_mod_file_version_id INTEGER REFERENCES mod_file_versions(id) ON UPDATE CASCADE ON DELETE RESTRICT,
-  owner_override_id INTEGER REFERENCES overrides(id) ON UPDATE CASCADE ON DELETE RESTRICT,
+  owner_mod_file_version_id INTEGER REFERENCES mod_file_versions(id) ON UPDATE CASCADE ON DELETE SET NULL,
+  owner_override_id INTEGER REFERENCES overrides(id) ON UPDATE CASCADE ON DELETE SET NULL,
   -- the profile that last applied this file ("last writer wins"; not exclusive
   -- ownership -- the same mod file version may exist in multiple profiles)
   owner_profile_id INTEGER REFERENCES profiles(id) ON UPDATE CASCADE ON DELETE SET NULL,
@@ -31,13 +31,7 @@ CREATE TABLE installed_files
   verified_at TEXT,
 
   -- one canonical row per path
-  UNIQUE(game_install_id, target_id, relpath),
-
-  CHECK (
-    (owner_mod_file_version_id IS NOT NULL AND owner_override_id IS NULL)
-    OR
-    (owner_mod_file_version_id IS NULL AND owner_override_id IS NOT NULL)
-  )
+  UNIQUE(game_install_id, target_id, relpath)
 ) STRICT;
 -- +goose StatementEnd
 

@@ -19,12 +19,10 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"path/filepath"
 	"strconv"
 
-	"github.com/mattn/go-sqlite3"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
@@ -114,12 +112,6 @@ path back to the mod winner or remove it if no mod provides it.`,
 			TargetID:  target.ID,
 			Relpath:   relpath,
 		}); err != nil {
-			if isInstalledFilesFK(err) {
-				return fmt.Errorf(
-					"override for %q is currently installed; unapply the profile first, then remove the override",
-					relpath,
-				)
-			}
 			return fmt.Errorf("delete override: %w", err)
 		}
 
@@ -144,12 +136,4 @@ func init() {
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return completion.ProfileNames(cmd, toComplete)
 		})
-}
-
-func isInstalledFilesFK(err error) bool {
-	var sqliteErr sqlite3.Error
-	if errors.As(err, &sqliteErr) {
-		return sqliteErr.ExtendedCode == sqlite3.ErrConstraintForeignKey
-	}
-	return false
 }
