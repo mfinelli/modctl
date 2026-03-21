@@ -2046,3 +2046,15 @@ WHERE id = ?;
 UPDATE mod_files
 SET is_primary = 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 WHERE id = ?;
+
+-- name: GetInventoryParseErrorsForArchive :many
+SELECT
+    id,
+    archive_sha256,
+    raw_path,
+    position,
+    parse_error
+FROM archive_inventory_entries
+WHERE archive_sha256 = ?
+  AND parse_error IS NOT NULL
+ORDER BY position ASC;

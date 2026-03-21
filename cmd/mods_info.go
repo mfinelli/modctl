@@ -39,7 +39,10 @@ import (
 	"go.finelli.dev/util"
 )
 
-var modsInfoGame string
+var (
+	modsInfoGame          string
+	modsInfoShowInventory bool
+)
 
 var modsInfoCmd = &cobra.Command{
 	Use:   "info",
@@ -100,7 +103,7 @@ to refresh cached data.`,
 			return err
 		}
 
-		return runModsInfo(ctx, q, mp.ID, gi.ID)
+		return runModsInfo(ctx, q, mp.ID, gi.ID, modsInfoShowInventory)
 	},
 }
 
@@ -113,6 +116,9 @@ func init() {
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return completion.GameInstallSelectors(cmd, toComplete)
 		})
+
+	modsInfoCmd.Flags().BoolVar(&modsInfoShowInventory, "show-inventory", false,
+		"Show archive inventory entries for each version")
 }
 
 type nexusFileCache struct {
@@ -128,11 +134,18 @@ type profileMembership struct {
 	Priority    int64
 }
 
+type versionInventory struct {
+	Entries     []dbq.GetInventoryEntriesForArchiveRow
+	ParseErrors []dbq.GetInventoryParseErrorsForArchiveRow
+	Scanned     bool
+}
+
 func runModsInfo(
 	ctx context.Context,
 	q *dbq.Queries,
 	modPageID int64,
 	gameInstallID int64,
+	showInventory bool,
 ) error {
 	// fetch mod page
 	mp, err := q.GetModPageByID(ctx, dbq.GetModPageByIDParams{
@@ -263,7 +276,27 @@ func runModsInfo(
 		}
 	}
 
-	fmt.Println(renderModInfo(mp, fileVersions, versionProfiles, nexusModInfo, nexusFileInfos, superseded))
+	inventories := make(map[int64]versionInventory) // keyed by mod_file_version_id
+
+	if showInventory {
+		for _, fv := range fileVersions {
+			entries, err := q.GetInventoryEntriesForArchive(ctx, fv.ArchiveSha256)
+			if err != nil {
+				return fmt.Errorf("fetching inventory for version %d: %w", fv.ModFileVersionID, err)
+			}
+			parseErrors, err := q.GetInventoryParseErrorsForArchive(ctx, fv.ArchiveSha256)
+			if err != nil {
+				return fmt.Errorf("fetching inventory parse errors for version %d: %w", fv.ModFileVersionID, err)
+			}
+			inventories[fv.ModFileVersionID] = versionInventory{
+				Entries:     entries,
+				ParseErrors: parseErrors,
+				Scanned:     len(entries) > 0 || len(parseErrors) > 0,
+			}
+		}
+	}
+
+	fmt.Println(renderModInfo(mp, fileVersions, versionProfiles, nexusModInfo, nexusFileInfos, superseded, inventories, showInventory))
 	return nil
 }
 
@@ -274,6 +307,8 @@ func renderModInfo(
 	nexusModInfo *dbc.NexusModInfo,
 	nexusFileInfos map[int64]*nexusFileCache,
 	superseded map[int64]struct{},
+	inventories map[int64]versionInventory,
+	showInventory bool,
 ) string {
 	// TODO: extract styles
 	cardBorder := lipgloss.NewStyle().
@@ -439,6 +474,36 @@ func renderModInfo(
 							fmt.Sprintf("%s [priority %d] %s",
 								m.ProfileName, m.Priority, tag,
 							))
+					}
+				}
+
+				if showInventory {
+					inv := inventories[v.ModFileVersionID]
+					if !inv.Scanned {
+						writeKVIndented16(&b, "  inventory:", subtleStyle.Render("(not scanned; run 'mods scan-inventory')"))
+					} else {
+						writeKVIndented16(&b, "  inventory:", fmt.Sprintf("%d file(s)", len(inv.Entries)))
+						for _, e := range inv.Entries {
+							path := ""
+							if e.RawPath.Valid {
+								path = e.RawPath.String
+							}
+							size := ""
+							if e.SizeBytes.Valid {
+								size = subtleStyle.Render(fmt.Sprintf("  %s", formatBytes(e.SizeBytes.Int64)))
+							}
+							b.WriteString(fmt.Sprintf("      %s%s\n", path, size))
+						}
+						if len(inv.ParseErrors) > 0 {
+							b.WriteString(warnStyle.Render(fmt.Sprintf(
+								"      ⚠ %d parse error(s):\n", len(inv.ParseErrors),
+							)))
+							for _, pe := range inv.ParseErrors {
+								b.WriteString(warnStyle.Render(fmt.Sprintf(
+									"        position %d: %s\n", pe.Position, pe.ParseError.String,
+								)))
+							}
+						}
 					}
 				}
 
