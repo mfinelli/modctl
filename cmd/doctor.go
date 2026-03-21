@@ -56,8 +56,7 @@ var doctorCmd = &cobra.Command{
 	Long: `Run a read-only health check to confirm modctl can operate safely.
 
 Doctor verifies:
-  - State directory layout and writability (archives/, backups/, overrides/,
-    tmp/)
+  - State directory layout and writability (archives/, backups/, overrides/)
   - Database is present and usable (SELECT 1), and reports pending migrations
   - SQLite integrity checks (quick_check by default; integrity_check +
     foreign_key_check with --deep)
@@ -324,7 +323,7 @@ func checkPaths() error {
 		viper.GetString("cache_dir"),
 		viper.GetString("locks_dir"),
 		viper.GetString("overrides_dir"),
-		viper.GetString("tmp_dir"),
+		// viper.GetString("tmp_dir"),
 	}
 
 	var fatalErr error
