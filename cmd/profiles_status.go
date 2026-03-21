@@ -420,15 +420,12 @@ func renderProfileStatus(
 	}
 
 	for _, pair := range incompatibilities {
-		warnings = append(warnings, fmt.Sprintf(
-			"⚠  %s and %s are marked incompatible",
-			pair.ModPageNameA, pair.ModPageNameB,
-		))
+		w := fmt.Sprintf("⚠  %s and %s are marked incompatible",
+			pair.ModPageNameA, pair.ModPageNameB)
 		if pair.Reason.Valid && strings.TrimSpace(pair.Reason.String) != "" {
-			warnings = append(warnings, fmt.Sprintf(
-				"   reason: %s", pair.Reason.String,
-			))
+			w += fmt.Sprintf(" (%s)", pair.Reason.String)
 		}
+		warnings = append(warnings, w)
 	}
 
 	if len(warnings) > 0 {
