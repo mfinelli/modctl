@@ -1241,7 +1241,7 @@ JOIN mod_pages mp ON mp.id = mi.mod_page_id_a
 WHERE mp.game_install_id = ?;
 
 -- name: ExportInsertStore :exec
-INSERT INTO stores (id, display_name, implementation, enabled, config, created_at, updated_at)
+INSERT OR IGNORE INTO stores (id, display_name, implementation, enabled, config, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?);
 
 -- name: ExportInsertGameInstall :exec
