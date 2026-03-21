@@ -414,8 +414,8 @@ ORDER BY priority ASC;
 -- name: BumpPrioritiesForProfile :exec
 UPDATE profile_items
 SET priority = priority + sqlc.arg(offset),
-    updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-WHERE profile_id = ?;
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE profile_id = sqlc.arg(profile_id);
 
 -- name: ListUnscannedArchives :many
 SELECT
