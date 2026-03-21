@@ -1032,31 +1032,6 @@ WHERE game_install_id = ?
 ORDER BY started_at DESC
 LIMIT 1;
 
--- name: GetProfileDiffItems :many
-SELECT
-    COALESCE(a.mod_file_version_id, b.mod_file_version_id) AS mod_file_version_id,
-    CASE WHEN a.mod_file_version_id IS NOT NULL THEN TRUE ELSE FALSE END AS in_profile_a,
-    CASE WHEN b.mod_file_version_id IS NOT NULL THEN TRUE ELSE FALSE END AS in_profile_b,
-    a.priority        AS priority_a,
-    a.enabled         AS enabled_a,
-    a.remap_config_id AS remap_config_id_a,
-    b.priority        AS priority_b,
-    b.enabled         AS enabled_b,
-    b.remap_config_id AS remap_config_id_b,
-    mp.name           AS mod_page_name,
-    mf.label          AS file_label,
-    mfv.version_string
-FROM profile_items a
-FULL OUTER JOIN profile_items b
-    ON a.mod_file_version_id = b.mod_file_version_id
-    AND b.profile_id = ?
-JOIN mod_file_versions mfv
-    ON mfv.id = COALESCE(a.mod_file_version_id, b.mod_file_version_id)
-JOIN mod_files mf ON mf.id = mfv.mod_file_id
-JOIN mod_pages mp ON mp.id = mf.mod_page_id
-WHERE a.profile_id = ?
-ORDER BY COALESCE(a.priority, b.priority) DESC;
-
 -- name: ListOperationsForGameInstall :many
 SELECT
     o.id,
@@ -2058,3 +2033,19 @@ FROM archive_inventory_entries
 WHERE archive_sha256 = ?
   AND parse_error IS NOT NULL
 ORDER BY position ASC;
+
+-- name: GetProfileItems :many
+SELECT
+    pi.mod_file_version_id,
+    pi.priority,
+    pi.enabled,
+    pi.remap_config_id,
+    mp.name    AS mod_page_name,
+    mf.label   AS file_label,
+    mfv.version_string
+FROM profile_items pi
+JOIN mod_file_versions mfv ON mfv.id = pi.mod_file_version_id
+JOIN mod_files mf ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp ON mp.id = mf.mod_page_id
+WHERE pi.profile_id = ?
+ORDER BY pi.priority DESC;

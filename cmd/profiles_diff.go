@@ -19,7 +19,9 @@
 package cmd
 
 import (
+	"database/sql"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -130,16 +132,17 @@ directional: profile A is the source and profile B is the target.`,
 			return fmt.Errorf("profile A and profile B are the same profile")
 		}
 
-		items, err := q.GetProfileDiffItems(ctx, dbq.GetProfileDiffItemsParams{
-			ProfileID:   profileA.ID,
-			ProfileID_2: profileB.ID,
-		})
+		itemsA, err := q.GetProfileItems(ctx, profileA.ID)
 		if err != nil {
-			return fmt.Errorf("get diff items: %w", err)
+			return fmt.Errorf("get profile a items: %w", err)
+		}
+		itemsB, err := q.GetProfileItems(ctx, profileB.ID)
+		if err != nil {
+			return fmt.Errorf("get profile b items: %w", err)
 		}
 
 		fmt.Println(renderProfileDiff(
-			items,
+			computeProfileDiff(itemsA, itemsB),
 			profileA.Name,
 			profileB.Name,
 			gi.DisplayName,
@@ -164,9 +167,9 @@ func init() {
 		"Hide mods that are identical in both profiles")
 }
 
-func classifyDiffRow(row dbq.GetProfileDiffItemsRow) diffKind {
-	inA := util.SqliteIntToBool(row.InProfileA)
-	inB := util.SqliteIntToBool(row.InProfileB)
+func classifyDiffRow(row diffRow) diffKind {
+	inA := row.InProfileA
+	inB := row.InProfileB
 
 	switch {
 	case inA && !inB:
@@ -184,8 +187,95 @@ func classifyDiffRow(row dbq.GetProfileDiffItemsRow) diffKind {
 	}
 }
 
+type diffRow struct {
+	ModFileVersionID int64
+	InProfileA       bool
+	InProfileB       bool
+	PriorityA        int64
+	PriorityB        int64
+	EnabledA         int64
+	EnabledB         int64
+	RemapConfigIDA   sql.NullInt64
+	RemapConfigIDB   sql.NullInt64
+	ModPageName      string
+	FileLabel        string
+	VersionString    sql.NullString
+}
+
+func computeProfileDiff(
+	itemsA, itemsB []dbq.GetProfileItemsRow,
+) []diffRow {
+	indexA := make(map[int64]dbq.GetProfileItemsRow, len(itemsA))
+	indexB := make(map[int64]dbq.GetProfileItemsRow, len(itemsB))
+	for _, r := range itemsA {
+		indexA[r.ModFileVersionID] = r
+	}
+	for _, r := range itemsB {
+		indexB[r.ModFileVersionID] = r
+	}
+
+	seen := make(map[int64]struct{})
+	var rows []diffRow
+
+	// A-side: present in A, may or may not be in B
+	for _, a := range itemsA {
+		b, inB := indexB[a.ModFileVersionID]
+		row := diffRow{
+			ModFileVersionID: a.ModFileVersionID,
+			InProfileA:       true,
+			InProfileB:       inB,
+			PriorityA:        a.Priority,
+			EnabledA:         a.Enabled,
+			RemapConfigIDA:   a.RemapConfigID,
+			ModPageName:      a.ModPageName,
+			FileLabel:        a.FileLabel,
+			VersionString:    a.VersionString,
+		}
+		if inB {
+			row.PriorityB = b.Priority
+			row.EnabledB = b.Enabled
+			row.RemapConfigIDB = b.RemapConfigID
+		}
+		rows = append(rows, row)
+		seen[a.ModFileVersionID] = struct{}{}
+	}
+
+	// B-only: present in B but not in A
+	for _, b := range itemsB {
+		if _, ok := seen[b.ModFileVersionID]; ok {
+			continue
+		}
+		rows = append(rows, diffRow{
+			ModFileVersionID: b.ModFileVersionID,
+			InProfileA:       false,
+			InProfileB:       true,
+			PriorityB:        b.Priority,
+			EnabledB:         b.Enabled,
+			RemapConfigIDB:   b.RemapConfigID,
+			ModPageName:      b.ModPageName,
+			FileLabel:        b.FileLabel,
+			VersionString:    b.VersionString,
+		})
+	}
+
+	// Sort by effective priority descending
+	sort.Slice(rows, func(i, j int) bool {
+		pi := rows[i].PriorityA
+		if !rows[i].InProfileA {
+			pi = rows[i].PriorityB
+		}
+		pj := rows[j].PriorityA
+		if !rows[j].InProfileA {
+			pj = rows[j].PriorityB
+		}
+		return pi > pj
+	})
+
+	return rows
+}
+
 func renderProfileDiff(
-	items []dbq.GetProfileDiffItemsRow,
+	items []diffRow,
 	nameA, nameB string,
 	gameName string,
 	noUnchanged bool,
