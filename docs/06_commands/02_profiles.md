@@ -101,6 +101,26 @@ Remove a mod from the active profile. Does not change anything on disk.
 modctl profiles remove "Appearance Menu Mod"
 ```
 
+### profiles upgrade
+
+Swap the mod file version currently in a profile for a newer one, preserving
+the existing priority slot, enabled state, and remap rules.
+
+Without `--to`, modctl picks the most recently imported version of the same
+mod file that is not already in the profile. With `--to`, the specified
+version is used directly.
+
+The old version is removed from the profile but its database record is
+preserved. Run `modctl gc` afterwards to reclaim disk space if needed.
+```bash
+modctl profiles upgrade "Appearance Menu Mod"
+modctl profiles upgrade "Appearance Menu Mod" --to 42
+```
+
+| Flag       | Description                                                               |
+|------------|---------------------------------------------------------------------------|
+| `--to <n>` | Specific mod file version ID to upgrade to instead of the latest imported |
+
 ### profiles enable / disable
 
 Enable or disable a mod within the active profile. Disabled mods remain in

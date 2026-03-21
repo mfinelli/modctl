@@ -201,6 +201,14 @@ Set the active game:
 *modctl profiles remove* <mod>
 	Remove a mod from the active profile.
 
+*modctl profiles upgrade* [--to <version-id>] <mod>
+	Swap the mod file version currently in the active profile for a newer
+	one, preserving the existing priority slot, enabled state, and remap
+	rules. Without --to, modctl picks the most recently imported version
+	of the same mod file that is not already in the profile. With --to,
+	the specified version is used directly. The old version is removed
+	from the profile.
+
 *modctl profiles enable* <mod>
 	Enable a mod in the active profile.
 
