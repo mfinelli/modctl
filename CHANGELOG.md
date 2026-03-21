@@ -5,6 +5,22 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 
 `modctl` adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.4.0 - 2026-03-21
+
+This is another bugfix release leading up to the stable release.
+
+**BREAKING CHANGE**: the internal database schema has been modified without
+a corresponding migration. You'll need to unapply any profiles you have active
+and then delete the local database before updating and then initialize it
+again afterwards. Hopefully this is the last time that it's necessary.
+
+### Changes
+
+- Add a `profiles upgrade` command to help updating an existing mod in the
+  load order.
+- Add a `--show-inventory` flag to `mods info` to see which files are contained
+  in a mod archive.
+
 ## v0.3.0 - 2026-03-19
 
 This will hopefully be the final pre-release (barring other bugfixes or issues
