@@ -418,14 +418,17 @@ SET priority = priority + sqlc.arg(offset),
 WHERE profile_id = ?;
 
 -- name: ListUnscannedArchives :many
-SELECT DISTINCT
+SELECT
     b.sha256,
     b.original_name,
     b.size_bytes
 FROM blobs b
-JOIN mod_file_versions mfv ON mfv.archive_sha256 = b.sha256
 WHERE b.kind = 'archive'
-  AND mfv.inventory_scanned_at IS NULL;
+  AND NOT EXISTS (
+    SELECT TRUE
+    FROM archive_inventory_entries aie
+    WHERE aie.archive_sha256 = b.sha256
+  );
 
 -- name: InsertArchiveInventoryEntry :exec
 INSERT INTO archive_inventory_entries (
@@ -447,10 +450,9 @@ WHERE archive_sha256 = ?
 
 -- name: IsArchiveInventoried :one
 SELECT EXISTS (
-    SELECT TRUE
-    FROM mod_file_versions
+  SELECT TRUE
+    FROM archive_inventory_entries
     WHERE archive_sha256 = ?
-      AND inventory_scanned_at IS NOT NULL
 ) AS inventoried;
 
 -- name: GetProfileStatusItems :many
