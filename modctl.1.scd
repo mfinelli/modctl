@@ -130,9 +130,10 @@ Set the active game:
 	List imported mods for the current game. Pass --details to expand each
 	mod page and show individual files and versions.
 
-*modctl mods info* <mod>
+*modctl mods info* [--show-inventory] <mod>
 	Show detailed information about a mod page including files, versions,
-	Nexus link state, and profile membership.
+	Nexus link state, and profile membership. Pass --show-inventory to list the
+	mod contents.
 
 *modctl mods remove* [--file-version <id>] [--force] <mod-page>
 	Remove a mod page and all files and versions under it. With

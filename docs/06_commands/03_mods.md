@@ -67,6 +67,10 @@ modctl mods info "Appearance Menu Mod"
 Nexus data is read from the local cache only. Run `modctl mods nexus
 check-updates` to refresh it.
 
+| Flag               | Description            |
+|--------------------|------------------------|
+| `--show-inventory` | List mod file contents |
+
 ## Deleting mods
 
 ### mods remove
