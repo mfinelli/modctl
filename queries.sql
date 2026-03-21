@@ -2049,3 +2049,44 @@ JOIN mod_files mf ON mf.id = mfv.mod_file_id
 JOIN mod_pages mp ON mp.id = mf.mod_page_id
 WHERE pi.profile_id = ?
 ORDER BY pi.priority DESC;
+
+-- name: GetProfileItemsForModPage :many
+SELECT
+    pi.id,
+    pi.mod_file_version_id,
+    pi.priority,
+    pi.enabled,
+    pi.remap_config_id,
+    mfv.mod_file_id,
+    mf.label  AS file_label,
+    mp.name   AS mod_page_name
+FROM profile_items pi
+JOIN mod_file_versions mfv ON mfv.id = pi.mod_file_version_id
+JOIN mod_files mf ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp ON mp.id = mf.mod_page_id
+WHERE pi.profile_id = ?
+  AND mp.id = ?;
+
+-- name: GetLatestUnusedModFileVersion :one
+SELECT
+    mfv.id,
+    mfv.version_string,
+    mfv.original_name
+FROM mod_file_versions mfv
+WHERE mfv.mod_file_id = ?
+  AND mfv.id NOT IN (
+    SELECT pi.mod_file_version_id
+    FROM profile_items pi
+    WHERE pi.profile_id = ?
+  )
+ORDER BY mfv.created_at DESC
+LIMIT 1;
+
+-- name: UpdateProfileItemModFileVersion :exec
+UPDATE profile_items
+SET mod_file_version_id = ?,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE id = ?;
+
+-- name: GetModFileVersionByIDForUpgrade :one
+SELECT * FROM mod_file_versions WHERE id = ? LIMIT 1;
