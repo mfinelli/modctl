@@ -122,10 +122,11 @@ func init() {
 }
 
 type nexusFileCache struct {
-	Version       string
-	FetchedAt     time.Time
-	HasUpdate     bool
-	LatestVersion string
+	Version               string
+	FetchedAt             time.Time
+	HasUpdate             bool
+	LatestVersion         string
+	UpdateAlreadyImported bool // true when superseded but head is imported
 }
 
 type profileMembership struct {
@@ -193,6 +194,13 @@ func runModsInfo(
 	next := make(map[int64]int64)
 	superseded := make(map[int64]struct{})
 
+	// set of all nexus_file_ids we have imported for this mod page
+	importedNexusFileIDs := make(map[int64]struct{})
+	for _, fv := range fileVersions {
+		if fv.NexusFileID.Valid {
+			importedNexusFileIDs[fv.NexusFileID.Int64] = struct{}{}
+		}
+	}
 	if mp.SourceKind == "nexus" && mp.NexusGameDomain.Valid && mp.NexusModID.Valid {
 		cacheReader, err := nexusclient.NewCacheReader(ctx, logger)
 		if err != nil {
@@ -260,6 +268,22 @@ func runModsInfo(
 					latestFileID := internal.WalkUpdateChain(fv.NexusFileID.Int64, next)
 					info.HasUpdate = latestFileID != fv.NexusFileID.Int64
 					if info.HasUpdate {
+						latestRow, err := cacheReader.GetNexusFileInfo(
+							mp.NexusGameDomain.String,
+							mp.NexusModID.Int64,
+							latestFileID,
+						)
+						if err == nil && latestRow.Version.Valid {
+							info.LatestVersion = latestRow.Version.String
+						}
+					}
+				} else {
+					// superseded: check if the head is already imported
+					latestFileID := internal.WalkUpdateChain(fv.NexusFileID.Int64, next)
+					_, headImported := importedNexusFileIDs[latestFileID]
+					info.UpdateAlreadyImported = headImported
+					if !headImported {
+						// need to surface the latest version string for the update prompt
 						latestRow, err := cacheReader.GetNexusFileInfo(
 							mp.NexusGameDomain.String,
 							mp.NexusModID.Int64,
@@ -437,10 +461,10 @@ func renderModInfo(
 				if v.NexusFileID.Valid {
 					if info, ok := nexusFileInfos[v.ModFileVersionID]; ok {
 						_, isSuperseded := superseded[v.NexusFileID.Int64]
-						if isSuperseded {
+						if isSuperseded && info.UpdateAlreadyImported {
 							writeKVIndented16(&b, "  nexus version:",
-								subtleStyle.Render(fmt.Sprintf("%s (old version)", info.Version)))
-						} else if info.HasUpdate {
+								subtleStyle.Render(fmt.Sprintf("%s (superseded)", info.Version)))
+						} else if isSuperseded || info.HasUpdate {
 							writeKVIndented16(&b, "  nexus version:",
 								nexusUpdateStyle.Render(fmt.Sprintf("%s ↑ update available → %s",
 									info.Version, info.LatestVersion)))
