@@ -35,6 +35,7 @@ import (
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"go.finelli.dev/util"
 )
 
 var (
@@ -111,7 +112,7 @@ version for manual linking.`,
 			if err != nil {
 				return err
 			}
-			return runManualLink(ctx, q, client, gi.ID, mfv.ID)
+			return runManualLink(ctx, db, q, client, gi.ID, mfv.ID)
 		}
 		return runAutoLink(ctx, q, client, gi.ID)
 	},
@@ -151,6 +152,7 @@ func init() {
 
 func runManualLink(
 	ctx context.Context,
+	db *sql.DB,
 	q *dbq.Queries,
 	client *nexusclient.Client,
 	gameInstallID int64,
@@ -275,13 +277,62 @@ func runManualLink(
 	}
 
 	if row.Label != match.File.Name {
-		if err := q.UpdateModFileLabel(ctx, dbq.UpdateModFileLabelParams{
-			ID:    row.ModFileID,
-			Label: match.File.Name,
-		}); err != nil {
-			return fmt.Errorf("updating mod file label: %w", err)
+		existing, err := q.GetModFileByLabel(ctx, dbq.GetModFileByLabelParams{
+			ModPageID: row.ModPageID,
+			Label:     match.File.Name,
+		})
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("checking for existing mod file: %w", err)
 		}
-		fmt.Println(subtleStyle.Render(fmt.Sprintf("  updated mod file label: %s", match.File.Name)))
+
+		if errors.Is(err, sql.ErrNoRows) {
+			// Simple rename, no conflict
+			if err := q.UpdateModFileLabel(ctx, dbq.UpdateModFileLabelParams{
+				ID:    row.ModFileID,
+				Label: match.File.Name,
+			}); err != nil {
+				return fmt.Errorf("updating mod file label: %w", err)
+			}
+			fmt.Println(subtleStyle.Render(fmt.Sprintf("  updated mod file label: %s", match.File.Name)))
+		} else {
+			// Target label already exists on a sibling row: merge
+			tx, err := db.BeginTx(ctx, nil)
+			if err != nil {
+				return fmt.Errorf("begin merge transaction: %w", err)
+			}
+			defer tx.Rollback()
+			qtx := q.WithTx(tx)
+
+			// Promote is_primary if the row being deleted holds it
+			if util.SqliteIntToBool(row.IsPrimary) && !util.SqliteIntToBool(existing.IsPrimary) {
+				if err := qtx.ClearModFilePrimary(ctx, row.ModFileID); err != nil {
+					return fmt.Errorf("clearing primary flag: %w", err)
+				}
+				if err := qtx.SetModFilePrimary(ctx, existing.ID); err != nil {
+					return fmt.Errorf("promoting primary flag: %w", err)
+				}
+			}
+
+			if err := qtx.MoveModFileVersions(ctx, dbq.MoveModFileVersionsParams{
+				NewModFileID: existing.ID,
+				OldModFileID: row.ModFileID,
+			}); err != nil {
+				return fmt.Errorf("moving mod file versions: %w", err)
+			}
+
+			if err := qtx.DeleteModFile(ctx, row.ModFileID); err != nil {
+				return fmt.Errorf("deleting orphaned mod file: %w", err)
+			}
+
+			if err := tx.Commit(); err != nil {
+				return fmt.Errorf("commit merge: %w", err)
+			}
+
+			fmt.Println(subtleStyle.Render(fmt.Sprintf(
+				"  merged mod file %q into existing %q",
+				row.Label, match.File.Name,
+			)))
+		}
 	}
 
 	return nil

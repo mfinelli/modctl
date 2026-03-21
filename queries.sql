@@ -553,6 +553,7 @@ SELECT
     mfv.archive_sha256,
     mf.id as mod_file_id,
     mf.label,
+    mf.is_primary,
     mf.mod_page_id,
     mp.nexus_game_domain,
     mp.nexus_mod_id,
@@ -2027,4 +2028,19 @@ WHERE id = ?;
 UPDATE override_patch_entries
 SET patch_type  = ?,
     entry_value = ?
+WHERE id = ?;
+
+-- name: MoveModFileVersions :exec
+UPDATE mod_file_versions
+SET mod_file_id = sqlc.arg(new_mod_file_id)
+WHERE mod_file_id = sqlc.arg(old_mod_file_id);
+
+-- name: ClearModFilePrimary :exec
+UPDATE mod_files
+SET is_primary = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE id = ?;
+
+-- name: SetModFilePrimary :exec
+UPDATE mod_files
+SET is_primary = 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 WHERE id = ?;
