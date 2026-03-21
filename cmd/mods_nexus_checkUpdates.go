@@ -225,17 +225,59 @@ Use --force to proceed even if the operation would exhaust your API quota.`,
 				continue
 			}
 
+			// Group versions by mod_file_id, keeping the one closest to the chain head
+			type modFileKey struct {
+				modFileID   int64
+				modPageName string
+				fileLabel   string
+			}
+
+			type bestVersion struct {
+				nexusFileID    int64
+				versionString  string
+				distanceToHead int
+			}
+
+			best := make(map[modFileKey]bestVersion)
+
 			for _, v := range linkedVersions {
 				latestFileID := internal.WalkUpdateChain(v.NexusFileID.Int64, next)
-				hasUpdate := latestFileID != v.NexusFileID.Int64
 
-				currentVersion := v.VersionString.String
+				// compute distance to head by walking the chain
+				distance := 0
+				cur := v.NexusFileID.Int64
+				for cur != latestFileID {
+					cur = next[cur]
+					distance++
+					if distance > 1000 { // safety valve
+						break
+					}
+				}
+
+				key := modFileKey{
+					modFileID:   v.ModFileID,
+					modPageName: v.ModPageName,
+					fileLabel:   v.FileLabel,
+				}
+
+				if existing, ok := best[key]; !ok || distance < existing.distanceToHead {
+					best[key] = bestVersion{
+						nexusFileID:    v.NexusFileID.Int64,
+						versionString:  v.VersionString.String,
+						distanceToHead: distance,
+					}
+				}
+			}
+
+			for key, b := range best {
+				latestFileID := internal.WalkUpdateChain(b.nexusFileID, next)
+				hasUpdate := latestFileID != b.nexusFileID
 				latestVersion := fileVersions[latestFileID]
 
 				results = append(results, updateResult{
-					modPageName:    v.ModPageName,
-					fileLabel:      v.FileLabel,
-					currentVersion: currentVersion,
+					modPageName:    key.modPageName,
+					fileLabel:      key.fileLabel,
+					currentVersion: b.versionString,
 					latestVersion:  latestVersion,
 					hasUpdate:      hasUpdate,
 				})
