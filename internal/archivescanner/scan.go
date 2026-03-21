@@ -56,6 +56,10 @@ func ScanOne(
 	}
 	if util.SqliteIntToBool(already) {
 		log.Info("archive already inventoried, skipping")
+		// Still mark the new mod_file_versions row as scanned
+		if err := queries.MarkArchiveInventoryScanned(ctx, archiveSha256); err != nil {
+			log.Warn("failed to mark archive as scanned", "err", err)
+		}
 		return nil
 	}
 
