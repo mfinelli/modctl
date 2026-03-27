@@ -42,6 +42,7 @@ import (
 var (
 	profilesStatusGame    string
 	profilesStatusProfile string
+	profilesStatusCompact bool
 )
 
 var profilesStatusCmd = &cobra.Command{
@@ -167,6 +168,7 @@ on the same path - run 'modctl apply --dry-run' for a precise diff.`,
 			hasPendingChanges,
 			overrideCount,
 			staleOverrides,
+			profilesStatusCompact,
 		))
 
 		return nil
@@ -189,6 +191,9 @@ func init() {
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return completion.ProfileNames(cmd, toComplete)
 		})
+
+	profilesStatusCmd.Flags().BoolVar(&profilesStatusCompact, "compact", false,
+		"Show a condensed one-line-per-mod summary")
 }
 
 type nexusVersionInfo struct {
@@ -208,6 +213,7 @@ func renderProfileStatus(
 	hasPendingChanges bool,
 	overrideCount int64,
 	staleOverrides []dbq.GetStalenessHeuristicForProfileRow,
+	compact bool,
 ) string {
 	// styles TODO extract somewhere...
 	cardBorder := lipgloss.NewStyle().
@@ -264,15 +270,25 @@ func renderProfileStatus(
 	// apply state (omitted if profile has never been applied)
 	if appliedState.AppliedProfileID.Valid &&
 		appliedState.AppliedProfileID.Int64 == profile.ID {
-		b.WriteString(sectionTitleStyle.Render("Apply State") + "\n")
-		writeKV16(&b, "Applied at:", appliedState.AppliedAt.String)
-		if appliedState.AppliedOperationID.Valid {
-			writeKV16(&b, "Operation:", fmt.Sprintf("#%d", appliedState.AppliedOperationID.Int64))
-		}
-		if hasPendingChanges {
-			writeKV16(&b, "Pending changes:", warnStyle.Render("yes ⚠"))
+		if compact {
+			pendingText := subtleStyle.Render("none")
+			if hasPendingChanges {
+				pendingText = warnStyle.Render("yes ⚠")
+			}
+			b.WriteString(sectionTitleStyle.Render("Apply State") + "\n")
+			b.WriteString(fmt.Sprintf("  Applied · %s · pending changes: %s\n",
+				appliedState.AppliedAt.String, pendingText))
 		} else {
-			writeKV16(&b, "Pending changes:", subtleStyle.Render("none"))
+			b.WriteString(sectionTitleStyle.Render("Apply State") + "\n")
+			writeKV16(&b, "Applied at:", appliedState.AppliedAt.String)
+			if appliedState.AppliedOperationID.Valid {
+				writeKV16(&b, "Operation:", fmt.Sprintf("#%d", appliedState.AppliedOperationID.Int64))
+			}
+			if hasPendingChanges {
+				writeKV16(&b, "Pending changes:", warnStyle.Render("yes ⚠"))
+			} else {
+				writeKV16(&b, "Pending changes:", subtleStyle.Render("none"))
+			}
 		}
 	}
 
@@ -281,6 +297,31 @@ func renderProfileStatus(
 
 	if len(items) == 0 {
 		b.WriteString(subtleStyle.Render("  (none)") + "\n")
+	} else if compact {
+		for _, item := range items {
+			dot := inactiveDot
+			if util.SqliteIntToBool(item.Enabled) {
+				dot = activeDot
+			}
+
+			versionStr := subtleStyle.Render("(no version)")
+			if item.VersionString.Valid {
+				versionStr = item.VersionString.String
+			}
+
+			line := fmt.Sprintf("  %s [%d] %s  %s  %s",
+				dot, item.Priority, item.ModPageName, item.FileLabel, versionStr)
+
+			if info, ok := nexusInfo[item.ModFileVersionID]; ok && info.HasUpdate {
+				line += "  " + nexusUpdateStyle.Render("↑")
+			}
+
+			if !util.SqliteIntToBool(item.Enabled) {
+				line += "   " + disabledTagStyle.Render("(disabled)")
+			}
+
+			b.WriteString(line + "\n")
+		}
 	} else {
 		for _, item := range items {
 			dot := inactiveDot

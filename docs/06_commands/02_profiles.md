@@ -66,6 +66,10 @@ applied, also shows whether there are pending changes.
 modctl profiles status
 ```
 
+| Flag        | Description                     |
+|-------------|---------------------------------|
+| `--compace` | Shorter one-line-per-mod output |
+
 ### profiles diff
 
 Compare two profiles for the current game. The comparison is directional:

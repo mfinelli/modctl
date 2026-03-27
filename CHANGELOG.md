@@ -11,6 +11,8 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 
 - Add `--show-conflicts` option to `apply` command to print detailed file
   conflict information.
+- Add `--compact` flag to `profiles status` command for a shorter
+  one-line-per-mod output.
 
 ## v0.4.0 - 2026-03-21
 

@@ -186,10 +186,11 @@ Set the active game:
 *modctl profiles set-active* <name>
 	Set the active profile for the current game.
 
-*modctl profiles status*
+*modctl profiles status* [--compact]
 	Show the mods in the active profile in priority order, their
 	enabled/disabled state, and any warnings. When the profile is applied,
-	also reports pending changes.
+	also reports pending changes. Use --compact for a short one-line-per-mod
+	output.
 
 *modctl profiles diff* [--no-unchanged] <profile-a> <profile-b>
 	Compare two profiles. The comparison is directional: profile-a is the
