@@ -5,7 +5,9 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 
 `modctl` adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## unreleased
+## v0.5.0 - 2026-03-27
+
+This is another pre-release that adds a few new features based on testing.
 
 ### Changes
 

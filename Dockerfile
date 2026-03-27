@@ -10,7 +10,7 @@ RUN go-licenses save ./... --ignore github.com/mfinelli/modctl \
 
 FROM alpine
 LABEL org.opencontainers.image.title=modctl
-LABEL org.opencontainers.image.version=0.4.0
+LABEL org.opencontainers.image.version=0.5.0
 LABEL org.opencontainers.image.description="command line mod manager"
 LABEL org.opencontainers.image.url=https://modctl.org
 LABEL org.opencontainers.image.source=https://github.com/mfinelli/modctl
