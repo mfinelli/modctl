@@ -5,6 +5,13 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 
 `modctl` adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## unreleased
+
+### Changes
+
+- Add `--show-conflicts` option to `apply` command to print detailed file
+  conflict information.
+
 ## v0.4.0 - 2026-03-21
 
 This is another bugfix release leading up to the stable release.

@@ -42,15 +42,16 @@ import (
 )
 
 var (
-	applyGame        string
-	applyProfile     string
-	applyDryRun      bool
-	applySkipRecheck bool
-	applyKeepStaging bool
-	applyVerbose     bool
-	applyForce       bool
-	applyAbort       bool
-	applyPruneDirs   bool
+	applyGame          string
+	applyProfile       string
+	applyDryRun        bool
+	applySkipRecheck   bool
+	applyKeepStaging   bool
+	applyVerbose       bool
+	applyForce         bool
+	applyAbort         bool
+	applyPruneDirs     bool
+	applyShowConflicts bool
 )
 
 var applyCmd = &cobra.Command{
@@ -167,7 +168,7 @@ Use --dry-run to preview the plan without making any changes.`,
 
 		// Dry-run output
 		if applyDryRun {
-			printApplyPlan(plan, p.Name, gi.DisplayName, boldStyle, subtleStyle, warnStyle, greenStyle, redStyle, yellowStyle, cyanStyle)
+			printApplyPlan(plan, p.Name, gi.DisplayName, applyShowConflicts, boldStyle, subtleStyle, warnStyle, greenStyle, redStyle, yellowStyle, cyanStyle)
 			return nil
 		}
 
@@ -517,6 +518,8 @@ func init() {
 		"Mark any incomplete operation as failed and exit")
 	applyCmd.Flags().BoolVar(&applyPruneDirs, "prune-dirs", false,
 		"Remove empty directories left behind after file removals")
+	applyCmd.Flags().BoolVar(&applyShowConflicts, "show-conflicts", false,
+		"Show losing mods for each conflicted path (implies --dry-run)")
 }
 
 // printApplyPlan renders the dry-run plan output
@@ -524,6 +527,7 @@ func printApplyPlan(
 	plan planner.Plan,
 	profileName string,
 	gameName string,
+	showConflicts bool,
 	bold, subtle, warn, green, red, yellow, cyan lipgloss.Style,
 ) {
 	fmt.Println(bold.Render(fmt.Sprintf("Apply plan for %q → %s", profileName, gameName)))
@@ -553,6 +557,9 @@ func printApplyPlan(
 			countWrite++
 			if len(op.File.Conflicts) > 1 {
 				countConflict++
+				if showConflicts {
+					printConflictLosers(op.File, subtle)
+				}
 			}
 
 		case planner.PlanOpOverwrite:
@@ -568,6 +575,9 @@ func printApplyPlan(
 			countOverwrite++
 			if len(op.File.Conflicts) > 1 {
 				countConflict++
+				if showConflicts {
+					printConflictLosers(op.File, subtle)
+				}
 			}
 
 		case planner.PlanOpRemove:
@@ -621,4 +631,23 @@ func formatModInfo(c planner.Conflict) string {
 		s += " " + c.VersionString
 	}
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render(s)
+}
+
+// printConflictLosers prints the losing mods for a conflicted path, indented
+// and muted, sorted by priority descending (same order as Conflicts slice).
+func printConflictLosers(pf *planner.PlanFile, subtle lipgloss.Style) {
+	for _, c := range pf.Conflicts {
+		if c.Won {
+			continue
+		}
+		fmt.Println(subtle.Render(fmt.Sprintf("      ✗ %s", formatModInfoRaw(c))))
+	}
+}
+
+// formatModInfoRaw returns the unstyled mod name + version string.
+func formatModInfoRaw(c planner.Conflict) string {
+	if c.VersionString != "" {
+		return c.ModPageName + " " + c.VersionString
+	}
+	return c.ModPageName
 }

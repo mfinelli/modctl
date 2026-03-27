@@ -62,13 +62,14 @@ Directories that still contain files modctl did not install are left alone.
 
 ### Flags
 
-| Flag             | Description                                                                                |
-|------------------|--------------------------------------------------------------------------------------------|
-| `--dry-run`      | Preview the plan without making any changes                                                |
-| `--no-recheck`   | Skip on-disk hash checks (faster but will not detect or back up externally modified files) |
-| `--print-ops`    | Print each file operation on its own line instead of using a progress indicator            |
-| `--keep-staging` | Keep the staging directory after apply (useful for debugging)                              |
-| `--prune-dirs`   | Remove empty directories left behind after file removals                                   |
+| Flag               | Description                                                                                |
+|--------------------|--------------------------------------------------------------------------------------------|
+| `--dry-run`        | Preview the plan without making any changes                                                |
+| `--no-recheck`     | Skip on-disk hash checks (faster but will not detect or back up externally modified files) |
+| `--print-ops`      | Print each file operation on its own line instead of using a progress indicator            |
+| `--keep-staging`   | Keep the staging directory after apply (useful for debugging)                              |
+| `--prune-dirs`     | Remove empty directories left behind after file removals                                   |
+| `--show-conflicts` | Combine with `--dry-run` to see detailed file conflict information                         |
 
 ## unapply
 

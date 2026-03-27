@@ -326,6 +326,8 @@ Set the active game:
 	deployed are skipped. Use --dry-run to preview without making changes.
 	Use --no-recheck to skip on-disk hash checks for faster applies. Use
 	\--prune-dirs to remove empty directories left behind after file removals.
+	Use --show-conflicts with --dry-run to show detailed mod conflict
+	information.
 
 *modctl unapply* [--dry-run] [--print-ops] [--prune-dirs]
 	Remove all tool-managed files and restore backed-up game files.
