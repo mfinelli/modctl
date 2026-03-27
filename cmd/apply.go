@@ -70,7 +70,8 @@ By default, files that are already correctly deployed are skipped (noop)
 and externally modified files are detected and backed up before being
 overwritten. Use --no-recheck to skip hash checks for faster applies.
 
-Use --dry-run to preview the plan without making any changes.`,
+Use --dry-run to preview the plan without making any changes. Add the
+--show-conflicts flag to get details file conflict information.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
