@@ -320,7 +320,7 @@ Set the active game:
 
 ## Apply
 
-*modctl apply* [--dry-run] [--no-recheck] [--print-ops] [--keep-staging] [--prune-dirs]
+*modctl apply* [--dry-run] [--no-recheck] [--print-ops] [--keep-staging] [--prune-dirs] [--show-conflicts]
 	Reconcile the game directory to match the active profile. Backs up
 	game-owned files before overwriting them. Files already correctly
 	deployed are skipped. Use --dry-run to preview without making changes.
