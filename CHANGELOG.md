@@ -5,6 +5,15 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 
 `modctl` adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## unreleased
+
+This is another pre-release that adds new features.
+
+### Changes
+
+- Support multiple targets: auto-discover the proton prefix and allow arbitrary
+  custom-path targets.
+
 ## v0.5.0 - 2026-03-27
 
 This is another pre-release that adds a few new features based on testing.
