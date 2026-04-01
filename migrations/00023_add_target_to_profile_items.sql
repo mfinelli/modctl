@@ -19,7 +19,7 @@ CREATE TABLE profile_items_new
   -- pinned version
   mod_file_version_id INTEGER NOT NULL REFERENCES mod_file_versions(id) ON UPDATE CASCADE ON DELETE RESTRICT,
 
-  target_id INTEGER NOT NULL REFERENCES targets(id) ON UPDATE CASCADE ON DELETE RESTRICT,
+  target_id INTEGER NOT NULL REFERENCES targets(id) ON UPDATE CASCADE ON DELETE CASCADE,
   enabled INTEGER NOT NULL DEFAULT FALSE CHECK (enabled IN (TRUE, FALSE)),
 
   -- larger numbers = higher priority (wins conflicts)
@@ -43,25 +43,7 @@ CREATE TABLE profile_items_new
 -- +goose StatementEnd
 
 -- +goose StatementBegin
--- Step 2: add a temporary migration trigger
--- Temporary guard: ensure every profile's game_install has a game_dir target;
--- abort if any profile_item cannot be backfilled to a game_dir target
-CREATE TRIGGER _migration_guard_profile_items_target
-BEFORE INSERT ON profile_items_new
-FOR EACH ROW
-WHEN NOT EXISTS (
-  SELECT 1 FROM targets t
-  JOIN profiles p ON p.id = NEW.profile_id
-  WHERE t.game_install_id = p.game_install_id
-    AND t.name = 'game_dir'
-)
-BEGIN
-  SELECT RAISE(ABORT, 'migration: profile_item has no game_dir target, cannot backfill target_id');
-END;
--- +goose StatementEnd
-
--- +goose StatementBegin
--- Step 3: copy existing rows, backfilling target_id from the game_dir target
+-- Step 2: copy existing rows, backfilling target_id from the game_dir target
 INSERT INTO profile_items_new (
   id, profile_id, policy, mod_file_version_id, target_id,
   enabled, priority, remap_config_id, notes, created_at, updated_at
@@ -84,21 +66,16 @@ JOIN targets t ON t.game_install_id = p.game_install_id AND t.name = 'game_dir';
 -- +goose StatementEnd
 
 -- +goose StatementBegin
--- Step 4: drop temporary trigger
-DROP TRIGGER _migration_guard_profile_items_target;
--- +goose StatementEnd
-
--- +goose StatementBegin
--- Step 5: drop old table
+-- Step 3: drop old table
 DROP TABLE profile_items;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
--- Step 6: rename new table into place
+-- Step 4: rename new table into place
 ALTER TABLE profile_items_new RENAME TO profile_items;
 -- +goose StatementEnd
 
--- Step 7: recreate indexes
+-- Step 5: recreate indexes
 -- +goose StatementBegin
 CREATE INDEX idx_profile_items_profile ON profile_items(profile_id);
 -- +goose StatementEnd
