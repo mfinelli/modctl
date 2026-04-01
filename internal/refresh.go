@@ -64,6 +64,11 @@ type RefreshStyles struct {
 	Cyan   lipgloss.Style
 }
 
+type steamInstall struct {
+	params       dbq.UpsertGameInstallParams
+	steamappsDir string // e.g. ~/.local/share/Steam/steamapps
+}
+
 func ScanStores(ctx context.Context, db *sql.DB, styles RefreshStyles) (RefreshResult, error) {
 	q := dbq.New(db)
 	stores, err := q.ListEnabledStores(ctx)
@@ -143,7 +148,7 @@ func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries, styles Refres
 	type upsertKey struct{ gameID, instanceID string }
 	upsertSet := make(map[upsertKey]struct{}, len(installs))
 	for _, di := range installs {
-		upsertSet[upsertKey{di.StoreGameID, di.InstanceID}] = struct{}{}
+		upsertSet[upsertKey{di.params.StoreGameID, di.params.InstanceID}] = struct{}{}
 	}
 
 	// Detect missing: was present before, not in discovered set now
@@ -169,14 +174,18 @@ func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries, styles Refres
 	}
 
 	for _, di := range installs {
-		id, err := qtx.UpsertGameInstall(ctx, di)
+		id, err := qtx.UpsertGameInstall(ctx, di.params)
 		if err != nil {
 			return result, fmt.Errorf("upsert game install %s:%s#%s: %w",
-				di.StoreID, di.StoreGameID, di.InstanceID, err)
+				di.params.StoreID, di.params.StoreGameID, di.params.InstanceID, err)
 		}
 
-		if err := upsertGameDirTarget(ctx, qtx, id, di.InstallRoot); err != nil {
-			return result, fmt.Errorf("error upserting target dir: %w", err)
+		if err := upsertGameDirTarget(ctx, qtx, id, di.params.InstallRoot); err != nil {
+			return result, fmt.Errorf("error upserting game_dir target: %w", err)
+		}
+
+		if err := upsertProtonPrefixTarget(ctx, qtx, id, di.steamappsDir, di.params.StoreGameID); err != nil {
+			return result, fmt.Errorf("error upserting proton_prefix target: %w", err)
 		}
 
 		if err := qtx.EnsureDefaultProfile(ctx, id); err != nil {
@@ -184,18 +193,18 @@ func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries, styles Refres
 		}
 
 		// Classify and print
-		k := existingKey{di.StoreGameID, di.InstanceID}
+		k := existingKey{di.params.StoreGameID, di.params.InstanceID}
 		if prev, known := existingMap[k]; !known {
-			result.New = append(result.New, di.DisplayName)
-			fmt.Println(styles.Green.Render(fmt.Sprintf("  + %s", di.DisplayName)) +
+			result.New = append(result.New, di.params.DisplayName)
+			fmt.Println(styles.Green.Render(fmt.Sprintf("  + %s", di.params.DisplayName)) +
 				styles.Subtle.Render("  (new)"))
 		} else if !prev.isPresent {
-			result.Returned = append(result.Returned, di.DisplayName)
-			fmt.Println(styles.Cyan.Render(fmt.Sprintf("  ↩ %s", di.DisplayName)) +
+			result.Returned = append(result.Returned, di.params.DisplayName)
+			fmt.Println(styles.Cyan.Render(fmt.Sprintf("  ↩ %s", di.params.DisplayName)) +
 				styles.Subtle.Render("  (returned)"))
 		} else {
-			result.Updated = append(result.Updated, di.DisplayName)
-			fmt.Println(styles.Subtle.Render(fmt.Sprintf("  = %s", di.DisplayName)))
+			result.Updated = append(result.Updated, di.params.DisplayName)
+			fmt.Println(styles.Subtle.Render(fmt.Sprintf("  = %s", di.params.DisplayName)))
 		}
 	}
 
@@ -327,7 +336,7 @@ func assignSteamInstanceIDs(libs []string) map[string]string {
 func discoverSteamInstalls(
 	libraryRoots []string, // canonical library roots
 	instanceByLib map[string]string, // canonical lib root -> instance_id
-) ([]dbq.UpsertGameInstallParams, []string, []string, error) {
+) ([]steamInstall, []string, []string, error) {
 	// for each lib:
 	// - list steamapps/appmanifest_*.acf
 	// - parse
@@ -337,7 +346,7 @@ func discoverSteamInstalls(
 	// - metadata: include install_root_raw + library_root (+ manifest_path)
 	warnings := []string{}
 	skipped := []string{}
-	installs := []dbq.UpsertGameInstallParams{}
+	installs := []steamInstall{}
 
 	type key struct {
 		appid    string
@@ -419,16 +428,19 @@ func discoverSteamInstalls(
 			}
 			seen[k] = struct{}{}
 
-			installs = append(installs, dbq.UpsertGameInstallParams{
-				StoreID:         "steam",
-				StoreGameID:     appid,
-				InstanceID:      instID,
-				CanonicalGameID: sql.NullString{}, // not used for steam v1
-				DisplayName:     display,
-				InstallRoot:     installCanon,
-				Metadata:        nullStringFromBytes(metaJSON),
-				IsPresent:       util.SqliteBoolToInt(true),
-				LastSeenAt:      sql.NullString{String: nowISO8601Z(), Valid: true}, // caller sets once per refresh
+			installs = append(installs, steamInstall{
+				params: dbq.UpsertGameInstallParams{
+					StoreID:         "steam",
+					StoreGameID:     appid,
+					InstanceID:      instID,
+					CanonicalGameID: sql.NullString{},
+					DisplayName:     display,
+					InstallRoot:     installCanon,
+					Metadata:        nullStringFromBytes(metaJSON),
+					IsPresent:       util.SqliteBoolToInt(true),
+					LastSeenAt:      sql.NullString{String: nowISO8601Z(), Valid: true},
+				},
+				steamappsDir: steamapps,
 			})
 		}
 	}
@@ -446,6 +458,32 @@ func upsertGameDirTarget(ctx context.Context, q *dbq.Queries, gameInstallID int6
 		return fmt.Errorf("upsert game_dir target for install_id=%d: %w", gameInstallID, err)
 	}
 	return nil
+}
+
+func upsertProtonPrefixTarget(ctx context.Context, q *dbq.Queries, gameInstallID int64, steamappsDir, appid string) error {
+	const targetName = "proton_prefix"
+
+	prefixPath := filepath.Join(steamappsDir, "compatdata", appid, "pfx", "drive_c")
+	if _, err := os.Stat(prefixPath); err != nil {
+		if os.IsNotExist(err) {
+			// No Proton prefix for this game (native Linux or never launched).
+			return nil
+		}
+		// Stat failed for some other reason; non-fatal, skip.
+		return nil
+	}
+
+	canon, err := canonicalizePathBestEffort(prefixPath)
+	if err != nil {
+		canon = filepath.Clean(prefixPath)
+	}
+
+	_, err = q.UpsertDiscoveredTarget(ctx, dbq.UpsertDiscoveredTargetParams{
+		GameInstallID: gameInstallID,
+		Name:          targetName,
+		RootPath:      canon,
+	})
+	return err
 }
 
 // canonicalizePathBestEffort returns an absolute, cleaned path, attempting to
