@@ -1,18 +1,5 @@
 -- +goose Up
--- Guard: ensure every profile's game_install has a game_dir target.
--- If any profile item cannot be backfilled, abort before touching anything.
-SELECT CASE
-  WHEN COUNT(*) > 0
-  THEN RAISE(ABORT, 'migration: found profile_items whose game_install has no game_dir target; cannot backfill target_id')
-END
-FROM profile_items pi
-JOIN profiles p ON p.id = pi.profile_id
-WHERE NOT EXISTS (
-  SELECT 1 FROM targets t
-  WHERE t.game_install_id = p.game_install_id
-    AND t.name = 'game_dir'
-);
-
+-- +goose StatementBegin
 -- Step 1: create the new table with target_id NOT NULL
 CREATE TABLE profile_items_new
 -- profile_items: the pinned set of mod file versions within a profile
@@ -53,8 +40,28 @@ CREATE TABLE profile_items_new
   -- priority is unique per profile
   UNIQUE(profile_id, priority)
 ) STRICT;
+-- +goose StatementEnd
 
--- Step 2: copy existing rows, backfilling target_id from the game_dir target
+-- +goose StatementBegin
+-- Step 2: add a temporary migration trigger
+-- Temporary guard: ensure every profile's game_install has a game_dir target;
+-- abort if any profile_item cannot be backfilled to a game_dir target
+CREATE TRIGGER _migration_guard_profile_items_target
+BEFORE INSERT ON profile_items_new
+FOR EACH ROW
+WHEN NOT EXISTS (
+  SELECT 1 FROM targets t
+  JOIN profiles p ON p.id = NEW.profile_id
+  WHERE t.game_install_id = p.game_install_id
+    AND t.name = 'game_dir'
+)
+BEGIN
+  SELECT RAISE(ABORT, 'migration: profile_item has no game_dir target, cannot backfill target_id');
+END;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+-- Step 3: copy existing rows, backfilling target_id from the game_dir target
 INSERT INTO profile_items_new (
   id, profile_id, policy, mod_file_version_id, target_id,
   enabled, priority, remap_config_id, notes, created_at, updated_at
@@ -74,19 +81,39 @@ SELECT
 FROM profile_items pi
 JOIN profiles p ON p.id = pi.profile_id
 JOIN targets t ON t.game_install_id = p.game_install_id AND t.name = 'game_dir';
+-- +goose StatementEnd
 
--- Step 3: drop old table
+-- +goose StatementBegin
+-- Step 4: drop temporary trigger
+DROP TRIGGER _migration_guard_profile_items_target;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+-- Step 5: drop old table
 DROP TABLE profile_items;
+-- +goose StatementEnd
 
--- Step 4: rename new table into place
+-- +goose StatementBegin
+-- Step 6: rename new table into place
 ALTER TABLE profile_items_new RENAME TO profile_items;
+-- +goose StatementEnd
 
--- Step 5: recreate indexes
+-- Step 7: recreate indexes
+-- +goose StatementBegin
 CREATE INDEX idx_profile_items_profile ON profile_items(profile_id);
+-- +goose StatementEnd
+-- +goose StatementBegin
 CREATE INDEX idx_profile_items_remap_config ON profile_items(remap_config_id);
+-- +goose StatementEnd
+-- +goose StatementBegin
 CREATE INDEX idx_profile_items_profile_priority ON profile_items(profile_id, enabled, priority DESC);
+-- +goose StatementEnd
+-- +goose StatementBegin
 CREATE INDEX idx_profile_items_mfv ON profile_items(mod_file_version_id);
+-- +goose StatementEnd
+-- +goose StatementBegin
 CREATE INDEX idx_profile_items_target ON profile_items(target_id);
+-- +goose StatementEnd
 
 -- +goose Down
 SELECT 'TODO: do the rebuild in reverse...';
