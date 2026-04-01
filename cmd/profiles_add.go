@@ -31,11 +31,13 @@ import (
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
+	"go.finelli.dev/util"
 )
 
 var (
 	profilesAddGame    string
 	profilesAddProfile string
+	profilesAddTarget  string
 
 	profilesAddPriority int64
 	profilesAddDisabled bool
@@ -50,7 +52,11 @@ By default, this adds to the active profile for the current game. You can
 override the target profile with --profile.
 
 If --priority is not provided, modctl assigns the next highest priority in the
-profile. Higher priority wins conflicts.`,
+profile. Higher priority wins conflicts.
+
+Use --target to specify which install target the mod should be deployed to
+(e.g. "game_dir", "proton_prefix", or a custom target name). Defaults to
+"game_dir".`,
 	Args: cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) != 0 {
@@ -107,6 +113,23 @@ profile. Higher priority wins conflicts.`,
 			return err
 		}
 
+		// Resolve target: default to game_dir.
+		targetName := profilesAddTarget
+		if targetName == "" {
+			targetName = "game_dir"
+		}
+
+		target, err := q.GetTargetByGameInstallAndName(ctx, dbq.GetTargetByGameInstallAndNameParams{
+			GameInstallID: gi.ID,
+			Name:          targetName,
+		})
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("target %q not found for game %q; run `modctl games targets list` to see available targets", targetName, gi.DisplayName)
+			}
+			return fmt.Errorf("resolve target %q: %w", targetName, err)
+		}
+
 		tx, err := db.BeginTx(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("error starting transaction: %w", err)
@@ -144,14 +167,15 @@ profile. Higher priority wins conflicts.`,
 			}
 		}
 
-		enabledVal := int64(1) // default enabled=true
+		enabledVal := util.SqliteBoolToInt(true) // default enabled=true
 		if profilesAddDisabled {
-			enabledVal = 0
+			enabledVal = util.SqliteBoolToInt(false)
 		}
 
 		itemID, err := qtx.CreateProfileItem(ctx, dbq.CreateProfileItemParams{
 			ProfileID:        p.ID,
 			ModFileVersionID: mfv.ID,
+			TargetID:         target.ID,
 			Enabled:          enabledVal,
 			Priority:         priority,
 		})
@@ -184,8 +208,8 @@ profile. Higher priority wins conflicts.`,
 			return fmt.Errorf("commit: %w", err)
 		}
 
-		fmt.Printf("Added version %d to profile %q (item_id=%d, priority=%d, enabled=%t)\n",
-			mfv.ID, p.Name, itemID, priority, enabledVal != 0)
+		fmt.Printf("Added version %d to profile %q (item_id=%d, priority=%d, enabled=%t, target=%s)\n",
+			mfv.ID, p.Name, itemID, priority, enabledVal != 0, target.Name)
 
 		return nil
 	},
@@ -206,6 +230,13 @@ func init() {
 	profilesAddCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return completion.ProfileNames(cmd, toComplete)
+		})
+
+	profilesAddCmd.Flags().StringVarP(&profilesAddTarget, "target", "t", "",
+		`Install target to deploy this mod to (default "game_dir")`)
+	profilesAddCmd.RegisterFlagCompletionFunc("target",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return completion.TargetNames(cmd, toComplete)
 		})
 
 	profilesAddCmd.Flags().Int64Var(&profilesAddPriority, "priority", 0,

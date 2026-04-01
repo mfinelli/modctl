@@ -22,8 +22,11 @@ version. modctl discovers games automatically by reading the store's library
 configuration; no manual path entry is required.
 
 *Games* are discovered game installations. Each game has one or more targets:
-named locations where mods can be installed. In the current version the only
-target is the game's installation directory.
+named locations where mods can be installed. The game's installation directory
+is always available as the _game_dir_ target. For games that run under Proton,
+modctl also creates a _proton_prefix_ target pointing at the Wine C: drive root
+inside the Proton prefix. Additional targets can be defined with
+*modctl games targets add*.
 
 *Mods* are organised in three levels: a mod page (a mod project), a mod file
 (a downloadable file under a mod page), and a mod file version (a specific
@@ -111,6 +114,21 @@ Set the active game:
 	Set the active game install used by subsequent commands. Accepts a
 	numeric ID, a selector, or a game title.
 
+*modctl games targets list*
+	List all install targets for the current game.
+
+*modctl games targets add* [--relative-to <target>] <name> <path>
+	Add a user-defined install target. The path must be absolute unless
+	\--relative-to is specified, in which case it is resolved relative to
+	the named target's root path at creation time. The resolved absolute
+	path is stored permanently; the base target is not tracked after that
+	point.
+
+*modctl games targets remove* <name>
+	Remove a user-defined install target. Refuses if any files are
+	currently installed to that target (unapply first). Cannot remove
+	auto-discovered targets such as _game_dir_ or _proton_prefix_.
+
 ## Stores
 
 *modctl stores list*
@@ -196,9 +214,10 @@ Set the active game:
 	Compare two profiles. The comparison is directional: profile-a is the
 	source, profile-b is the target.
 
-*modctl profiles add* [--priority <n>] [--disabled] <mod>
+*modctl profiles add* [--priority <n>] [--disabled] [--target <name>] <mod>
 	Add a mod to the active profile. Assigned the next highest priority by
-	default.
+	default. Use --target to specify which install target the mod deploys
+	to (default: _game_dir_).
 
 *modctl profiles remove* <mod>
 	Remove a mod from the active profile.

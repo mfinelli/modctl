@@ -497,6 +497,7 @@ func importProfileItems(ctx context.Context, dst, src *dbq.Queries, oldGameInsta
 			Enabled:          item.Enabled,
 			Priority:         item.Priority,
 			RemapConfigID:    newRemapConfigID,
+			TargetID:         item.TargetID,
 			Notes:            item.Notes,
 			CreatedAt:        item.CreatedAt,
 			UpdatedAt:        item.UpdatedAt,

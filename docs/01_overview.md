@@ -40,9 +40,12 @@ In practice most people have one install per game, but the distinction matters
 for the future when multiple stores are supported.
 
 Each game install has one or more **targets**: named locations where mods can
-be installed. In v1 the only target is `game_dir`, the game's installation
-directory. Future versions will add support for Proton prefixes, documents
-folders, and other locations.
+be deployed. The `game_dir` target (the game's installation directory) is
+always present. For games that run under Proton, modctl also creates a
+`proton_prefix` target automatically, pointing at the Wine C: drive root
+inside the Proton prefix. For games that expect mods in a specific
+subdirectory you can define additional, arbitrary named targets. See the
+[games command reference](../commands/games-stores#targets) for details.
 
 ## Mods
 

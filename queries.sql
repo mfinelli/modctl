@@ -68,32 +68,24 @@ RETURNING id;
 -- name: GetTargetByName :one
 SELECT * FROM targets WHERE game_install_id = ? AND name = ? LIMIT 1;
 
--- name: UpsertDiscoveredTarget :exec
+-- name: UpsertDiscoveredTarget :one
+-- if a user_override exists for the same (game_install_id, name) the conflict
+-- is silently ignored and the user's row is left untouched
 INSERT INTO targets (
-  game_install_id,
-  name,
-  root_path,
-  origin,
-  metadata,
+  game_install_id, name, root_path, origin,
   created_at,
   updated_at
 )
 VALUES (
-  ?, -- game_install_id
-  ?, -- name (e.g. 'game_dir')
-  ?, -- root_path (canonical)
-  'discovered',
-  ?, -- metadata (nullable)
+  ?, ?, ?, 'discovered',
   strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
   strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 )
 ON CONFLICT (game_install_id, name) DO UPDATE SET
-  -- IMPORTANT: caller must avoid calling this if origin='user_override'
   root_path = excluded.root_path,
-  origin    = 'discovered',
-  metadata  = excluded.metadata,
   updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-RETURNING id;
+WHERE targets.origin = 'discovered'
+RETURNING *;
 
 -- name: EnsureDefaultProfile :exec
 INSERT INTO profiles (
@@ -353,11 +345,12 @@ INSERT INTO profile_items (
   profile_id,
   policy,
   mod_file_version_id,
+  target_id,
   enabled,
   priority,
   remap_config_id,
   notes
-) VALUES (?, 'pinned', ?, ?, ?, NULL, NULL)
+) VALUES (?, 'pinned', ?, ?, ?, ?, NULL, NULL)
 RETURNING id;
 
 -- name: ExistsModFileVersion :one
@@ -460,7 +453,9 @@ SELECT
     pi.id                       AS item_id,
     pi.priority,
     pi.enabled,
+    pi.target_id,
     pi.notes                    AS item_notes,
+    t.name                      AS target_name,
     mp.id                       AS mod_page_id,
     mp.name                     AS mod_page_name,
     mp.source_kind,
@@ -480,6 +475,7 @@ SELECT
         WHERE rr.remap_config_id = pi.remap_config_id
     ), 0) AS INTEGER)           AS remap_rule_count
 FROM profile_items pi
+JOIN targets t              ON t.id = pi.target_id
 JOIN mod_file_versions mfv ON mfv.id = pi.mod_file_version_id
 JOIN mod_files mf           ON mf.id = mfv.mod_file_id
 JOIN mod_pages mp            ON mp.id = mf.mod_page_id
@@ -739,11 +735,12 @@ JOIN mod_pages mpb ON mpb.id = mi.mod_page_id_b
 WHERE mpa.game_install_id = ?
 ORDER BY mi.created_at DESC;
 
--- name: GetProfileItemForPlanning :many
+-- name: GetProfileItemsForPlanning :many
 SELECT
     pi.id                       AS item_id,
     pi.priority,
     pi.enabled,
+    pi.target_id,
     pi.remap_config_id,
     mfv.id                      AS mod_file_version_id,
     mfv.archive_sha256,
@@ -756,6 +753,7 @@ JOIN mod_file_versions mfv ON mfv.id = pi.mod_file_version_id
 JOIN mod_files mf           ON mf.id = mfv.mod_file_id
 JOIN mod_pages mp            ON mp.id = mf.mod_page_id
 WHERE pi.profile_id = ?
+  AND pi.target_id = ?
   AND pi.enabled = TRUE
 ORDER BY pi.priority DESC;
 
@@ -1195,7 +1193,7 @@ FROM remap_rules WHERE remap_config_id = ?;
 
 -- name: ExportGetProfileItemsForGameInstall :many
 SELECT pi.id, pi.profile_id, pi.policy, pi.mod_file_version_id,
-       pi.enabled, pi.priority, pi.remap_config_id, pi.notes,
+       pi.target_id, pi.enabled, pi.priority, pi.remap_config_id, pi.notes,
        pi.created_at, pi.updated_at
 FROM profile_items pi
 JOIN profiles p ON p.id = pi.profile_id
@@ -1286,10 +1284,10 @@ VALUES (?, ?, ?, ?, ?, ?, ?);
 
 -- name: ExportInsertProfileItem :exec
 INSERT INTO profile_items (id, profile_id, policy, mod_file_version_id,
-                            enabled, priority, remap_config_id, notes,
+                            target_id, enabled, priority, remap_config_id, notes,
                             created_at, updated_at)
 VALUES (?, ?, ?, ?,
-        ?, ?, ?, ?,
+        ?, ?, ?, ?, ?,
         ?, ?);
 
 -- name: ExportInsertProfilePathPolicy :exec
@@ -1385,9 +1383,9 @@ RETURNING id;
 
 -- name: ImportInsertProfileItem :one
 INSERT INTO profile_items (profile_id, policy, mod_file_version_id,
-                            enabled, priority, remap_config_id, notes,
+                            target_id, enabled, priority, remap_config_id, notes,
                             created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 RETURNING id;
 
 -- name: ImportInsertProfilePathPolicy :one
@@ -2090,3 +2088,38 @@ WHERE id = ?;
 
 -- name: GetModFileVersionByIDForUpgrade :one
 SELECT * FROM mod_file_versions WHERE id = ? LIMIT 1;
+
+-- name: GetTargetByGameInstallAndName :one
+SELECT *
+FROM targets
+WHERE game_install_id = ?
+  AND name = ?;
+
+-- name: InsertUserTarget :one
+INSERT INTO targets (game_install_id, name, root_path, origin)
+VALUES (?, ?, ?, 'user_override')
+RETURNING *;
+
+-- name: UpdateTargetPath :one
+-- filters on origin = 'user_override' so it's a no-op if someone tries on an
+-- autodiscovered target
+UPDATE targets
+SET root_path = ?,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE id = ?
+  AND origin = 'user_override'
+RETURNING *;
+
+-- name: DeleteTarget :exec
+DELETE FROM targets
+WHERE id = ?;
+
+-- name: CountInstalledFilesForTarget :one
+SELECT CAST(COUNT(*) AS INTEGER) AS count
+FROM installed_files
+WHERE target_id = ?;
+
+-- name: CountProfileItemsForTarget :one
+SELECT CAST(COUNT(*) AS INTEGER) AS count
+FROM profile_items
+WHERE target_id = ?;
