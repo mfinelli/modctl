@@ -2091,3 +2091,32 @@ SELECT *
 FROM targets
 WHERE game_install_id = ?
   AND name = ?;
+
+-- name: InsertUserTarget :one
+INSERT INTO targets (game_install_id, name, root_path, origin)
+VALUES (?, ?, ?, 'user_override')
+RETURNING *;
+
+-- name: UpdateTargetPath :one
+-- filters on origin = 'user_override' so it's a no-op if someone tries on an
+-- autodiscovered target
+UPDATE targets
+SET root_path = ?,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE id = ?
+  AND origin = 'user_override'
+RETURNING *;
+
+-- name: DeleteTarget :exec
+DELETE FROM targets
+WHERE id = ?;
+
+-- name: CountInstalledFilesForTarget :one
+SELECT CAST(COUNT(*) AS INTEGER) AS count
+FROM installed_files
+WHERE target_id = ?;
+
+-- name: CountProfileItemsForTarget :one
+SELECT CAST(COUNT(*) AS INTEGER) AS count
+FROM profile_items
+WHERE target_id = ?;
