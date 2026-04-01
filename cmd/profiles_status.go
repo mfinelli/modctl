@@ -376,6 +376,10 @@ func renderProfileStatus(
 						item.RemapRuleCount, item.ModFileVersionID)))
 			}
 
+			if item.TargetName != "game_dir" {
+				writeKVIndented16(&b, "target:", item.TargetName)
+			}
+
 			b.WriteString("\n")
 		}
 	}

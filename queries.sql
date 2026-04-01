@@ -455,6 +455,7 @@ SELECT
     pi.enabled,
     pi.target_id,
     pi.notes                    AS item_notes,
+    t.name                      AS target_name,
     mp.id                       AS mod_page_id,
     mp.name                     AS mod_page_name,
     mp.source_kind,
@@ -474,6 +475,7 @@ SELECT
         WHERE rr.remap_config_id = pi.remap_config_id
     ), 0) AS INTEGER)           AS remap_rule_count
 FROM profile_items pi
+JOIN targets t              ON t.id = pi.target_id
 JOIN mod_file_versions mfv ON mfv.id = pi.mod_file_version_id
 JOIN mod_files mf           ON mf.id = mfv.mod_file_id
 JOIN mod_pages mp            ON mp.id = mf.mod_page_id
