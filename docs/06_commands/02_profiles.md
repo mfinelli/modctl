@@ -68,7 +68,7 @@ modctl profiles status
 
 | Flag        | Description                     |
 |-------------|---------------------------------|
-| `--compace` | Shorter one-line-per-mod output |
+| `--compact` | Shorter one-line-per-mod output |
 
 ### profiles diff
 
@@ -93,10 +93,18 @@ automatically.
 modctl profiles add "Appearance Menu Mod"
 ```
 
-| Flag             | Description                      |
-|------------------|----------------------------------|
-| `--priority <n>` | Assign a specific priority value |
-| `--disabled`     | Add the mod without enabling it  |
+Use `--target` to specify which install target the mod deploys to. If not
+provided, defaults to `game_dir`. The target must already exist for the
+current game; run `modctl games targets list` to see available targets.
+```bash
+modctl profiles add "ToyBox" --target unitymodmanager
+```
+
+| Flag              | Description                                               |
+|-------------------|-----------------------------------------------------------|
+| `--priority <n>`  | Assign a specific priority value                          |
+| `--disabled`      | Add the mod without enabling it                           |
+| `--target <name>` | Deploy to a specific install target (default: `game_dir`) |
 
 ### profiles remove
 
