@@ -22,7 +22,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -438,36 +437,15 @@ func discoverSteamInstalls(
 }
 
 func upsertGameDirTarget(ctx context.Context, q *dbq.Queries, gameInstallID int64, installRoot string) error {
-	const targetName = "game_dir"
-
-	t, err := q.GetTargetByName(ctx, dbq.GetTargetByNameParams{
+	_, err := q.UpsertDiscoveredTarget(ctx, dbq.UpsertDiscoveredTargetParams{
 		GameInstallID: gameInstallID,
-		Name:          targetName,
+		Name:          "game_dir",
+		RootPath:      installRoot,
 	})
 	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("get target %s for install_id=%d: %w", targetName, gameInstallID, err)
-		}
-		// doesn't exist -> create
-		return q.UpsertDiscoveredTarget(ctx, dbq.UpsertDiscoveredTargetParams{
-			GameInstallID: gameInstallID,
-			Name:          targetName,
-			RootPath:      installRoot,
-			Metadata:      sql.NullString{},
-		})
+		return fmt.Errorf("upsert game_dir target for install_id=%d: %w", gameInstallID, err)
 	}
-
-	// don't overwrite if user has specified something manually
-	if t.Origin == "user_override" {
-		return nil
-	}
-
-	return q.UpsertDiscoveredTarget(ctx, dbq.UpsertDiscoveredTargetParams{
-		GameInstallID: gameInstallID,
-		Name:          targetName,
-		RootPath:      installRoot,
-		Metadata:      sql.NullString{},
-	})
+	return nil
 }
 
 // canonicalizePathBestEffort returns an absolute, cleaned path, attempting to
