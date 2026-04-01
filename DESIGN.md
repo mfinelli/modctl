@@ -78,15 +78,36 @@ and mod configuration.
 
 ### Target
 
-A named install root within a `GameInstall`. v1 supports:
-- `game_dir` only
+A named install root within a `GameInstall`. Two tiers are supported:
 
-Future targets:
-- `proton_prefix`
-- `documents`, `appdata`, etc.
+**Auto-discovered targets** are created and maintained by modctl during store
+refresh. They cannot be removed manually and are recreated on the next refresh
+if missing:
+- `game_dir`: the game's install directory. Created for every game install.
+- `proton_prefix`: the Wine C: drive root (`compatdata/<appid>/pfx/drive_c`).
+  Created automatically for any Steam game that has a Proton compatdata
+  directory. Not created for native Linux games.
 
-Track installed files as `(game_install_id, target_id, relpath)` so we can
-extend beyond game directory later.
+**User-defined targets** are created manually via `games targets add` and
+stored with `origin='user_override'`. They can be removed with
+`games targets remove` provided no files are currently installed to that
+target. Use `--relative-to <target-name>` to resolve a path relative to an
+existing target at creation time (the resolved absolute path is stored and
+the base target is not tracked after that point).
+
+For games where all mods deploy to a specific deep subdirectory (e.g.
+UnityModManager under the Proton prefix), the recommended pattern is a
+one-time `games targets add` that resolves to an absolute path, after which
+`profiles add --target <name>` requires no remap rules for the common case.
+
+Track installed files as `(game_install_id, target_id, relpath)` so
+deployment can span multiple roots. Conflict detection is scoped to
+`(profile_id, target_id, relpath)` (two mods providing the same relative
+path under different targets do not conflict).
+
+Targets with active installed files cannot be removed; the profile must be
+unapplied first. Removing a target cascades to any profile items that
+reference it (since nothing is on disk after unapply, this is safe).
 
 ### Mods model
 
@@ -955,6 +976,21 @@ to the database, as they are internal Steam software rather than moddable games:
 - `Steam Linux Runtime *` (any title with this prefix, e.g. `Steam Linux Runtime 1.0`)
 - `Steamworks Common Redistributables`
 
+#### Target discovery
+
+During refresh, modctl upserts two targets for each game install:
+
+**`game_dir`** is always upserted with `root_path = <install_root>` and
+`origin = 'discovered'`. If a `user_override` row exists for the same name,
+it is left untouched.
+
+**`proton_prefix`** is upserted only when
+`<steamapps>/compatdata/<appid>/pfx/drive_c` exists on disk. The resolved
+absolute path is stored as `root_path` with `origin = 'discovered'`. If a
+`user_override` row exists for the same name, it is left untouched. Games
+that have never been launched under Proton, or native Linux games, will not
+have a `proton_prefix` target.
+
 ## 13. Extensibility for game-specific integrations
 
 ### Integration type
@@ -1012,6 +1048,9 @@ This preserves a clean v1 while allowing richer v2.
   - Items are added to a profile enabled by default. The schema default is `FALSE`
     but the CLI overrides this at insert time. Use `--disabled` to explicitly add
     an item without enabling it.
+  - `profiles add` - add a mod file version to a profile. Use `--target <name>`
+  to specify which install target the mod deploys to (default: `game_dir`).
+  The target must exist for the current game install.
 - `profiles order compact|move|set|swap`
 - `profiles remap add|remove|list|clear|copy|preview` - manage remap rules for
   a mod version within a profile. Rules are appended by default; use
@@ -1097,6 +1136,15 @@ This preserves a clean v1 while allowing richer v2.
   the config file
 - `operations list|show` - show specific actions that we took during
   apply/unapply
+- `games targets list` - list all install targets for the active (or specified)
+  game install, showing name, root path, and origin
+- `games targets add <name> <path> [--relative-to <target-name>]` - add a
+  user-defined install target. The path must be absolute unless
+  `--relative-to` is specified, in which case it is resolved relative to the
+  named target's root path at creation time and stored as an absolute path.
+- `games targets remove <name>` - remove a user-defined target. Refuses if
+  any installed files reference the target (unapply first). Cascades to
+  profile items referencing the target. Cannot remove auto-discovered targets.
 
 Key behavior:
 - "intent changes" (enable/disable/order) are cheap
