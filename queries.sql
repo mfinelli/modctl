@@ -2085,3 +2085,9 @@ WHERE id = ?;
 
 -- name: GetModFileVersionByIDForUpgrade :one
 SELECT * FROM mod_file_versions WHERE id = ? LIMIT 1;
+
+-- name: GetTargetByGameInstallAndName :one
+SELECT *
+FROM targets
+WHERE game_install_id = ?
+  AND name = ?;
