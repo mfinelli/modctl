@@ -147,15 +147,31 @@ Use --dry-run to preview the plan without making any changes.`,
 		}
 		defer unlock()
 
-		// Build the unapply plan.
-		plan, err := planner.BuildUnapplyPlan(ctx, q, gi.ID)
+		// Build the unapply plans
+		targets, err := q.ListTargetsForGameInstall(ctx, gi.ID)
 		if err != nil {
-			return fmt.Errorf("build unapply plan: %w", err)
+			return fmt.Errorf("list targets: %w", err)
+		}
+		if len(targets) == 0 {
+			return fmt.Errorf("no targets found for game install %d", gi.ID)
 		}
 
-		if len(plan.Ops) == 0 {
+		var plans []planner.Plan
+		for _, target := range targets {
+			plan, err := planner.BuildUnapplyPlan(ctx, q, gi.ID, target)
+			if err != nil {
+				return fmt.Errorf("build unapply plan for target %q: %w", target.Name, err)
+			}
+			plans = append(plans, plan)
+		}
+
+		totalOps := 0
+		for _, plan := range plans {
+			totalOps += len(plan.Ops)
+		}
+		if totalOps == 0 {
 			fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render(
-				"  nothing to unapply - no tool-managed files found"))
+				"  nothing to unapply: no tool-managed files found"))
 			return nil
 		}
 
@@ -168,7 +184,9 @@ Use --dry-run to preview the plan without making any changes.`,
 
 		// Dry-run output
 		if unapplyDryRun {
-			printUnapplyPlan(plan, gi.DisplayName, appliedProfileName, boldStyle, subtleStyle, warnStyle, redStyle, cyanStyle)
+			for _, plan := range plans {
+				printUnapplyPlan(plan, gi.DisplayName, appliedProfileName, boldStyle, subtleStyle, warnStyle, redStyle, cyanStyle)
+			}
 			return nil
 		}
 
@@ -203,7 +221,7 @@ Use --dry-run to preview the plan without making any changes.`,
 		}
 
 		// Counters
-		total := len(plan.Ops)
+		total := totalOps
 		current := 0
 		var (
 			countRemove  int
@@ -238,36 +256,41 @@ Use --dry-run to preview the plan without making any changes.`,
 			return err
 		}
 
-		var removedPaths []string
+		var allWarnings []string
 
-		for _, planOp := range plan.Ops {
-			switch planOp.Kind {
-			case planner.PlanOpRemove:
-				printOp(redStyle.Render("-"), planOp.DestPath)
-				if _, err := ext.RemoveFile(ctx, db, q, planOp, plan.TargetRoot, gi.ID, plan.TargetID, op.ID); err != nil {
-					countFailed++
-					return markFailed(fmt.Errorf("remove %q: %w", planOp.DestPath, err))
+		for _, plan := range plans {
+			var removedPaths []string
+
+			for _, planOp := range plan.Ops {
+				switch planOp.Kind {
+				case planner.PlanOpRemove:
+					printOp(redStyle.Render("-"), planOp.DestPath)
+					if _, err := ext.RemoveFile(ctx, db, q, planOp, plan.TargetRoot, gi.ID, plan.TargetID, op.ID); err != nil {
+						countFailed++
+						return markFailed(fmt.Errorf("remove %q: %w", planOp.DestPath, err))
+					}
+					countRemove++
+					removedPaths = append(removedPaths, planOp.DestPath)
+
+				case planner.PlanOpRestoreBackup:
+					printOp(cyanStyle.Render("↩"), planOp.DestPath)
+					if _, err := ext.RestoreFile(ctx, db, q, planOp, plan.TargetRoot, gi.ID, plan.TargetID, op.ID); err != nil {
+						countFailed++
+						return markFailed(fmt.Errorf("restore %q: %w", planOp.DestPath, err))
+					}
+					countRestore++
+
+				default:
+					plan.Warnings = append(plan.Warnings,
+						fmt.Sprintf("unexpected op kind %q for %q during unapply - skipped", planOp.Kind, planOp.DestPath))
 				}
-				countRemove++
-				removedPaths = append(removedPaths, planOp.DestPath)
-
-			case planner.PlanOpRestoreBackup:
-				printOp(cyanStyle.Render("↩"), planOp.DestPath)
-				if _, err := ext.RestoreFile(ctx, db, q, planOp, plan.TargetRoot, gi.ID, plan.TargetID, op.ID); err != nil {
-					countFailed++
-					return markFailed(fmt.Errorf("restore %q: %w", planOp.DestPath, err))
-				}
-				countRestore++
-
-			default:
-				plan.Warnings = append(plan.Warnings,
-					fmt.Sprintf("unexpected op kind %q for %q during unapply - skipped", planOp.Kind, planOp.DestPath))
 			}
-		}
 
-		if unapplyPruneDirs {
-			pruneWarnings := extractor.PruneDirs(plan.TargetRoot, removedPaths)
-			plan.Warnings = append(plan.Warnings, pruneWarnings...)
+			if unapplyPruneDirs {
+				pruneWarnings := extractor.PruneDirs(plan.TargetRoot, removedPaths)
+				allWarnings = append(allWarnings, pruneWarnings...)
+			}
+			allWarnings = append(allWarnings, plan.Warnings...)
 		}
 
 		// Clear spinner line
@@ -309,9 +332,9 @@ Use --dry-run to preview the plan without making any changes.`,
 		if countRestore > 0 {
 			fmt.Printf("  restored:  %d\n", countRestore)
 		}
-		if len(plan.Warnings) > 0 {
-			fmt.Println(warnStyle.Render(fmt.Sprintf("  warnings:  %d", len(plan.Warnings))))
-			for _, w := range plan.Warnings {
+		if len(allWarnings) > 0 {
+			fmt.Println(warnStyle.Render(fmt.Sprintf("  warnings:  %d", len(allWarnings))))
+			for _, w := range allWarnings {
 				fmt.Println(warnStyle.Render("    ⚠  " + w))
 			}
 		}

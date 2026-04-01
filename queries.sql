@@ -733,7 +733,7 @@ JOIN mod_pages mpb ON mpb.id = mi.mod_page_id_b
 WHERE mpa.game_install_id = ?
 ORDER BY mi.created_at DESC;
 
--- name: GetProfileItemForPlanning :many
+-- name: GetProfileItemsForPlanning :many
 SELECT
     pi.id                       AS item_id,
     pi.priority,
@@ -751,6 +751,7 @@ JOIN mod_file_versions mfv ON mfv.id = pi.mod_file_version_id
 JOIN mod_files mf           ON mf.id = mfv.mod_file_id
 JOIN mod_pages mp            ON mp.id = mf.mod_page_id
 WHERE pi.profile_id = ?
+  AND pi.target_id = ?
   AND pi.enabled = TRUE
 ORDER BY pi.priority DESC;
 

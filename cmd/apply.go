@@ -149,13 +149,25 @@ Use --dry-run to preview the plan without making any changes. Add the
 		}
 		defer unlock()
 
-		plan, err := planner.BuildApplyPlan(ctx, q, gi.ID, p.ID, applySkipRecheck)
+		targets, err := q.ListTargetsForGameInstall(ctx, gi.ID)
 		if err != nil {
-			var uninvErr *planner.UninventoriedArchiveError
-			if errors.As(err, &uninvErr) {
-				return fmt.Errorf("%w\nrun 'modctl mods scan-inventory' to fix", uninvErr)
+			return fmt.Errorf("list targets: %w", err)
+		}
+		if len(targets) == 0 {
+			return fmt.Errorf("no targets found for game install %d", gi.ID)
+		}
+
+		var plans []planner.Plan
+		for _, target := range targets {
+			plan, err := planner.BuildApplyPlan(ctx, q, gi.ID, p.ID, target, applySkipRecheck)
+			if err != nil {
+				var uninvErr *planner.UninventoriedArchiveError
+				if errors.As(err, &uninvErr) {
+					return fmt.Errorf("%w\nrun 'modctl mods scan-inventory' to fix", uninvErr)
+				}
+				return fmt.Errorf("build plan for target %q: %w", target.Name, err)
 			}
-			return fmt.Errorf("build plan: %w", err)
+			plans = append(plans, plan)
 		}
 
 		// TODO extract these styles somewhere
@@ -169,7 +181,9 @@ Use --dry-run to preview the plan without making any changes. Add the
 
 		// Dry-run output
 		if applyDryRun {
-			printApplyPlan(plan, p.Name, gi.DisplayName, applyShowConflicts, boldStyle, subtleStyle, warnStyle, greenStyle, redStyle, yellowStyle, cyanStyle)
+			for _, plan := range plans {
+				printApplyPlan(plan, p.Name, gi.DisplayName, applyShowConflicts, boldStyle, subtleStyle, warnStyle, greenStyle, redStyle, yellowStyle, cyanStyle)
+			}
 			return nil
 		}
 
@@ -210,47 +224,13 @@ Use --dry-run to preview the plan without making any changes. Add the
 			sha256 string
 			ops    []planner.PlanOp
 		}
-		archiveMap := make(map[string]*archiveGroup)
-		var archiveOrder []string
-		var overrideOps []planner.PlanOp
-		var removeOps []planner.PlanOp
-		var restoreOps []planner.PlanOp
-
-		for _, planOp := range plan.Ops {
-			switch planOp.Kind {
-			case planner.PlanOpWrite, planner.PlanOpOverwrite:
-				if planOp.OverrideID.Valid {
-					overrideOps = append(overrideOps, planOp)
-					// For patch overrides, the base archive is handled via
-					// PatchBaseArchives below, not grouped here
-				} else {
-					sha := planOp.File.Winner().Entry.ArchiveSha256
-					if _, ok := archiveMap[sha]; !ok {
-						archiveMap[sha] = &archiveGroup{sha256: sha}
-						archiveOrder = append(archiveOrder, sha)
-					}
-					archiveMap[sha].ops = append(archiveMap[sha].ops, planOp)
-				}
-			case planner.PlanOpRemove:
-				removeOps = append(removeOps, planOp)
-			case planner.PlanOpRestoreBackup:
-				restoreOps = append(restoreOps, planOp)
-			case planner.PlanOpNoop:
-				logger.Debug("skipping noop op", "path", planOp.DestPath)
-			}
-		}
-
-		// Add patch base archives to the staging set if not already present
-		// No ops added; archive is staged for patch base file access only
-		for _, sha := range plan.PatchBaseArchives {
-			if _, ok := archiveMap[sha]; !ok {
-				archiveMap[sha] = &archiveGroup{sha256: sha}
-				archiveOrder = append(archiveOrder, sha)
-			}
-		}
 
 		// Counters for summary
-		total := len(plan.Ops)
+		total := 0
+		for _, plan := range plans {
+			total += len(plan.Ops)
+		}
+
 		current := 0
 		var (
 			countWrite     int
@@ -260,28 +240,6 @@ Use --dry-run to preview the plan without making any changes. Add the
 			countBackedUp  int
 			countFailed    int
 		)
-
-		// Helper to print progress
-		width := len(strconv.Itoa(total))
-		fmtCounter := fmt.Sprintf("[%%%dd/%%%dd]", width, width)
-
-		// Print an initial line so \r updates have something to overwrite
-		if !applyVerbose {
-			fmt.Printf("  [%*d/%d] ...", width, 0, total)
-		}
-
-		printOp := func(symbol, path, detail string) {
-			current++
-			line := fmt.Sprintf("  "+fmtCounter+" %s %s", current, total, symbol, path)
-			if detail != "" {
-				line += subtleStyle.Render("  " + detail)
-			}
-			if applyVerbose {
-				fmt.Println(line)
-			} else {
-				fmt.Printf("\r%-*s", 80, line)
-			}
-		}
 
 		// markFailed marks the operation as failed and returns the error
 		markFailed := func(err error) error {
@@ -293,32 +251,146 @@ Use --dry-run to preview the plan without making any changes. Add the
 			return err
 		}
 
-		// Extract and deploy archives
-		for _, sha := range archiveOrder {
-			group := archiveMap[sha]
-			stagingPath, err := ext.ExtractArchive(ctx, sha)
-			if err != nil {
-				return markFailed(fmt.Errorf("extract archive %.16s: %w", sha, err))
+		for _, plan := range plans {
+			archiveMap := make(map[string]*archiveGroup)
+			var archiveOrder []string
+			var overrideOps []planner.PlanOp
+			var removeOps []planner.PlanOp
+			var restoreOps []planner.PlanOp
+
+			for _, planOp := range plan.Ops {
+				switch planOp.Kind {
+				case planner.PlanOpWrite, planner.PlanOpOverwrite:
+					if planOp.OverrideID.Valid {
+						overrideOps = append(overrideOps, planOp)
+						// For patch overrides, the base archive is handled via
+						// PatchBaseArchives below, not grouped here
+					} else {
+						sha := planOp.File.Winner().Entry.ArchiveSha256
+						if _, ok := archiveMap[sha]; !ok {
+							archiveMap[sha] = &archiveGroup{sha256: sha}
+							archiveOrder = append(archiveOrder, sha)
+						}
+						archiveMap[sha].ops = append(archiveMap[sha].ops, planOp)
+					}
+				case planner.PlanOpRemove:
+					removeOps = append(removeOps, planOp)
+				case planner.PlanOpRestoreBackup:
+					restoreOps = append(restoreOps, planOp)
+				case planner.PlanOpNoop:
+					logger.Debug("skipping noop op", "path", planOp.DestPath)
+				}
 			}
 
-			for _, planOp := range group.ops {
+			// Add patch base archives to the staging set if not already present
+			// No ops added; archive is staged for patch base file access only
+			for _, sha := range plan.PatchBaseArchives {
+				if _, ok := archiveMap[sha]; !ok {
+					archiveMap[sha] = &archiveGroup{sha256: sha}
+					archiveOrder = append(archiveOrder, sha)
+				}
+			}
+
+			// Helper to print progress
+			width := len(strconv.Itoa(total))
+			fmtCounter := fmt.Sprintf("[%%%dd/%%%dd]", width, width)
+
+			// Print an initial line so \r updates have something to overwrite
+			if !applyVerbose {
+				fmt.Printf("  [%*d/%d] ...", width, 0, total)
+			}
+
+			printOp := func(symbol, path, detail string) {
+				current++
+				line := fmt.Sprintf("  "+fmtCounter+" %s %s", current, total, symbol, path)
+				if detail != "" {
+					line += subtleStyle.Render("  " + detail)
+				}
+				if applyVerbose {
+					fmt.Println(line)
+				} else {
+					fmt.Printf("\r%-*s", 80, line)
+				}
+			}
+
+			// Extract and deploy archives
+			for _, sha := range archiveOrder {
+				group := archiveMap[sha]
+				stagingPath, err := ext.ExtractArchive(ctx, sha)
+				if err != nil {
+					return markFailed(fmt.Errorf("extract archive %.16s: %w", sha, err))
+				}
+
+				for _, planOp := range group.ops {
+					symbol := greenStyle.Render("+")
+					detail := ""
+					if planOp.Kind == planner.PlanOpOverwrite {
+						symbol = yellowStyle.Render("~")
+					}
+					if planOp.NeedsBackup {
+						detail = "(backing up original)"
+					}
+					printOp(symbol, planOp.DestPath, detail)
+
+					result, err := ext.DeployFile(ctx, db, q, planOp, stagingPath, plan.TargetRoot, gi.ID, plan.TargetID, p.ID, op.ID)
+					if err != nil {
+						countFailed++
+						if applyVerbose {
+							fmt.Println(warnStyle.Render(fmt.Sprintf("    ✗ %v", err)))
+						}
+						return markFailed(fmt.Errorf("deploy %q: %w", planOp.DestPath, err))
+					}
+
+					if planOp.Kind == planner.PlanOpOverwrite {
+						countOverwrite++
+					} else {
+						countWrite++
+					}
+					if result.WasBackedUp {
+						countBackedUp++
+					}
+				}
+			}
+
+			// Deploy override ops
+			for _, planOp := range overrideOps {
 				symbol := greenStyle.Render("+")
-				detail := ""
+				detail := "(override)"
 				if planOp.Kind == planner.PlanOpOverwrite {
 					symbol = yellowStyle.Render("~")
 				}
 				if planOp.NeedsBackup {
-					detail = "(backing up original)"
+					detail = "(override, backing up original)"
 				}
 				printOp(symbol, planOp.DestPath, detail)
 
-				result, err := ext.DeployFile(ctx, db, q, planOp, stagingPath, plan.TargetRoot, gi.ID, plan.TargetID, p.ID, op.ID)
+				// Load patch entries if needed
+				var patchEntries []patchapply.Entry
+				if planOp.OverrideType != "full_file" {
+					dbEntries, err := q.ListOverridePatchEntries(ctx, planOp.OverrideID.Int64)
+					if err != nil {
+						countFailed++
+						return markFailed(fmt.Errorf("load patch entries for %q: %w", planOp.DestPath, err))
+					}
+					for _, e := range dbEntries {
+						patchEntries = append(patchEntries, patchapply.Entry{
+							PatchType:    e.PatchType,
+							EntrySection: e.EntrySection.String,
+							EntryKey:     e.EntryKey,
+							EntryValue:   e.EntryValue.String,
+						})
+					}
+				}
+
+				result, err := ext.DeployOverrideFile(
+					ctx, db, q, planOp,
+					ext.StagingPathFor(planOp.OverrideBaseArchiveSha256.String),
+					plan.TargetRoot, gi.ID, plan.TargetID, p.ID, op.ID,
+					patchEntries,
+				)
 				if err != nil {
 					countFailed++
-					if applyVerbose {
-						fmt.Println(warnStyle.Render(fmt.Sprintf("    ✗ %v", err)))
-					}
-					return markFailed(fmt.Errorf("deploy %q: %w", planOp.DestPath, err))
+					return markFailed(fmt.Errorf("deploy override %q: %w", planOp.DestPath, err))
 				}
 
 				if planOp.Kind == planner.PlanOpOverwrite {
@@ -330,86 +402,35 @@ Use --dry-run to preview the plan without making any changes. Add the
 					countBackedUp++
 				}
 			}
-		}
 
-		// Deploy override ops
-		for _, planOp := range overrideOps {
-			symbol := greenStyle.Render("+")
-			detail := "(override)"
-			if planOp.Kind == planner.PlanOpOverwrite {
-				symbol = yellowStyle.Render("~")
-			}
-			if planOp.NeedsBackup {
-				detail = "(override, backing up original)"
-			}
-			printOp(symbol, planOp.DestPath, detail)
+			var removedPaths []string
 
-			// Load patch entries if needed
-			var patchEntries []patchapply.Entry
-			if planOp.OverrideType != "full_file" {
-				dbEntries, err := q.ListOverridePatchEntries(ctx, planOp.OverrideID.Int64)
-				if err != nil {
+			// Remove ops
+			for _, planOp := range removeOps {
+				printOp(redStyle.Render("-"), planOp.DestPath, "")
+				if _, err := ext.RemoveFile(ctx, db, q, planOp, plan.TargetRoot, gi.ID, plan.TargetID, op.ID); err != nil {
 					countFailed++
-					return markFailed(fmt.Errorf("load patch entries for %q: %w", planOp.DestPath, err))
+					return markFailed(fmt.Errorf("remove %q: %w", planOp.DestPath, err))
 				}
-				for _, e := range dbEntries {
-					patchEntries = append(patchEntries, patchapply.Entry{
-						PatchType:    e.PatchType,
-						EntrySection: e.EntrySection.String,
-						EntryKey:     e.EntryKey,
-						EntryValue:   e.EntryValue.String,
-					})
+				countRemove++
+				removedPaths = append(removedPaths, planOp.DestPath)
+			}
+
+			// Restore ops
+			for _, planOp := range restoreOps {
+				printOp(cyanStyle.Render("↩"), planOp.DestPath, "")
+				if _, err := ext.RestoreFile(ctx, db, q, planOp, plan.TargetRoot, gi.ID, plan.TargetID, op.ID); err != nil {
+					countFailed++
+					return markFailed(fmt.Errorf("restore %q: %w", planOp.DestPath, err))
 				}
+				countRestore++
 			}
 
-			result, err := ext.DeployOverrideFile(
-				ctx, db, q, planOp,
-				ext.StagingPathFor(planOp.OverrideBaseArchiveSha256.String),
-				plan.TargetRoot, gi.ID, plan.TargetID, p.ID, op.ID,
-				patchEntries,
-			)
-			if err != nil {
-				countFailed++
-				return markFailed(fmt.Errorf("deploy override %q: %w", planOp.DestPath, err))
+			// Prune empty directories if requested
+			if applyPruneDirs {
+				pruneWarnings := extractor.PruneDirs(plan.TargetRoot, removedPaths)
+				plan.Warnings = append(plan.Warnings, pruneWarnings...)
 			}
-
-			if planOp.Kind == planner.PlanOpOverwrite {
-				countOverwrite++
-			} else {
-				countWrite++
-			}
-			if result.WasBackedUp {
-				countBackedUp++
-			}
-		}
-
-		var removedPaths []string
-
-		// Remove ops
-		for _, planOp := range removeOps {
-			printOp(redStyle.Render("-"), planOp.DestPath, "")
-			if _, err := ext.RemoveFile(ctx, db, q, planOp, plan.TargetRoot, gi.ID, plan.TargetID, op.ID); err != nil {
-				countFailed++
-				return markFailed(fmt.Errorf("remove %q: %w", planOp.DestPath, err))
-			}
-			countRemove++
-			removedPaths = append(removedPaths, planOp.DestPath)
-		}
-
-		// Restore ops
-		for _, planOp := range restoreOps {
-			printOp(cyanStyle.Render("↩"), planOp.DestPath, "")
-			if _, err := ext.RestoreFile(ctx, db, q, planOp, plan.TargetRoot, gi.ID, plan.TargetID, op.ID); err != nil {
-				countFailed++
-				return markFailed(fmt.Errorf("restore %q: %w", planOp.DestPath, err))
-			}
-			countRestore++
-		}
-
-		// Prune empty directories if requested
-		if applyPruneDirs {
-			pruneWarnings := extractor.PruneDirs(plan.TargetRoot, removedPaths)
-			plan.Warnings = append(plan.Warnings, pruneWarnings...)
 		}
 
 		// Clear the spinner line before printing summary
@@ -474,9 +495,13 @@ Use --dry-run to preview the plan without making any changes. Add the
 		if countBackedUp > 0 {
 			fmt.Printf("  backed up:   %d\n", countBackedUp)
 		}
-		if len(plan.Warnings) > 0 {
-			fmt.Println(warnStyle.Render(fmt.Sprintf("  warnings:    %d", len(plan.Warnings))))
-			for _, w := range plan.Warnings {
+		var allWarnings []string
+		for _, plan := range plans {
+			allWarnings = append(allWarnings, plan.Warnings...)
+		}
+		if len(allWarnings) > 0 {
+			fmt.Println(warnStyle.Render(fmt.Sprintf("  warnings:    %d", len(allWarnings))))
+			for _, w := range allWarnings {
 				fmt.Println(warnStyle.Render("    ⚠  " + w))
 			}
 		}

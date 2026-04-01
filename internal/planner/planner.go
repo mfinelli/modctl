@@ -144,18 +144,7 @@ func (e *UninventoriedArchiveError) Error() string {
 // BuildApplyPlan computes the desired file state for applying profileID to
 // gameInstallID. It reads the filesystem to check file existence and
 // ownership but does not modify anything.
-func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileID int64, skipRecheck bool) (Plan, error) {
-	target, err := q.GetTargetByName(ctx, dbq.GetTargetByNameParams{
-		GameInstallID: gameInstallID,
-		Name:          "game_dir",
-	})
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return Plan{}, fmt.Errorf("no game_dir target found for game install %d", gameInstallID)
-		}
-		return Plan{}, fmt.Errorf("resolve target: %w", err)
-	}
-
+func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileID int64, target dbq.Target, skipRecheck bool) (Plan, error) {
 	plan := Plan{
 		GameInstallID: gameInstallID,
 		ProfileID:     profileID,
@@ -163,8 +152,11 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 		TargetRoot:    target.RootPath,
 	}
 
-	// Load enabled profile items sorted by priority desc.
-	items, err := q.GetProfileItemForPlanning(ctx, profileID)
+	// Load enabled profile items (for this target) sorted by priority desc
+	items, err := q.GetProfileItemsForPlanning(ctx, dbq.GetProfileItemsForPlanningParams{
+		ProfileID: profileID,
+		TargetID:  target.ID,
+	})
 	if err != nil {
 		return Plan{}, fmt.Errorf("load profile items: %w", err)
 	}
@@ -491,18 +483,7 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 
 // BuildUnapplyPlan computes the operations needed to remove all tool-managed
 // files for a game install. It does not require the profile to still exist.
-func BuildUnapplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID int64) (Plan, error) {
-	target, err := q.GetTargetByName(ctx, dbq.GetTargetByNameParams{
-		GameInstallID: gameInstallID,
-		Name:          "game_dir",
-	})
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return Plan{}, fmt.Errorf("no game_dir target found for game install %d", gameInstallID)
-		}
-		return Plan{}, fmt.Errorf("resolve target: %w", err)
-	}
-
+func BuildUnapplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID int64, target dbq.Target) (Plan, error) {
 	plan := Plan{
 		GameInstallID: gameInstallID,
 		TargetID:      target.ID,
