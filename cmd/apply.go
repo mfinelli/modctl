@@ -251,6 +251,28 @@ Use --dry-run to preview the plan without making any changes. Add the
 			return err
 		}
 
+		// Helper to print progress
+		width := len(strconv.Itoa(total))
+		fmtCounter := fmt.Sprintf("[%%%dd/%%%dd]", width, width)
+
+		// Print an initial line so \r updates have something to overwrite
+		if !applyVerbose {
+			fmt.Printf("  [%*d/%d] ...", width, 0, total)
+		}
+
+		printOp := func(symbol, path, detail string) {
+			current++
+			line := fmt.Sprintf("  "+fmtCounter+" %s %s", current, total, symbol, path)
+			if detail != "" {
+				line += subtleStyle.Render("  " + detail)
+			}
+			if applyVerbose {
+				fmt.Println(line)
+			} else {
+				fmt.Printf("\r%-*s", 80, line)
+			}
+		}
+
 		for _, plan := range plans {
 			archiveMap := make(map[string]*archiveGroup)
 			var archiveOrder []string
@@ -288,28 +310,6 @@ Use --dry-run to preview the plan without making any changes. Add the
 				if _, ok := archiveMap[sha]; !ok {
 					archiveMap[sha] = &archiveGroup{sha256: sha}
 					archiveOrder = append(archiveOrder, sha)
-				}
-			}
-
-			// Helper to print progress
-			width := len(strconv.Itoa(total))
-			fmtCounter := fmt.Sprintf("[%%%dd/%%%dd]", width, width)
-
-			// Print an initial line so \r updates have something to overwrite
-			if !applyVerbose {
-				fmt.Printf("  [%*d/%d] ...", width, 0, total)
-			}
-
-			printOp := func(symbol, path, detail string) {
-				current++
-				line := fmt.Sprintf("  "+fmtCounter+" %s %s", current, total, symbol, path)
-				if detail != "" {
-					line += subtleStyle.Render("  " + detail)
-				}
-				if applyVerbose {
-					fmt.Println(line)
-				} else {
-					fmt.Printf("\r%-*s", 80, line)
 				}
 			}
 
