@@ -2123,3 +2123,31 @@ WHERE target_id = ?;
 SELECT CAST(COUNT(*) AS INTEGER) AS count
 FROM profile_items
 WHERE target_id = ?;
+
+-- name: AddSkipBackupPattern :exec
+INSERT INTO profile_item_skip_backup_patterns (profile_item_id, pattern)
+VALUES (?, ?);
+
+-- name: RemoveSkipBackupPattern :execrows
+DELETE FROM profile_item_skip_backup_patterns
+WHERE profile_item_id = ? AND pattern = ?;
+
+-- name: ListSkipBackupPatterns :many
+SELECT id, profile_item_id, pattern, created_at
+FROM profile_item_skip_backup_patterns
+WHERE profile_item_id = ?
+ORDER BY pattern ASC;
+
+-- name: AddWriteOncePattern :exec
+INSERT INTO profile_item_write_once_patterns (profile_item_id, pattern)
+VALUES (?, ?);
+
+-- name: RemoveWriteOncePattern :execrows
+DELETE FROM profile_item_write_once_patterns
+WHERE profile_item_id = ? AND pattern = ?;
+
+-- name: ListWriteOncePatterns :many
+SELECT id, profile_item_id, pattern, created_at
+FROM profile_item_write_once_patterns
+WHERE profile_item_id = ?
+ORDER BY pattern ASC;
