@@ -1,5 +1,10 @@
 GO := go
 SQLC := sqlc
+GREP := grep
+
+ifeq ($(shell uname), Darwin)
+	GREP := ggrep
+endif
 
 SOURCES := $(wildcard *.go cmd/*.go internal/*.go \
 	   internal/archivescanner/*.go internal/argresolver/*.go \
@@ -10,11 +15,16 @@ SOURCES := $(wildcard *.go cmd/*.go internal/*.go \
 	   internal/planner/*.go internal/remap/*.go internal/restore/*.go \
 	   internal/state/*.go migrations/*.sql)
 
-VERSION ?= $(shell grep -P "^\tVersion:" cmd/root.go | awk -F\" '{print $$2}')
+VERSION ?= $(shell $(GREP) -P "^\tVersion:" cmd/root.go | awk -F\" '{print $$2}')
 TODAY ?= $(shell date +%Y-%m-%d)
 
-# Detect target architecture
-# respect GOARCH if set, fall back to host arch
+# Detect target OS (respect GOOS if set, fall back to host)
+TARGET_OS ?= $(shell uname -s | tr '[:upper:]' '[:lower:]')
+ifdef GOOS
+	TARGET_OS = $(GOOS)
+endif
+
+# Detect target architecture (respect GOARCH if set, fall back to host arch)
 TARGET_ARCH ?= $(shell uname -m)
 ifdef GOARCH
 	ifeq ($(GOARCH),arm64)
@@ -25,20 +35,36 @@ ifdef GOARCH
 	endif
 endif
 
-# hardening flags adapted from archlinux makepkg.conf
-LDFLAGS ?= -Wl,-O1 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now \
-	   -Wl,-z,pack-relative-relocs
+# hardening flags adapted from archlinux makepkg.conf (GNU ld only)
+LDFLAGS_linux ?= -Wl,-O1 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro \
+		 -Wl,-z,now -Wl,-z,pack-relative-relocs
 
-# base flags for all architectures
-CGO_CFLAGS_BASE ?= -O2 -fno-plt -fexceptions -Wp,-U_FORTIFY_SOURCE,-D_FORTIFY_SOURCE=3 \
-		   -Wformat -Werror=format-security -fstack-clash-protection \
-		   -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
+# macOS linker (ld64/lld) doesn't support GNU ld flags;
+# PIE and ASLR are enforced by the OS; dead_strip ~= --as-needed
+LDFLAGS_darwin ?= -Wl,-dead_strip
 
-# x86_64 only flags
-CGO_CFLAGS_x86_64 ?= -fcf-protection
+LDFLAGS ?= $(LDFLAGS_$(TARGET_OS))
+
+# base flags for all architectures (linux only)
+CGO_CFLAGS_BASE_linux ?= -O2 -fno-plt -fexceptions \
+			 -Wp,-U_FORTIFY_SOURCE,-D_FORTIFY_SOURCE=3 \
+			 -Wformat -Werror=format-security \
+			 -fstack-clash-protection \
+			 -fno-omit-frame-pointer \
+			 -mno-omit-leaf-frame-pointer
+
+# macOS: conservative base flags, let the SDK handle hardening
+CGO_CFLAGS_BASE_darwin ?= -O2 -fexceptions \
+			   -Wformat -Werror=format-security \
+			   -fno-omit-frame-pointer
+
+CGO_CFLAGS_BASE ?= $(CGO_CFLAGS_BASE_$(TARGET_OS))
+
+# x86_64 only flags (linux only)
+CGO_CFLAGS_x86_64_linux ?= -fcf-protection
 
 # final flags to actually use
-CGO_CFLAGS ?= $(CGO_CFLAGS_BASE) $(CGO_CFLAGS_$(TARGET_ARCH))
+CGO_CFLAGS ?= $(CGO_CFLAGS_BASE) $(CGO_CFLAGS_$(TARGET_ARCH)_$(TARGET_OS))
 
 all: modctl
 
