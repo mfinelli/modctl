@@ -2165,3 +2165,35 @@ FROM profile_item_write_once_patterns p
 JOIN profile_items pi ON pi.id = p.profile_item_id
 WHERE pi.profile_id = ?
 ORDER BY pi.id, p.pattern;
+
+-- name: ExportGetSkipBackupPatternsForGameInstall :many
+SELECT p.id, p.profile_item_id, p.pattern, p.created_at
+FROM profile_item_skip_backup_patterns p
+JOIN profile_items pi ON pi.id = p.profile_item_id
+JOIN profiles pr ON pr.id = pi.profile_id
+WHERE pr.game_install_id = ?
+ORDER BY p.id;
+
+-- name: ExportInsertSkipBackupPattern :exec
+INSERT INTO profile_item_skip_backup_patterns (id, profile_item_id, pattern, created_at)
+VALUES (?, ?, ?, ?);
+
+-- name: ExportGetWriteOncePatternsForGameInstall :many
+SELECT p.id, p.profile_item_id, p.pattern, p.created_at
+FROM profile_item_write_once_patterns p
+JOIN profile_items pi ON pi.id = p.profile_item_id
+JOIN profiles pr ON pr.id = pi.profile_id
+WHERE pr.game_install_id = ?
+ORDER BY p.id;
+
+-- name: ExportInsertWriteOncePattern :exec
+INSERT INTO profile_item_write_once_patterns (id, profile_item_id, pattern, created_at)
+VALUES (?, ?, ?, ?);
+
+-- name: ImportInsertSkipBackupPattern :exec
+INSERT INTO profile_item_skip_backup_patterns (profile_item_id, pattern, created_at)
+VALUES (?, ?, ?);
+
+-- name: ImportInsertWriteOncePattern :exec
+INSERT INTO profile_item_write_once_patterns (profile_item_id, pattern, created_at)
+VALUES (?, ?, ?);
