@@ -224,8 +224,8 @@ Set the active game:
 
 *modctl profiles upgrade* [--to <version-id>] <mod>
 	Swap the mod file version currently in the active profile for a newer
-	one, preserving the existing priority slot, enabled state, and remap
-	rules. Without --to, modctl picks the most recently imported version
+	one, preserving the existing priority slot, enabled state, remap rules, and
+	deploy rules. Without --to, modctl picks the most recently imported version
 	of the same mod file that is not already in the profile. With --to,
 	the specified version is used directly. The old version is removed
 	from the profile.
@@ -272,6 +272,32 @@ Set the active game:
 	hidden by default; pass --show-filtered to see them alongside the reason
 	they were excluded. The archive must be inventoried first; run
 	*modctl mods scan-inventory* if needed.
+
+*modctl profiles deploys skip-backup list* <mod>
+	List skip-backup patterns for a mod version in the active profile.
+
+*modctl profiles deploys skip-backup add* <mod> <pattern>
+	Add a skip-backup pattern for a mod version in the active profile.
+
+*modctl profiles deploys skip-backup remove* <mod> <pattern>
+	Remove a skip-backup pattern for a mod version in the active profile.
+
+*modctl profiles deploys skip-backup copy* <src-mod> <dst-mod>
+	Copy skip-backup patterns from one mod version to another in the active
+	profile. Existing patterns on the destination are replaced.
+
+*modctl profiles deploys write-once list* <mod>
+	List write-once patterns for a mod version in the active profile.
+
+*modctl profiles deploys write-once add* <mod> <pattern>
+	Add a write-once pattern for a mod version in the active profile.
+
+*modctl profiles deploys write-once remove* <mod> <pattern>
+	Remove a write-once pattern for a mod version in the active profile.
+
+*modctl profiles deploys write-once copy* <src-mod> <dst-mod>
+	Copy write-once patterns from one mod version to another in the active
+	profile. Existing patterns on the destination are replaced.
 
 *modctl profiles overrides list*
 	List all overrides for the active profile with a summary staleness
