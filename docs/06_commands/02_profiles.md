@@ -142,6 +142,13 @@ modctl profiles enable "Appearance Menu Mod"
 modctl profiles disable "Appearance Menu Mod"
 ```
 
+Pass `--all` to enable or disable every mod in the profile at once. `--all`
+and a positional argument are mutually exclusive.
+```bash
+modctl profiles enable --all
+modctl profiles disable --all
+```
+
 ### profiles preview
 
 Show a unified diff between the current on-disk file and what the active

@@ -28,11 +28,13 @@ import (
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
+	"go.finelli.dev/util"
 )
 
 var (
 	profilesDisableGame    string
 	profilesDisableProfile string
+	profilesDisableAll     bool
 )
 
 var profilesDisableCmd = &cobra.Command{
@@ -42,9 +44,9 @@ var profilesDisableCmd = &cobra.Command{
 
 This keeps the version in the profile but marks it as inactive. Disabled
 versions are ignored when computing the applied mod set.`,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.RangeArgs(0, 1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) != 0 {
+		if len(args) != 0 || profilesDisableAll {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 		return completion.ModFileVersionIDs(cmd, toComplete)
@@ -52,6 +54,13 @@ versions are ignored when computing the applied mod set.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
+
+		if profilesDisableAll && len(args) > 0 {
+			return fmt.Errorf("--all and a positional argument are mutually exclusive")
+		}
+		if !profilesDisableAll && len(args) == 0 {
+			return fmt.Errorf("must specify a mod file version ID or pass --all")
+		}
 
 		err := internal.EnsureDBExists()
 		if err != nil {
@@ -93,6 +102,13 @@ versions are ignored when computing the applied mod set.`,
 			return err
 		}
 
+		if profilesDisableAll { // (or profilesDisableAll for disable)
+			return q.SetAllProfileItemsEnabled(ctx, dbq.SetAllProfileItemsEnabledParams{
+				ProfileID: p.ID,
+				Enabled:   util.SqliteBoolToInt(false), // false for disable
+			})
+		}
+
 		mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
 		if err != nil {
 			return err
@@ -118,4 +134,7 @@ func init() {
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return completion.ProfileNames(cmd, toComplete)
 		})
+
+	profilesDisableCmd.Flags().BoolVarP(&profilesDisableAll, "all", "A", false,
+		"Disable all mods in the profile")
 }

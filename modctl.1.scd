@@ -257,12 +257,15 @@ Set the active game:
 	the specified version is used directly. The old version is removed
 	from the profile.
 
-*modctl profiles enable* <mod>
-	Enable a mod in the active profile.
+*modctl profiles enable* [--all] <mod>
+	Enable a mod in the active profile. Pass --all to enable every mod in
+	the profile at once; --all and a positional argument are mutually
+	exclusive.
 
-*modctl profiles disable* <mod>
+*modctl profiles disable* [--all] <mod>
 	Disable a mod in the active profile. Disabled mods are excluded from
-	planning.
+	planning. Pass --all to disable every mod in the profile at once;
+	\--all and a positional argument are mutually exclusive.
 
 *modctl profiles order move* [--before <mod>|--after <mod>] <mod>
 	Move a mod before or after another in the priority order.

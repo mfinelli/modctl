@@ -2256,3 +2256,8 @@ FROM installed_files
 WHERE game_install_id = ?
   AND target_id = ?
   AND relpath = ?;
+
+-- name: SetAllProfileItemsEnabled :exec
+UPDATE profile_items
+SET enabled = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE profile_id = ?;

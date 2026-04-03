@@ -28,11 +28,13 @@ import (
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
+	"go.finelli.dev/util"
 )
 
 var (
 	profilesEnableGame    string
 	profilesEnableProfile string
+	profilesEnableAll     bool
 )
 
 var profilesEnableCmd = &cobra.Command{
@@ -42,9 +44,9 @@ var profilesEnableCmd = &cobra.Command{
 
 This marks the version as active in the profile without changing its
 priority or position in the load order.`,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.RangeArgs(0, 1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) != 0 {
+		if len(args) != 0 || profilesEnableAll {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 		return completion.ModFileVersionIDs(cmd, toComplete)
@@ -52,6 +54,13 @@ priority or position in the load order.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
+
+		if profilesEnableAll && len(args) > 0 {
+			return fmt.Errorf("--all and a positional argument are mutually exclusive")
+		}
+		if !profilesEnableAll && len(args) == 0 {
+			return fmt.Errorf("must specify a mod file version ID or pass --all")
+		}
 
 		err := internal.EnsureDBExists()
 		if err != nil {
@@ -93,6 +102,13 @@ priority or position in the load order.`,
 			return err
 		}
 
+		if profilesEnableAll { // (or profilesDisableAll for disable)
+			return q.SetAllProfileItemsEnabled(ctx, dbq.SetAllProfileItemsEnabledParams{
+				ProfileID: p.ID,
+				Enabled:   util.SqliteBoolToInt(true), // false for disable
+			})
+		}
+
 		mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
 		if err != nil {
 			return err
@@ -118,4 +134,7 @@ func init() {
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return completion.ProfileNames(cmd, toComplete)
 		})
+
+	profilesEnableCmd.Flags().BoolVarP(&profilesEnableAll, "all", "A", false,
+		"Enable all mods in the profile")
 }
