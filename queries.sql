@@ -2249,3 +2249,10 @@ DELETE FROM backups
 WHERE game_install_id = ?
   AND target_id = ?
   AND relpath = ?;
+
+-- name: GetInstalledFileByPath :one
+SELECT *
+FROM installed_files
+WHERE game_install_id = ?
+  AND target_id = ?
+  AND relpath = ?;
