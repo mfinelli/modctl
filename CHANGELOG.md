@@ -13,6 +13,7 @@ This is another pre-release that adds new features.
 
 - Support multiple targets: auto-discover the proton prefix and allow arbitrary
   custom-path targets.
+- Add mod deploy rules: skip-backup and write-once.
 
 ## v0.5.0 - 2026-03-27
 
