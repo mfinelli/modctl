@@ -142,6 +142,27 @@ modctl profiles enable "Appearance Menu Mod"
 modctl profiles disable "Appearance Menu Mod"
 ```
 
+### profiles preview
+
+Show a unified diff between the current on-disk file and what the active
+profile's winning mod would write at that path if apply were run. Useful
+for understanding exactly what apply would change at a specific path before
+deciding whether to add a write-once or skip-backup rule.
+```bash
+modctl profiles preview "settings/game.ini"
+```
+
+Note: this command requires archive extraction which may be slow for large
+archives.
+
+Binary files are detected automatically and refused unless `--force` is
+passed.
+
+| Flag              | Description                                      |
+|-------------------|--------------------------------------------------|
+| `--target <name>` | Install target (default: `game_dir`)             |
+| `--force`         | Diff binary files without refusing               |
+
 ## Priority order
 
 ### profiles order move

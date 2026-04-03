@@ -132,6 +132,105 @@ targets (`game_dir`, `proton_prefix`) cannot be removed.
 modctl games targets remove saves
 ```
 
+## Backups
+
+modctl automatically backs up game-owned files before overwriting them during
+apply. These backups are restored automatically on unapply. The backup commands
+let you inspect and manage individual backup entries without running a full
+unapply.
+
+Backups are scoped to the game install rather than a specific profile, since
+they describe the pre-mod state of the filesystem regardless of which profile
+caused the overwrite.
+
+### games backups list
+
+List all backed-up files for the current game. Shows the target, path, size,
+when the backup was taken, and which operation created it.
+```bash
+modctl games backups list
+```
+
+Pass `--target` to filter to a specific install target:
+```bash
+modctl games backups list --target proton_prefix
+```
+
+| Flag              | Description                                     |
+|-------------------|-------------------------------------------------|
+| `--target <name>` | Filter by install target (default: all targets) |
+
+### games backups view
+
+Print the content of a backed-up file to the terminal. The path is relative
+to the target root.
+```bash
+modctl games backups view "settings/game.ini"
+```
+
+Binary files are detected automatically and refused. Pass `--force` to print
+them anyway.
+
+| Flag              | Description                          |
+|-------------------|--------------------------------------|
+| `--target <name>` | Install target (default: `game_dir`) |
+| `--force`         | Print binary files without refusing  |
+
+### games backups delete
+
+Delete a backup entry. The blob is not immediately removed from disk; run
+`modctl gc` to reclaim space.
+```bash
+modctl games backups delete "settings/game.ini"
+```
+
+Note that deleting a backup means modctl cannot restore the original file at
+this path on unapply; the file will be deleted instead of restored.
+
+| Flag              | Description                          |
+|-------------------|--------------------------------------|
+| `--target <name>` | Install target (default: `game_dir`) |
+
+### games backups restore
+
+Restore a backed-up file to disk immediately without running a full unapply.
+Useful for reverting a single file to its pre-mod state while leaving
+everything else in place.
+```bash
+modctl games backups restore "settings/game.ini"
+```
+
+If the active profile is currently applied, modctl warns that running apply
+again will overwrite this path. If you want the restored file to be
+preserved across future applies, add a write-once or skip-backup rule for
+this path.
+
+If the on-disk file has drifted from what modctl last installed, `--force`
+is required to proceed.
+
+| Flag              | Description                                                             |
+|-------------------|-------------------------------------------------------------------------|
+| `--target <name>` | Install target (default: `game_dir`)                                    |
+| `--force`         | Restore even if the on-disk file has drifted from what modctl installed |
+
+### games backups diff
+
+Show a unified diff between the backed-up content and the current on-disk
+file. Useful for understanding what has changed since the backup was taken,
+for example to decide whether to restore the backup or add a deploy rule.
+```bash
+modctl games backups diff "settings/game.ini"
+```
+
+If the on-disk file is missing, the backup content is shown as a full
+deletion with a warning. Binary files are detected automatically and refused
+unless `--force` is passed.
+
+| Flag              | Description                          |
+|-------------------|------------------------------------- |
+| `--target <name>` | Install target (default: `game_dir`) |
+| `--force`         | Diff binary files without refusing   |
+
 ---
 
 ## stores
