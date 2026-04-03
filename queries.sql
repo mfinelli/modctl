@@ -2203,3 +2203,43 @@ DELETE FROM profile_item_skip_backup_patterns WHERE profile_item_id = ?;
 
 -- name: DeleteAllWriteOncePatterns :exec
 DELETE FROM profile_item_write_once_patterns WHERE profile_item_id = ?;
+
+-- name: ListBackupsForGameInstall :many
+SELECT
+    b.id,
+    b.relpath,
+    b.size_bytes,
+    b.created_at,
+    b.backup_blob_sha256,
+    b.original_content_sha256,
+    t.name AS target_name,
+    t.id AS target_id,
+    o.id AS operation_id,
+    o.op_type AS operation_type,
+    o.started_at AS operation_started_at
+FROM backups b
+JOIN targets t ON t.id = b.target_id
+LEFT JOIN operations o ON o.id = b.created_by_operation_id
+WHERE b.game_install_id = sqlc.arg(game_install_id)
+  AND (sqlc.arg(target_name)= '' OR t.name = sqlc.arg(target_name))
+ORDER BY t.name, b.relpath;
+
+-- name: GetBackupForGameInstallByPath :one
+SELECT
+    b.id,
+    b.relpath,
+    b.size_bytes,
+    b.created_at,
+    b.backup_blob_sha256,
+    b.original_content_sha256,
+    t.name AS target_name,
+    t.id AS target_id,
+    o.id AS operation_id,
+    o.op_type AS operation_type,
+    o.started_at AS operation_started_at
+FROM backups b
+JOIN targets t ON t.id = b.target_id
+LEFT JOIN operations o ON o.id = b.created_by_operation_id
+WHERE b.game_install_id = ?
+  AND b.target_id = ?
+  AND b.relpath = ?;
