@@ -225,6 +225,9 @@ SQLite stores:
 - file manifests (planned + installed)
 - installed file hashes and ownership
 - backup mappings
+- backup management is tracked in `backups` with one row per
+  `(game_install_id, target_id, relpath)`; rows are removed explicitly via
+  `games backups delete` or implicitly on unapply restore
 - operation journal/logs
 - override/merge policy data structures (even if merge policy unused in v1)
 - blob references
@@ -645,7 +648,77 @@ preserved automatically since the profile item is updated in place. Manual
 copying via the `copy` subcommand is only needed when moving rules between
 two distinct profile items.
 
-## 10. User Overrides / Editable Files
+## 10. Backup inspection and management
+
+The `backups` table records pre-existing files that modctl saved before
+overwriting them. Backups are created automatically during apply and restored
+automatically during unapply. The backup management commands allow users to
+inspect, diff, restore, and delete individual backup entries without running
+a full unapply.
+
+### Scope
+
+Backups are scoped to `(game_install_id, target_id, relpath)` with no
+reference to a profile. This reflects the fact that backups describe
+pre-mod on-disk state which is independent of which profile caused the
+overwrite. The `games backups` commands operate at the game level and
+optionally filter by target.
+
+### Backup lifecycle
+
+A backup row is created when apply would overwrite a file that modctl did
+not install (i.e. a non-tool-owned file). The blob is content-addressed and
+deduplicated; if the same file content is backed up multiple times only one
+blob is stored. The backup row is removed when unapply restores the file, or
+explicitly via `games backups delete`.
+
+Deleting a backup row does not immediately remove the blob from disk; run
+`gc` to reclaim space. Deleting a backup means modctl cannot restore the
+original file at that path on unapply — the file will be deleted instead.
+
+### Out-of-band restore
+
+`games backups restore` writes the backup content back to disk immediately
+without running a full unapply. This is useful for reverting a single file
+to its pre-mod state without touching everything else. It does not update
+`installed_files` (the profile's desired state is unchanged), so the next
+apply will detect drift and overwrite the restored file again. The command
+warns when the active profile is currently applied and suggests adding a
+write-once or skip-backup rule if the user wants to preserve the restored
+state permanently.
+
+Restore requires `--force` if the on-disk file has drifted from what modctl
+last installed, since this indicates an external modification that the user
+should be aware of before overwriting.
+
+No operation record is created for out-of-band restores. The next apply will
+surface the path as drifted, providing an implicit audit trail.
+
+### Binary detection
+
+The `view` and `diff` commands detect binary content by scanning the first
+8KB of file data for null bytes, matching the heuristic used by Git. Binary
+files are refused by default with a clear error message. Pass `--force` to
+proceed anyway.
+
+### Diff commands
+
+Two diff commands are available:
+
+**`games backups diff <path>`** shows a unified diff between the backup blob
+and the current on-disk content. Direction: backup → on-disk. Shows what has
+changed since the backup was taken. If the on-disk file is missing, the
+backup content is shown as a full deletion with a warning.
+
+**`profiles preview <path>`** shows a unified diff between the current
+on-disk content and what the active profile's winning mod would write at that
+path. Direction: on-disk → incoming. Shows what apply would do to the file.
+Requires archive extraction and may be slow for large archives. Errors if no
+mod in the active profile provides the path. This command is profile-scoped
+and lives under `profiles` rather than `games backups` since it requires
+resolving the conflict winner from a specific profile's planned state.
+
+## 11. User Overrides / Editable Files
 
 ### Goal
 
@@ -947,7 +1020,7 @@ For game-scoped import, `overrides` and `override_patch_entries` are added to
 the ID remapping table. `overrides copy` copies override rows and patch entries
 in a single transaction, preserving source anchor fields verbatim.
 
-## 11. Mod Incompatibilities
+## 12. Mod Incompatibilities
 
 ### Purpose
 
@@ -991,7 +1064,7 @@ implicit since mod page IDs are globally unique and carry their own
 `game_install_id`. For `list` the current game install context is used to
 scope results.
 
-## 12. Backups strategy
+## 13. Backups strategy
 
 ### When to back up
 
@@ -1011,7 +1084,7 @@ On unapply/rollback:
 - if user changed file since backup, require explicit choice (or use hash
   checks)
 
-## 13. Multi-store support
+## 14. Multi-store support
 
 ### Store integration responsibilities
 
@@ -1059,7 +1132,7 @@ absolute path is stored as `root_path` with `origin = 'discovered'`. If a
 that have never been launched under Proton, or native Linux games, will not
 have a `proton_prefix` target.
 
-## 14. Extensibility for game-specific integrations
+## 15. Extensibility for game-specific integrations
 
 ### Integration type
 
@@ -1081,7 +1154,7 @@ Game-specific integrations add/override:
 
 This preserves a clean v1 while allowing richer v2.
 
-## 15. Commands
+## 16. Commands
 
 - `init` initialized the modctl database and storage directories
 - `auth`
@@ -1139,6 +1212,9 @@ This preserves a clean v1 while allowing richer v2.
   remapped destination path. Files matching a write-once pattern are deployed
   on first apply and left untouched on subsequent applies unless missing from
   disk. Use `copy` to transfer patterns from one mod version to another.
+- `profiles preview <path>` - show a unified diff between the current
+  on-disk file and what the active profile's winning mod would write at that
+  path; requires archive extraction which may be slow for large archives
 - `policy set` (future: merge/manual policy)
 - `status` (conflicts, drift, missing)
 - `apply` (top-level) - apply the active profile to the game directory.
@@ -1224,6 +1300,17 @@ This preserves a clean v1 while allowing richer v2.
 - `games targets remove <name>` - remove a user-defined target. Refuses if
   any installed files reference the target (unapply first). Cascades to
   profile items referencing the target. Cannot remove auto-discovered targets.
+- `games backups list` - list all backed-up files for the current game,
+  optionally filtered by target
+- `games backups view <path>` - print the content of a backed-up file to
+  the terminal; binary files are refused unless `--force` is passed
+- `games backups delete <path>` - delete a backup entry; warns that unapply
+  will delete rather than restore the file at this path
+- `games backups restore <path>` - restore a backed-up file to disk
+  immediately without running a full unapply; warns if the active profile
+  is applied; requires `--force` if the on-disk file has drifted
+- `games backups diff <path>` - show a unified diff between the backup blob
+  and the current on-disk file
 
 Key behavior:
 - "intent changes" (enable/disable/order) are cheap
@@ -1307,7 +1394,7 @@ This check detects added, removed, or swapped mod versions but does not
 detect priority reordering between mods that conflict on the same path. Run
 `apply --dry-run` for a precise diff.
 
-## 16. Testing strategy
+## 17. Testing strategy
 
 ### Unit tests
 
@@ -1354,7 +1441,7 @@ Include in `testdata/`:
   entries, malformed lines) should be tested at the unit level and included
   in `testdata/` fixture archives for integration tests
 
-## 17. Operational considerations
+## 18. Operational considerations
 
 - lock per game during apply to avoid concurrent changes
 - refuse to operate if game is running (optional v1, but helpful)
@@ -1364,7 +1451,7 @@ Include in `testdata/`:
   of any apply/unapply command, refusing to proceed without `--force` or
   `--abort`
 
-## 18. Configuration
+## 19. Configuration
 
 ### File location
 
@@ -1419,7 +1506,7 @@ custom formatting added by hand will not be preserved.
   if it does not exist; prints a plain-text storage notice when setting
   `nexus.apikey`
 
-## 19. Nexus Mods integration
+## 20. Nexus Mods integration
 
 ### Overview
 
@@ -1529,7 +1616,7 @@ The API key is read from config (`nexus.apikey`). If not configured, Nexus
 linking is silently skipped at import time; commands that require it error
 with a helpful message.
 
-## 20. Garbage Collection
+## 21. Garbage Collection
 
 ### Purpose
 
@@ -1587,7 +1674,7 @@ Flags:
 - `--skip-orphans`: skip on-disk files with no database row (orphans are
   removed by default)
 
-## 21. Export and Import
+## 22. Export and Import
 
 ### Purpose
 
