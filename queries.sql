@@ -626,6 +626,7 @@ AND mod_file_versions.id IN (
 -- name: GetNexusLinkedModPages :many
 SELECT DISTINCT
     mp.id as mod_page_id,
+    mp.name AS mod_page_name,
     mp.nexus_game_domain,
     mp.nexus_mod_id
 FROM mod_pages mp
@@ -2261,3 +2262,11 @@ WHERE game_install_id = ?
 UPDATE profile_items
 SET enabled = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 WHERE profile_id = ?;
+
+-- name: GetAllNexusLinkedModFileVersions :many
+SELECT mfv.id, mfv.nexus_file_id
+FROM mod_file_versions mfv
+JOIN mod_files mf ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp ON mp.id = mf.mod_page_id
+WHERE mp.game_install_id = ?1
+  AND mfv.nexus_file_id IS NOT NULL;

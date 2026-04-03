@@ -198,8 +198,13 @@ Set the active game:
 *modctl mods nexus unlink* <mod>
 	Remove the Nexus link from a mod.
 
-*modctl mods nexus check-updates* [--ignore-ttl] [--force]
-	Check all Nexus-linked mods for available updates.
+*modctl mods nexus check-updates* [--ignore-ttl] [--force] [--limit <n>] [--print-all] [--include-superseded]
+	Check all Nexus-linked mods for available updates. Superseded mod versions
+	(where a newer version is already imported) are skipped by default. Pass
+	\--include-superseded to check them anyway. Pass --limit to cap the number
+	of mods checked without erroring; the quota warning will suggest an
+	appropriate value. Pass --print-all to print each mod on its own line instead
+	of using a progress indicator. --force and --limit are mutually exclusive.
 
 *modctl mods incompatible add* [--reason <text>] <mod-a> <mod-b>
 	Flag two mods as incompatible. Incompatibilities are user-defined and

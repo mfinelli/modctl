@@ -149,14 +149,26 @@ modctl mods nexus unlink "Appearance Menu Mod"
 Check all Nexus-linked mods for the current game for available updates.
 Results are cached locally and shown in `modctl profiles status` and
 `modctl mods info` without additional API calls.
+
+Mods are checked oldest-cached-first so the most stale data is always
+refreshed first. Superseded mod versions — where a newer version of the
+same mod is already imported — are skipped by default.
+
+If your API quota is insufficient for the full check, modctl will suggest
+an appropriate `--limit` value in the warning message.
 ```bash
 modctl mods nexus check-updates
+modctl mods nexus check-updates --limit 20
+modctl mods nexus check-updates --include-superseded
 ```
 
-| Flag           | Description                                                 |
-|----------------|-------------------------------------------------------------|
-| `--ignore-ttl` | Force a fresh fetch even if cached data has not yet expired |
-| `--force`      | Proceed even if Nexus API quota may be insufficient         |
+| Flag                   | Description                                                                             |
+|------------------------|-----------------------------------------------------------------------------------------|
+| `--ignore-ttl`         | Force a fresh fetch even if cached data has not yet expired                             |
+| `--force`              | Proceed even if Nexus API quota may be insufficient (mutually exclusive with `--limit`) |
+| `--limit <n>`          | Check at most N mods; mutually exclusive with `--force`                                 |
+| `--print-all`          | Print each mod on its own line instead of using a progress indicator                    |
+| `--include-superseded` | Include superseded mod versions in the check instead of skipping them                   |
 
 ## Incompatibilities
 

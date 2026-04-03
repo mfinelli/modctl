@@ -18,6 +18,7 @@ This is another pre-release that adds new features.
 - Add `profiles preview` to see the file contents that would be written on
   apply.
 - Add `--all` flag to profiles `enable` and `disable`.
+- Add progress output to nexus check-updates command.
 
 ## v0.5.0 - 2026-03-27
 

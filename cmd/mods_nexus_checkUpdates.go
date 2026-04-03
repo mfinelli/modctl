@@ -22,7 +22,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
@@ -37,9 +39,12 @@ import (
 )
 
 var (
-	modsNexusCheckUpdatesGame      string
-	modsNexusCheckUpdatesForce     bool
-	modsNexusCheckUpdatesIgnoreTTL bool
+	modsNexusCheckUpdatesGame              string
+	modsNexusCheckUpdatesForce             bool
+	modsNexusCheckUpdatesIgnoreTTL         bool
+	modsNexusCheckUpdatesLimit             int
+	modsNexusCheckUpdatesPrintAll          bool
+	modsNexusCheckUpdatesIncludeSuperseded bool
 )
 
 var modsNexusCheckUpdatesCmd = &cobra.Command{
@@ -52,7 +57,12 @@ For each linked mod file version, checks whether a newer version is available
 by walking the Nexus file update chain. Results are displayed immediately and
 cached for use by 'profiles status'.
 
-Use --force to proceed even if the operation would exhaust your API quota.`,
+Mods are checked oldest-cached-first so the most stale data is always
+refreshed first. Superseded mod versions (where a newer version is already
+imported) are skipped by default; pass --include-superseded to check them too.
+
+Use --limit to cap the number of mods checked without erroring. Use --force
+to proceed even if the operation would exhaust your API quota.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -118,54 +128,189 @@ Use --force to proceed even if the operation would exhaust your API quota.`,
 			return nil
 		}
 
-		// determine which mod pages actually need a fetch
-		needsFetch := make(map[int64]bool, len(modPages))
+		// Free quota check via validate endpoint - also gives us fresh rate limit state
+		if _, err := client.ValidateUser(); err != nil {
+			logger.Warn("failed to validate nexus user for quota check", "error", err)
+		}
+		rateLimitState, err := nexusclient.LoadRateLimitState()
+		if err != nil {
+			logger.Warn("failed to load rate limit state", "error", err)
+		}
+
+		// Build set of all imported nexus_file_ids for this game install so we
+		// can detect superseded versions (chain head already in local DB)
+		allVersions, err := q.GetAllNexusLinkedModFileVersions(ctx, gi.ID)
+		if err != nil {
+			return fmt.Errorf("fetching linked mod file versions: %w", err)
+		}
+		importedNexusFileIDs := make(map[int64]struct{}, len(allVersions))
+		for _, v := range allVersions {
+			if v.NexusFileID.Valid {
+				importedNexusFileIDs[v.NexusFileID.Int64] = struct{}{}
+			}
+		}
+
+		// Open cache reader to check TTL and build superseded set
+		cacheReader, err := nexusclient.NewCacheReader(ctx, logger)
+		if err != nil {
+			return fmt.Errorf("opening nexus cache: %w", err)
+		}
+		defer cacheReader.Close()
+
+		type modPageEntry struct {
+			mp        dbq.GetNexusLinkedModPagesRow
+			coldCache bool
+			fetchedAt time.Time // zero if cold
+		}
+
+		// Classify each mod page and build superseded set from cache
+		var entries []modPageEntry
 		for _, mp := range modPages {
+			entry := modPageEntry{mp: mp}
+
 			if modsNexusCheckUpdatesIgnoreTTL {
-				needsFetch[mp.ModPageID] = true
+				entry.coldCache = true
+				entries = append(entries, entry)
 				continue
 			}
+
 			row, err := client.GetNexusFileInfoFetchedAt(
 				mp.NexusGameDomain.String,
 				mp.NexusModID.Int64,
 			)
-			if errors.Is(err, sql.ErrNoRows) {
-				needsFetch[mp.ModPageID] = true
-				continue
-			}
-			if err != nil {
-				// if we can't check, assume we need to fetch
-				needsFetch[mp.ModPageID] = true
+			if errors.Is(err, sql.ErrNoRows) || err != nil {
+				entry.coldCache = true
+				entries = append(entries, entry)
 				continue
 			}
 			fetchedAt, err := time.Parse(time.RFC3339, row)
 			if err != nil || time.Since(fetchedAt) >= nexusclient.ModFilesTTL {
-				needsFetch[mp.ModPageID] = true
+				entry.coldCache = true
+			} else {
+				entry.coldCache = false
+				entry.fetchedAt = fetchedAt
 			}
+			entries = append(entries, entry)
 		}
 
+		// Filter superseded mod pages unless --include-superseded.
+		// A mod page is superseded if every linked version's nexus_file_id
+		// appears as an old_file_id in the update chain AND the chain head
+		// is already in our local DB.
+		if !modsNexusCheckUpdatesIncludeSuperseded {
+			var filtered []modPageEntry
+			for _, e := range entries {
+				chain, err := cacheReader.GetNexusFileUpdateChain(
+					e.mp.NexusGameDomain.String,
+					e.mp.NexusModID.Int64,
+				)
+				if err != nil || len(chain) == 0 {
+					// no chain data: can't determine superseded, keep it
+					filtered = append(filtered, e)
+					continue
+				}
+				next := make(map[int64]int64, len(chain))
+				for _, row := range chain {
+					next[row.OldFileID] = row.NewFileID
+				}
+				// Get linked versions for this mod page
+				linkedVersions, err := q.GetLinkedModFileVersionsForPage(ctx, e.mp.ModPageID)
+				if err != nil || len(linkedVersions) == 0 {
+					filtered = append(filtered, e)
+					continue
+				}
+				allSuperseded := true
+				for _, v := range linkedVersions {
+					if !v.NexusFileID.Valid {
+						allSuperseded = false
+						break
+					}
+					head := internal.WalkUpdateChain(v.NexusFileID.Int64, next)
+					if head == v.NexusFileID.Int64 {
+						// not superseded: this version is already at the head
+						allSuperseded = false
+						break
+					}
+					if _, headImported := importedNexusFileIDs[head]; !headImported {
+						// superseded but head not imported: still needs attention
+						allSuperseded = false
+						break
+					}
+				}
+				if !allSuperseded {
+					filtered = append(filtered, e)
+				}
+			}
+			entries = filtered
+		}
+
+		if len(entries) == 0 {
+			fmt.Println(subtleStyle.Render("  all mods are up to date or superseded"))
+			return nil
+		}
+
+		// Sort: cold cache first, then warm ordered by fetchedAt ascending
+		sort.Slice(entries, func(i, j int) bool {
+			if entries[i].coldCache != entries[j].coldCache {
+				return entries[i].coldCache
+			}
+			return entries[i].fetchedAt.Before(entries[j].fetchedAt)
+		})
+
+		// Apply --limit
+		if modsNexusCheckUpdatesLimit > 0 && modsNexusCheckUpdatesLimit < len(entries) {
+			entries = entries[:modsNexusCheckUpdatesLimit]
+		}
+
+		// Count how many cold fetches we need and check quota
 		needed := int64(0)
-		for _, needs := range needsFetch {
-			if needs {
+		for _, e := range entries {
+			if e.coldCache {
 				needed++
 			}
 		}
 
-		// Pre-flight rate limit check
-		rateLimitState, err := client.RateLimitState()
-		if err != nil {
-			logger.Warn("failed to load rate limit state", "error", err)
-		} else {
+		if rateLimitState != nil {
 			hourly, daily := rateLimitState.EffectiveRemaining()
+			conservative := min(int64(hourly), int64(daily)) - 10 // leave headroom of 10 api calls
 			if needed > int64(hourly) || needed > int64(daily) {
-				fmt.Printf("  ⚠ this operation requires %d API calls (hourly remaining: %d, daily remaining: %d)\n",
+				fmt.Printf("  ⚠ this operation requires ~%d API calls (hourly remaining: %d, daily remaining: %d)\n",
 					needed, hourly, daily)
 				if !modsNexusCheckUpdatesForce {
-					fmt.Println(warnStyle.Render("  operation aborted: not enough API quota remaining; pass --force to proceed anyway"))
+					suggested := max(0, conservative)
+					fmt.Println(warnStyle.Render(fmt.Sprintf(
+						"  operation aborted: not enough API quota remaining; use --limit %d to check as many mods as your quota allows",
+						suggested,
+					)))
 					return nil
 				}
 				fmt.Println(warnStyle.Render("  proceeding anyway due to --force"))
 			}
+		}
+
+		// Initial progress line
+		total := len(entries)
+		width := len(strconv.Itoa(total))
+		fmtCounter := fmt.Sprintf("[%%%dd/%%%dd]", width, width)
+
+		remaining := int64(0)
+		if rateLimitState != nil {
+			hourly, daily := rateLimitState.EffectiveRemaining()
+			remaining = min(int64(hourly), int64(daily))
+		}
+
+		printProgress := func(current int, modName string) {
+			line := fmt.Sprintf("  "+fmtCounter+" Checking: %s... (%d calls remaining)",
+				current, total, modName, remaining)
+			if modsNexusCheckUpdatesPrintAll {
+				fmt.Println(line)
+			} else {
+				fmt.Printf("\r%-*s", 80, line)
+			}
+		}
+
+		if !modsNexusCheckUpdatesPrintAll {
+			fmt.Printf("  [%*d/%d] Checking... (%d calls remaining)", width, 0, total, remaining)
 		}
 
 		type updateResult struct {
@@ -178,13 +323,20 @@ Use --force to proceed even if the operation would exhaust your API quota.`,
 
 		var results []updateResult
 		failed := 0
+		coldFetchCount := 0
 
-		for _, mp := range modPages {
+		for i, e := range entries {
+			mp := e.mp
+			printProgress(i+1, mp.ModPageName)
+
 			var filesResp *nexusclient.ModFilesResponse
 
-			if needsFetch[mp.ModPageID] {
+			if e.coldCache {
 				fresh, err := client.GetModFiles(mp.NexusGameDomain.String, mp.NexusModID.Int64)
 				if err != nil {
+					if !modsNexusCheckUpdatesPrintAll {
+						fmt.Println()
+					}
 					fmt.Println(warnStyle.Render(fmt.Sprintf(
 						"  ⚠ failed to fetch file info for mod page %d: %s",
 						mp.ModPageID, err,
@@ -193,6 +345,16 @@ Use --force to proceed even if the operation would exhaust your API quota.`,
 					continue
 				}
 				filesResp = fresh
+				coldFetchCount++
+				remaining--
+
+				// Re-sync remaining count from state file every 10 cold fetches
+				if coldFetchCount%10 == 0 {
+					if s, err := nexusclient.LoadRateLimitState(); err == nil {
+						h, d := s.EffectiveRemaining()
+						remaining = min(int64(h), int64(d))
+					}
+				}
 			} else {
 				cached, err := client.GetModFilesCached(mp.NexusGameDomain.String, mp.NexusModID.Int64)
 				if err != nil {
@@ -206,7 +368,7 @@ Use --force to proceed even if the operation would exhaust your API quota.`,
 				filesResp = cached
 			}
 
-			// build a map of file_id -> version for quick lookup
+			// Build file version map and update chain
 			fileVersions := make(map[int64]string, len(filesResp.Files))
 			for _, f := range filesResp.Files {
 				fileVersions[int64(f.FileID)] = f.Version
@@ -274,35 +436,47 @@ Use --force to proceed even if the operation would exhaust your API quota.`,
 				hasUpdate := latestFileID != b.nexusFileID
 				latestVersion := fileVersions[latestFileID]
 
-				results = append(results, updateResult{
+				r := updateResult{
 					modPageName:    key.modPageName,
 					fileLabel:      key.fileLabel,
 					currentVersion: b.versionString,
 					latestVersion:  latestVersion,
 					hasUpdate:      hasUpdate,
-				})
+				}
+				results = append(results, r)
+
+				if hasUpdate {
+					// Print update line immediately, breaking out of the \r
+					if !modsNexusCheckUpdatesPrintAll {
+						fmt.Print("\r" + strings.Repeat(" ", 80) + "\r")
+					}
+					fmt.Printf("  %s\n", nexusUpdateStyle.Render(fmt.Sprintf(
+						"↑ %s / %s: %s → %s",
+						r.modPageName, r.fileLabel, r.currentVersion, r.latestVersion,
+					)))
+					// Resume progress line
+					if !modsNexusCheckUpdatesPrintAll {
+						printProgress(i+1, mp.ModPageName)
+					}
+				} else if modsNexusCheckUpdatesPrintAll {
+					fmt.Printf("  %s\n", subtleStyle.Render(fmt.Sprintf(
+						"✓ %s / %s: %s",
+						r.modPageName, r.fileLabel, r.currentVersion,
+					)))
+				}
 			}
 		}
 
-		// Output results
-		if len(results) == 0 && failed == 0 {
-			fmt.Println(subtleStyle.Render("  no linked mod file versions found"))
-			return nil
+		// Clear progress line
+		if !modsNexusCheckUpdatesPrintAll {
+			fmt.Print("\r" + strings.Repeat(" ", 80) + "\r")
 		}
 
+		// Summary
 		updatesAvailable := 0
 		for _, r := range results {
 			if r.hasUpdate {
 				updatesAvailable++
-				fmt.Printf("  %s\n", nexusUpdateStyle.Render(fmt.Sprintf(
-					"↑ %s / %s: %s → %s",
-					r.modPageName, r.fileLabel, r.currentVersion, r.latestVersion,
-				)))
-			} else {
-				fmt.Printf("  %s\n", subtleStyle.Render(fmt.Sprintf(
-					"✓ %s / %s: %s",
-					r.modPageName, r.fileLabel, r.currentVersion,
-				)))
 			}
 		}
 
@@ -333,7 +507,15 @@ func init() {
 		})
 
 	modsNexusCheckUpdatesCmd.Flags().BoolVar(&modsNexusCheckUpdatesForce, "force", false,
-		"proceed even if API quota may be exhausted")
+		"Proceed even if API quota may be exhausted")
 	modsNexusCheckUpdatesCmd.Flags().BoolVar(&modsNexusCheckUpdatesIgnoreTTL, "ignore-ttl", false,
-		"fetch data from the nexus even if cached data is fresh")
+		"Fetch data from Nexus even if cached data is still fresh")
+	modsNexusCheckUpdatesCmd.Flags().IntVarP(&modsNexusCheckUpdatesLimit, "limit", "l", 0,
+		"Maximum number of mods to check (0 = unlimited)")
+	modsNexusCheckUpdatesCmd.Flags().BoolVar(&modsNexusCheckUpdatesPrintAll, "print-all", false,
+		"Print each mod on its own line instead of using a progress indicator")
+	modsNexusCheckUpdatesCmd.Flags().BoolVar(&modsNexusCheckUpdatesIncludeSuperseded, "include-superseded", false,
+		"Include superseded mod versions in the update check")
+
+	modsNexusCheckUpdatesCmd.MarkFlagsMutuallyExclusive("force", "limit")
 }
