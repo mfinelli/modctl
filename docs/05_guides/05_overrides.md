@@ -217,5 +217,5 @@ change in the base file.
 
 ---
 
-Next up is the [Configuration reference](../configuration), which covers all
-available configuration keys and their defaults.
+Next is the [Deploy rules](../deploy-rules) guide, which covers how top stop
+modctl from backing up or overwriting certain mod-shipped files.

@@ -116,7 +116,7 @@ modctl profiles remove "Appearance Menu Mod"
 ### profiles upgrade
 
 Swap the mod file version currently in a profile for a newer one, preserving
-the existing priority slot, enabled state, and remap rules.
+the existing priority slot, enabled state, remap rules, and deployment rules
 
 Without `--to`, modctl picks the most recently imported version of the same
 mod file that is not already in the profile. With `--to`, the specified
@@ -141,6 +141,27 @@ the profile but are excluded from planning entirely.
 modctl profiles enable "Appearance Menu Mod"
 modctl profiles disable "Appearance Menu Mod"
 ```
+
+### profiles preview
+
+Show a unified diff between the current on-disk file and what the active
+profile's winning mod would write at that path if apply were run. Useful
+for understanding exactly what apply would change at a specific path before
+deciding whether to add a write-once or skip-backup rule.
+```bash
+modctl profiles preview "settings/game.ini"
+```
+
+Note: this command requires archive extraction which may be slow for large
+archives.
+
+Binary files are detected automatically and refused unless `--force` is
+passed.
+
+| Flag              | Description                                      |
+|-------------------|--------------------------------------------------|
+| `--target <name>` | Install target (default: `game_dir`)             |
+| `--force`         | Diff binary files without refusing               |
 
 ## Priority order
 
@@ -382,4 +403,79 @@ entries in memory, and display a unified diff of the result. Requires archive
 extraction and may be slow for large archives.
 ```bash
 modctl profiles overrides patch preview settings.ini
+```
+
+## Deployment rules
+
+For a full explanation of deployment rules see
+[Deployment rules](../../guides/deploy-rules).
+
+### profiles deploys skip-backup list
+
+List all skip-backup patterns for a mod version in the active profile.
+Patterns are evaluated against the final remapped destination path.
+```bash
+modctl profiles deploys skip-backup list "My Mod"
+```
+
+### profiles deploys skip-backup add
+
+Add a skip-backup pattern for a mod version in the active profile. Files
+matching the pattern are never backed up during apply, including the initial
+backup of any pre-existing game-owned file. On unapply, matched paths are
+deleted rather than restored.
+```bash
+modctl profiles deploys skip-backup add "My Mod" "*.cache"
+modctl profiles deploys skip-backup add "My Mod" "Cache/*"
+```
+
+### profiles deploys skip-backup remove
+
+Remove a skip-backup pattern. Use `skip-backup list` to see current patterns.
+```bash
+modctl profiles deploys skip-backup remove "My Mod" "*.cache"
+```
+
+### profiles deploys skip-backup copy
+
+Copy skip-backup patterns from one mod version to another within the same
+profile. Existing patterns on the destination are replaced. Useful when
+manually swapping mod versions.
+```bash
+modctl profiles deploys skip-backup copy "My Mod v1.0" "My Mod v1.1"
+```
+
+### profiles deploys write-once list
+
+List all write-once patterns for a mod version in the active profile.
+Patterns are evaluated against the final remapped destination path.
+```bash
+modctl profiles deploys write-once list "My Mod"
+```
+
+### profiles deploys write-once add
+
+Add a write-once pattern for a mod version in the active profile. Files
+matching the pattern are deployed on first apply and left untouched on
+subsequent applies, preserving any in-game changes. If a matched file is
+missing from disk it is re-deployed.
+```bash
+modctl profiles deploys write-once add "My Mod" "settings.ini"
+modctl profiles deploys write-once add "My Mod" "Config/*.cfg"
+```
+
+### profiles deploys write-once remove
+
+Remove a write-once pattern. Use `write-once list` to see current patterns.
+```bash
+modctl profiles deploys write-once remove "My Mod" "settings.ini"
+```
+
+### profiles deploys write-once copy
+
+Copy write-once patterns from one mod version to another within the same
+profile. Existing patterns on the destination are replaced. Useful when
+manually swapping mod versions.
+```bash
+modctl profiles deploys write-once copy "My Mod v1.0" "My Mod v1.1"
 ```

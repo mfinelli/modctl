@@ -129,6 +129,33 @@ Set the active game:
 	currently installed to that target (unapply first). Cannot remove
 	auto-discovered targets such as _game_dir_ or _proton_prefix_.
 
+*modctl games backups list* [--target <target>]
+	List all files that modctl has backed up for the current game. Pass
+	\--target to filter by a specific install target.
+
+*modctl games backups view* [--target <target>] [--force] <path>
+	Print the content of a backed-up file to the terminal. The path is
+	relative to the target root. Binary files are refused unless --force
+	is passed.
+
+*modctl games backups delete* [--target <target>] <path>
+	Delete a backup entry. modctl will no longer be able to restore the
+	original file at this path on unapply; the file will be deleted
+	instead. The blob is not immediately removed from disk; run
+	*modctl gc* to reclaim space.
+
+*modctl games backups restore* [--target <target>] [--force] <path>
+	Restore a backed-up file to disk immediately without running a full
+	unapply. Warns if the active profile is currently applied, since
+	running apply again will overwrite this path. Requires --force if
+	the on-disk file has drifted from what modctl last installed.
+
+*modctl games backups diff* [--target <target>] [--force] <path>
+	Show a unified diff between the backed-up content and the current
+	on-disk file. If the on-disk file is missing, the backup content is
+	shown as a full deletion. Binary files are refused unless --force
+	is passed.
+
 ## Stores
 
 *modctl stores list*
@@ -224,8 +251,8 @@ Set the active game:
 
 *modctl profiles upgrade* [--to <version-id>] <mod>
 	Swap the mod file version currently in the active profile for a newer
-	one, preserving the existing priority slot, enabled state, and remap
-	rules. Without --to, modctl picks the most recently imported version
+	one, preserving the existing priority slot, enabled state, remap rules, and
+	deploy rules. Without --to, modctl picks the most recently imported version
 	of the same mod file that is not already in the profile. With --to,
 	the specified version is used directly. The old version is removed
 	from the profile.
@@ -272,6 +299,38 @@ Set the active game:
 	hidden by default; pass --show-filtered to see them alongside the reason
 	they were excluded. The archive must be inventoried first; run
 	*modctl mods scan-inventory* if needed.
+
+*modctl profiles preview* [--target <target>] [--force] <path>
+	Show a unified diff between the current on-disk file and what the
+	active profile's winning mod would write at that path. Requires archive
+	extraction which may be slow for large archives. Binary files are
+	refused unless --force is passed.
+
+*modctl profiles deploys skip-backup list* <mod>
+	List skip-backup patterns for a mod version in the active profile.
+
+*modctl profiles deploys skip-backup add* <mod> <pattern>
+	Add a skip-backup pattern for a mod version in the active profile.
+
+*modctl profiles deploys skip-backup remove* <mod> <pattern>
+	Remove a skip-backup pattern for a mod version in the active profile.
+
+*modctl profiles deploys skip-backup copy* <src-mod> <dst-mod>
+	Copy skip-backup patterns from one mod version to another in the active
+	profile. Existing patterns on the destination are replaced.
+
+*modctl profiles deploys write-once list* <mod>
+	List write-once patterns for a mod version in the active profile.
+
+*modctl profiles deploys write-once add* <mod> <pattern>
+	Add a write-once pattern for a mod version in the active profile.
+
+*modctl profiles deploys write-once remove* <mod> <pattern>
+	Remove a write-once pattern for a mod version in the active profile.
+
+*modctl profiles deploys write-once copy* <src-mod> <dst-mod>
+	Copy write-once patterns from one mod version to another in the active
+	profile. Existing patterns on the destination are replaced.
 
 *modctl profiles overrides list*
 	List all overrides for the active profile with a summary staleness

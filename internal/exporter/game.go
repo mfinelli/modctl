@@ -276,6 +276,16 @@ func buildGameScopedDB(
 		return "", "", 0, 0, 0, fmt.Errorf("export profile items: %w", err)
 	}
 
+	if err := exportSkipBackupPatterns(ctx, q, sq, gi.ID); err != nil {
+		os.Remove(tmpPath)
+		return "", "", 0, 0, 0, fmt.Errorf("export skip-backup patterns: %w", err)
+	}
+
+	if err := exportWriteOncePatterns(ctx, q, sq, gi.ID); err != nil {
+		os.Remove(tmpPath)
+		return "", "", 0, 0, 0, fmt.Errorf("export write-once patterns: %w", err)
+	}
+
 	if err := exportProfilePathPolicies(ctx, q, sq, gi.ID); err != nil {
 		os.Remove(tmpPath)
 		return "", "", 0, 0, 0, fmt.Errorf("export profile path policies: %w", err)
@@ -525,4 +535,30 @@ func exportOverrides(ctx context.Context, src, dst *dbq.Queries, gameInstallID i
 		}
 	}
 	return overrideCount, nil
+}
+
+func exportSkipBackupPatterns(ctx context.Context, src, dst *dbq.Queries, gameInstallID int64) error {
+	rows, err := src.ExportGetSkipBackupPatternsForGameInstall(ctx, gameInstallID)
+	if err != nil {
+		return fmt.Errorf("get skip-backup patterns: %w", err)
+	}
+	for _, row := range rows {
+		if err := dst.ExportInsertSkipBackupPattern(ctx, dbq.ExportInsertSkipBackupPatternParams(row)); err != nil {
+			return fmt.Errorf("insert skip-backup pattern %d: %w", row.ID, err)
+		}
+	}
+	return nil
+}
+
+func exportWriteOncePatterns(ctx context.Context, src, dst *dbq.Queries, gameInstallID int64) error {
+	rows, err := src.ExportGetWriteOncePatternsForGameInstall(ctx, gameInstallID)
+	if err != nil {
+		return fmt.Errorf("get write-once patterns: %w", err)
+	}
+	for _, row := range rows {
+		if err := dst.ExportInsertWriteOncePattern(ctx, dbq.ExportInsertWriteOncePatternParams(row)); err != nil {
+			return fmt.Errorf("insert write-once pattern %d: %w", row.ID, err)
+		}
+	}
+	return nil
 }

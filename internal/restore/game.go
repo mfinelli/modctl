@@ -39,6 +39,7 @@ type idRemap struct {
 	remapConfigs    map[int64]int64
 	profiles        map[int64]int64
 	overrides       map[int64]int64
+	profileItems    map[int64]int64
 }
 
 // Game imports a game-scoped bundle into an existing database.
@@ -155,6 +156,7 @@ func Game(
 		remapConfigs:    make(map[int64]int64),
 		profiles:        make(map[int64]int64),
 		overrides:       make(map[int64]int64),
+		profileItems:    make(map[int64]int64),
 	}
 
 	// Insert store (reuse existing if present)
@@ -206,6 +208,14 @@ func Game(
 	// Profile items
 	if err := importProfileItems(ctx, q, bq, oldGameInstallID, remap); err != nil {
 		return res, fmt.Errorf("import profile items: %w", err)
+	}
+
+	if err := importSkipBackupPatterns(ctx, q, bq, oldGameInstallID, remap); err != nil {
+		return res, fmt.Errorf("import skip-backup patterns: %w", err)
+	}
+
+	if err := importWriteOncePatterns(ctx, q, bq, oldGameInstallID, remap); err != nil {
+		return res, fmt.Errorf("import write-once patterns: %w", err)
 	}
 
 	// Profile path policies
@@ -490,7 +500,7 @@ func importProfileItems(ctx context.Context, dst, src *dbq.Queries, oldGameInsta
 			}
 			newRemapConfigID = sql.NullInt64{Int64: newID, Valid: true}
 		}
-		if _, err := dst.ImportInsertProfileItem(ctx, dbq.ImportInsertProfileItemParams{
+		newID, err := dst.ImportInsertProfileItem(ctx, dbq.ImportInsertProfileItemParams{
 			ProfileID:        newProfileID,
 			Policy:           item.Policy,
 			ModFileVersionID: newMFVID,
@@ -501,9 +511,11 @@ func importProfileItems(ctx context.Context, dst, src *dbq.Queries, oldGameInsta
 			Notes:            item.Notes,
 			CreatedAt:        item.CreatedAt,
 			UpdatedAt:        item.UpdatedAt,
-		}); err != nil {
+		})
+		if err != nil {
 			return fmt.Errorf("insert profile item: %w", err)
 		}
+		remap.profileItems[item.ID] = newID
 	}
 	return nil
 }
@@ -639,6 +651,48 @@ func importOverrides(ctx context.Context, dst, src *dbq.Queries, oldGameInstallI
 			}); err != nil {
 				return fmt.Errorf("insert patch entry: %w", err)
 			}
+		}
+	}
+	return nil
+}
+
+func importSkipBackupPatterns(ctx context.Context, dst, src *dbq.Queries, oldGameInstallID int64, remap *idRemap) error {
+	patterns, err := src.ExportGetSkipBackupPatternsForGameInstall(ctx, oldGameInstallID)
+	if err != nil {
+		return fmt.Errorf("get skip-backup patterns: %w", err)
+	}
+	for _, p := range patterns {
+		newProfileItemID, ok := remap.profileItems[p.ProfileItemID]
+		if !ok {
+			return fmt.Errorf("skip-backup pattern references unknown profile item %d", p.ProfileItemID)
+		}
+		if err := dst.ImportInsertSkipBackupPattern(ctx, dbq.ImportInsertSkipBackupPatternParams{
+			ProfileItemID: newProfileItemID,
+			Pattern:       p.Pattern,
+			CreatedAt:     p.CreatedAt,
+		}); err != nil {
+			return fmt.Errorf("insert skip-backup pattern %q: %w", p.Pattern, err)
+		}
+	}
+	return nil
+}
+
+func importWriteOncePatterns(ctx context.Context, dst, src *dbq.Queries, oldGameInstallID int64, remap *idRemap) error {
+	patterns, err := src.ExportGetWriteOncePatternsForGameInstall(ctx, oldGameInstallID)
+	if err != nil {
+		return fmt.Errorf("get write-once patterns: %w", err)
+	}
+	for _, p := range patterns {
+		newProfileItemID, ok := remap.profileItems[p.ProfileItemID]
+		if !ok {
+			return fmt.Errorf("write-once pattern references unknown profile item %d", p.ProfileItemID)
+		}
+		if err := dst.ImportInsertWriteOncePattern(ctx, dbq.ImportInsertWriteOncePatternParams{
+			ProfileItemID: newProfileItemID,
+			Pattern:       p.Pattern,
+			CreatedAt:     p.CreatedAt,
+		}); err != nil {
+			return fmt.Errorf("insert write-once pattern %q: %w", p.Pattern, err)
 		}
 	}
 	return nil

@@ -2123,3 +2123,136 @@ WHERE target_id = ?;
 SELECT CAST(COUNT(*) AS INTEGER) AS count
 FROM profile_items
 WHERE target_id = ?;
+
+-- name: AddSkipBackupPattern :exec
+INSERT INTO profile_item_skip_backup_patterns (profile_item_id, pattern)
+VALUES (?, ?);
+
+-- name: RemoveSkipBackupPattern :execrows
+DELETE FROM profile_item_skip_backup_patterns
+WHERE profile_item_id = ? AND pattern = ?;
+
+-- name: ListSkipBackupPatterns :many
+SELECT id, profile_item_id, pattern, created_at
+FROM profile_item_skip_backup_patterns
+WHERE profile_item_id = ?
+ORDER BY pattern ASC;
+
+-- name: AddWriteOncePattern :exec
+INSERT INTO profile_item_write_once_patterns (profile_item_id, pattern)
+VALUES (?, ?);
+
+-- name: RemoveWriteOncePattern :execrows
+DELETE FROM profile_item_write_once_patterns
+WHERE profile_item_id = ? AND pattern = ?;
+
+-- name: ListWriteOncePatterns :many
+SELECT id, profile_item_id, pattern, created_at
+FROM profile_item_write_once_patterns
+WHERE profile_item_id = ?
+ORDER BY pattern ASC;
+
+-- name: GetSkipBackupPatternsForProfile :many
+SELECT pi.id AS profile_item_id, p.pattern
+FROM profile_item_skip_backup_patterns p
+JOIN profile_items pi ON pi.id = p.profile_item_id
+WHERE pi.profile_id = ?
+ORDER BY pi.id, p.pattern;
+
+-- name: GetWriteOncePatternsForProfile :many
+SELECT pi.id AS profile_item_id, p.pattern
+FROM profile_item_write_once_patterns p
+JOIN profile_items pi ON pi.id = p.profile_item_id
+WHERE pi.profile_id = ?
+ORDER BY pi.id, p.pattern;
+
+-- name: ExportGetSkipBackupPatternsForGameInstall :many
+SELECT p.id, p.profile_item_id, p.pattern, p.created_at
+FROM profile_item_skip_backup_patterns p
+JOIN profile_items pi ON pi.id = p.profile_item_id
+JOIN profiles pr ON pr.id = pi.profile_id
+WHERE pr.game_install_id = ?
+ORDER BY p.id;
+
+-- name: ExportInsertSkipBackupPattern :exec
+INSERT INTO profile_item_skip_backup_patterns (id, profile_item_id, pattern, created_at)
+VALUES (?, ?, ?, ?);
+
+-- name: ExportGetWriteOncePatternsForGameInstall :many
+SELECT p.id, p.profile_item_id, p.pattern, p.created_at
+FROM profile_item_write_once_patterns p
+JOIN profile_items pi ON pi.id = p.profile_item_id
+JOIN profiles pr ON pr.id = pi.profile_id
+WHERE pr.game_install_id = ?
+ORDER BY p.id;
+
+-- name: ExportInsertWriteOncePattern :exec
+INSERT INTO profile_item_write_once_patterns (id, profile_item_id, pattern, created_at)
+VALUES (?, ?, ?, ?);
+
+-- name: ImportInsertSkipBackupPattern :exec
+INSERT INTO profile_item_skip_backup_patterns (profile_item_id, pattern, created_at)
+VALUES (?, ?, ?);
+
+-- name: ImportInsertWriteOncePattern :exec
+INSERT INTO profile_item_write_once_patterns (profile_item_id, pattern, created_at)
+VALUES (?, ?, ?);
+
+-- name: DeleteAllSkipBackupPatterns :exec
+DELETE FROM profile_item_skip_backup_patterns WHERE profile_item_id = ?;
+
+-- name: DeleteAllWriteOncePatterns :exec
+DELETE FROM profile_item_write_once_patterns WHERE profile_item_id = ?;
+
+-- name: ListBackupsForGameInstall :many
+SELECT
+    b.id,
+    b.relpath,
+    b.size_bytes,
+    b.created_at,
+    b.backup_blob_sha256,
+    b.original_content_sha256,
+    t.name AS target_name,
+    t.id AS target_id,
+    o.id AS operation_id,
+    o.op_type AS operation_type,
+    o.started_at AS operation_started_at
+FROM backups b
+JOIN targets t ON t.id = b.target_id
+LEFT JOIN operations o ON o.id = b.created_by_operation_id
+WHERE b.game_install_id = sqlc.arg(game_install_id)
+  AND (sqlc.arg(target_name)= '' OR t.name = sqlc.arg(target_name))
+ORDER BY t.name, b.relpath;
+
+-- name: GetBackupForGameInstallByPath :one
+SELECT
+    b.id,
+    b.relpath,
+    b.size_bytes,
+    b.created_at,
+    b.backup_blob_sha256,
+    b.original_content_sha256,
+    t.name AS target_name,
+    t.id AS target_id,
+    o.id AS operation_id,
+    o.op_type AS operation_type,
+    o.started_at AS operation_started_at
+FROM backups b
+JOIN targets t ON t.id = b.target_id
+LEFT JOIN operations o ON o.id = b.created_by_operation_id
+WHERE b.game_install_id = ?
+  AND b.target_id = ?
+  AND b.relpath = ?;
+
+-- name: DeleteBackupByPath :execrows
+DELETE FROM backups
+WHERE game_install_id = ?
+  AND target_id = ?
+  AND relpath = ?;
+
+-- name: GetInstalledFileByPath :one
+SELECT *
+FROM installed_files
+WHERE game_install_id = ?
+  AND target_id = ?
+  AND relpath = ?;
