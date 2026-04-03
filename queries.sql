@@ -2243,3 +2243,9 @@ LEFT JOIN operations o ON o.id = b.created_by_operation_id
 WHERE b.game_install_id = ?
   AND b.target_id = ?
   AND b.relpath = ?;
+
+-- name: DeleteBackupByPath :execrows
+DELETE FROM backups
+WHERE game_install_id = ?
+  AND target_id = ?
+  AND relpath = ?;
