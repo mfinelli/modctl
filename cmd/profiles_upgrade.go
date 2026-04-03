@@ -42,7 +42,8 @@ var profilesUpgradeCmd = &cobra.Command{
 	Use:   "upgrade <mod-page>",
 	Short: "Swap a mod version in a profile for a newer one",
 	Long: `Swap the mod file version currently in a profile for a newer one,
-preserving the existing priority slot, enabled state, and remap rules.
+preserving the existing priority slot, enabled state, remap rules, and
+deploy rules.
 
 Without --to, modctl picks the most recently imported version of the same
 mod file that is not already in the profile.

@@ -2197,3 +2197,9 @@ VALUES (?, ?, ?);
 -- name: ImportInsertWriteOncePattern :exec
 INSERT INTO profile_item_write_once_patterns (profile_item_id, pattern, created_at)
 VALUES (?, ?, ?);
+
+-- name: DeleteAllSkipBackupPatterns :exec
+DELETE FROM profile_item_skip_backup_patterns WHERE profile_item_id = ?;
+
+-- name: DeleteAllWriteOncePatterns :exec
+DELETE FROM profile_item_write_once_patterns WHERE profile_item_id = ?;
