@@ -2151,3 +2151,17 @@ SELECT id, profile_item_id, pattern, created_at
 FROM profile_item_write_once_patterns
 WHERE profile_item_id = ?
 ORDER BY pattern ASC;
+
+-- name: GetSkipBackupPatternsForProfile :many
+SELECT pi.id AS profile_item_id, p.pattern
+FROM profile_item_skip_backup_patterns p
+JOIN profile_items pi ON pi.id = p.profile_item_id
+WHERE pi.profile_id = ?
+ORDER BY pi.id, p.pattern;
+
+-- name: GetWriteOncePatternsForProfile :many
+SELECT pi.id AS profile_item_id, p.pattern
+FROM profile_item_write_once_patterns p
+JOIN profile_items pi ON pi.id = p.profile_item_id
+WHERE pi.profile_id = ?
+ORDER BY pi.id, p.pattern;

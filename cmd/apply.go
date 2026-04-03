@@ -576,6 +576,8 @@ func printApplyPlan(
 			if op.NeedsBackup {
 				detail = subtle.Render("(backup needed)")
 				countBackup++
+			} else if op.SkipBackup {
+				detail = subtle.Render("(skip-backup)")
 			}
 			winner := op.File.Winner()
 			modInfo := formatModInfo(winner)
@@ -594,6 +596,8 @@ func printApplyPlan(
 			if op.NeedsBackup {
 				detail = subtle.Render("(backup needed)")
 				countBackup++
+			} else if op.SkipBackup {
+				detail = subtle.Render("(skip-backup)")
 			}
 			winner := op.File.Winner()
 			modInfo := formatModInfo(winner)

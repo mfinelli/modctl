@@ -107,6 +107,13 @@ type PlanOp struct {
 	OverrideBaseArchiveSha256 sql.NullString
 	// OverrideBaseRawPath is the path inside the base archive for patch ops.
 	OverrideBaseRawPath sql.NullString
+
+	// SkipBackup is true when a skip-backup pattern matched this path.
+	// Informational only; used for dry-run display.
+	SkipBackup bool
+	// WriteOnce is true when a write-once pattern matched this path.
+	// Informational only; used for dry-run display.
+	WriteOnce bool
 }
 
 // Plan is the full computed desired state for a profile apply or unapply.
@@ -159,6 +166,26 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 	})
 	if err != nil {
 		return Plan{}, fmt.Errorf("load profile items: %w", err)
+	}
+
+	// Load skip-backup and write-once patterns for all items in this profile,
+	// keyed by profile_item_id for fast lookup during op building.
+	skipBackupRows, err := q.GetSkipBackupPatternsForProfile(ctx, profileID)
+	if err != nil {
+		return Plan{}, fmt.Errorf("load skip-backup patterns: %w", err)
+	}
+	skipBackupPatterns := make(map[int64][]string, len(skipBackupRows))
+	for _, row := range skipBackupRows {
+		skipBackupPatterns[row.ProfileItemID] = append(skipBackupPatterns[row.ProfileItemID], row.Pattern)
+	}
+
+	writeOnceRows, err := q.GetWriteOncePatternsForProfile(ctx, profileID)
+	if err != nil {
+		return Plan{}, fmt.Errorf("load write-once patterns: %w", err)
+	}
+	writeOncePatterns := make(map[int64][]string, len(writeOnceRows))
+	for _, row := range writeOnceRows {
+		writeOncePatterns[row.ProfileItemID] = append(writeOncePatterns[row.ProfileItemID], row.Pattern)
 	}
 
 	// winner map: destPath -> index into plan.Files
@@ -343,6 +370,14 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 			op.OverrideBaseRawPath = oi.baseRawPath
 		}
 
+		// Resolve deploy rules for the winning item (overrides are not
+		// subject to skip-backup or write-once rules, those are properties
+		// of the mod item, not the override layer)
+		isSkipBackup := !hasOverride && matchesAny(skipBackupPatterns[pf.ProfileItemID], pf.DestPath)
+		isWriteOnce := !hasOverride && matchesAny(writeOncePatterns[pf.ProfileItemID], pf.DestPath)
+		op.SkipBackup = isSkipBackup
+		op.WriteOnce = isWriteOnce
+
 		existingInstall, isInstalled := installed[pf.DestPath]
 		_, existsOnDisk := diskStat(absPath)
 
@@ -360,8 +395,8 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 					// Fall through to plain overwrite if we can't hash
 					op.Kind = PlanOpOverwrite
 				} else if onDiskHash == existingInstall.ContentSha256 &&
-					// File is already correct - noop.
 					existingInstall.OwnerOverrideID.Int64 == oi.id {
+					// File is already correct: noop
 					op.Kind = PlanOpNoop
 				} else {
 					op.Kind = PlanOpOverwrite
@@ -369,6 +404,23 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 			} else if hasOverride && skipRecheck {
 				// --no-recheck with override: always reapply
 				op.Kind = PlanOpOverwrite
+			} else if isWriteOnce {
+				// Write-once: leave the file untouched regardless of drift.
+				// Still hash-check so we can surface an informational warning
+				// if the file has been modified (e.g. by the game), but never
+				// act on it.
+				op.Kind = PlanOpNoop
+				if !skipRecheck {
+					onDiskHash, err := hashFile(absPath)
+					if err != nil {
+						plan.Warnings = append(plan.Warnings,
+							fmt.Sprintf("recheck: could not hash %q: %v", pf.DestPath, err))
+					} else if onDiskHash != existingInstall.ContentSha256 {
+						plan.Warnings = append(plan.Warnings,
+							fmt.Sprintf("write-once: %q has been modified since last deploy (write-once rule active, leaving as-is)",
+								pf.DestPath))
+					}
+				}
 			} else if !skipRecheck {
 				// Normal mod-owned file recheck
 				onDiskHash, err := hashFile(absPath)
@@ -381,25 +433,31 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 					op.Kind = PlanOpNoop
 				} else if onDiskHash != existingInstall.ContentSha256 &&
 					existingInstall.OwnerModFileVersionID.Int64 == pf.Winner().ModFileVersionID {
-					// Same owner but content drifted externally - back up new content
+					// Same owner but content drifted: back up unless skip-backup
 					op.Kind = PlanOpOverwrite
-					op.NeedsBackup = true
-					plan.Warnings = append(plan.Warnings,
-						fmt.Sprintf("drift: %q was modified externally (game update?), will back up current content before overwriting",
-							pf.DestPath))
+					if !isSkipBackup {
+						op.NeedsBackup = true
+						plan.Warnings = append(plan.Warnings,
+							fmt.Sprintf("drift: %q was modified externally (game update?), will back up current content before overwriting",
+								pf.DestPath))
+					} else {
+						plan.Warnings = append(plan.Warnings,
+							fmt.Sprintf("drift: %q was modified externally, overwriting without backup (skip-backup rule active)",
+								pf.DestPath))
+					}
 				} else {
-					// Different winner - plain overwrite, no backup needed since
-					// tool owns the file
+					// Different winner: plain overwrite, no backup needed
+					// since tool owns file
 					op.Kind = PlanOpOverwrite
 				}
 			} else {
-				// Tool owns it and it's on disk - normal overwrite, no backup
+				// --no-recheck: tool owns it and it's on disk, normal overwrite, no backup
 				op.Kind = PlanOpOverwrite
 			}
 
 		case isInstalled && !existsOnDisk:
 			// Tool thought it owned it but it's gone - drift warning, treat
-			// as a fresh write
+			// as a fresh write. (write-once re-deploys missing files)
 			op.Kind = PlanOpWrite
 			plan.Warnings = append(plan.Warnings,
 				fmt.Sprintf("drift: %q was installed but is missing from disk",
@@ -407,8 +465,11 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 
 		case !isInstalled && existsOnDisk:
 			// Pre-existing file not owned by the tool - backup before writing
+			// unless skip-backup is active
 			op.Kind = PlanOpWrite
-			op.NeedsBackup = true
+			if !isSkipBackup {
+				op.NeedsBackup = true
+			}
 
 		default:
 			// Not installed, not on disk - clean write
@@ -442,7 +503,7 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 		_, existsOnDisk := diskStat(absPath)
 
 		if !existsOnDisk {
-			// Already gone - just clean up the DB record, no disk op needed.
+			// Already gone: just clean up the DB record, no disk op needed
 			// We still emit a Remove so apply cleans up installed_files
 			plan.Warnings = append(plan.Warnings,
 				fmt.Sprintf("drift: %q was installed by mod_file_version %d but is already missing from disk",
@@ -543,4 +604,19 @@ func diskStat(path string) (os.FileInfo, bool) {
 		return nil, false
 	}
 	return info, true
+}
+
+// matchesAny reports whether path matches any of the given glob patterns.
+// Malformed patterns are silently skipped.
+func matchesAny(patterns []string, path string) bool {
+	for _, pattern := range patterns {
+		matched, err := filepath.Match(pattern, path)
+		if err != nil {
+			continue
+		}
+		if matched {
+			return true
+		}
+	}
+	return false
 }
