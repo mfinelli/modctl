@@ -129,6 +129,33 @@ Set the active game:
 	currently installed to that target (unapply first). Cannot remove
 	auto-discovered targets such as _game_dir_ or _proton_prefix_.
 
+*modctl games backups list* [--target <target>]
+	List all files that modctl has backed up for the current game. Pass
+	\--target to filter by a specific install target.
+
+*modctl games backups view* [--target <target>] [--force] <path>
+	Print the content of a backed-up file to the terminal. The path is
+	relative to the target root. Binary files are refused unless --force
+	is passed.
+
+*modctl games backups delete* [--target <target>] <path>
+	Delete a backup entry. modctl will no longer be able to restore the
+	original file at this path on unapply; the file will be deleted
+	instead. The blob is not immediately removed from disk; run
+	*modctl gc* to reclaim space.
+
+*modctl games backups restore* [--target <target>] [--force] <path>
+	Restore a backed-up file to disk immediately without running a full
+	unapply. Warns if the active profile is currently applied, since
+	running apply again will overwrite this path. Requires --force if
+	the on-disk file has drifted from what modctl last installed.
+
+*modctl games backups diff* [--target <target>] [--force] <path>
+	Show a unified diff between the backed-up content and the current
+	on-disk file. If the on-disk file is missing, the backup content is
+	shown as a full deletion. Binary files are refused unless --force
+	is passed.
+
 ## Stores
 
 *modctl stores list*
@@ -272,6 +299,12 @@ Set the active game:
 	hidden by default; pass --show-filtered to see them alongside the reason
 	they were excluded. The archive must be inventoried first; run
 	*modctl mods scan-inventory* if needed.
+
+*modctl profiles preview* [--target <target>] [--force] <path>
+	Show a unified diff between the current on-disk file and what the
+	active profile's winning mod would write at that path. Requires archive
+	extraction which may be slow for large archives. Binary files are
+	refused unless --force is passed.
 
 *modctl profiles deploys skip-backup list* <mod>
 	List skip-backup patterns for a mod version in the active profile.
