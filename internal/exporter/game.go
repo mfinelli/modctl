@@ -22,6 +22,7 @@ import (
 	"archive/tar"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -30,6 +31,8 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/nexusclient"
+	"github.com/mfinelli/modctl/internal/nexusclient/dbc"
 )
 
 // Game performs a game-scoped export containing only data relevant to a
@@ -95,6 +98,17 @@ func Game(
 	}
 	defer os.Remove(scopedDBPath)
 
+	// 1b. Build scoped nexus cache database
+	cacheDBPath, cacheSha256, err := buildGameScopedCacheDB(
+		ctx, q, opts.CacheDBPath, gi.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("build game-scoped nexus cache: %w", err)
+	}
+	if cacheDBPath != "" {
+		defer os.Remove(cacheDBPath)
+	}
+
 	// 2. Get schema version from source DB
 	schemaVersion, err := currentSchemaVersion(ctx, db)
 	if err != nil {
@@ -119,6 +133,7 @@ func Game(
 		ModctlVersion:       opts.ModctlVersion,
 		SchemaVersion:       schemaVersion,
 		DBSha256:            dbSha256,
+		NexusCacheSha256:    cacheSha256,
 		Counts: ManifestCounts{
 			Archives:  archiveCount,
 			Backups:   backupCount,
@@ -137,6 +152,13 @@ func Game(
 	// 5. Write scoped database
 	if err := writeFileToTar(tw, scopedDBPath, DatabaseFilename); err != nil {
 		return fmt.Errorf("write database: %w", err)
+	}
+
+	// 5b. Write scoped nexus cache if present
+	if cacheDBPath != "" {
+		if err := writeFileToTar(tw, cacheDBPath, "nexus_cache.db"); err != nil {
+			return fmt.Errorf("write nexus cache: %w", err)
+		}
 	}
 
 	// 6. Write archive blobs
@@ -558,6 +580,138 @@ func exportWriteOncePatterns(ctx context.Context, src, dst *dbq.Queries, gameIns
 	for _, row := range rows {
 		if err := dst.ExportInsertWriteOncePattern(ctx, dbq.ExportInsertWriteOncePatternParams(row)); err != nil {
 			return fmt.Errorf("insert write-once pattern %d: %w", row.ID, err)
+		}
+	}
+	return nil
+}
+
+// buildGameScopedCacheDB constructs a fresh nexus cache database containing
+// only rows relevant to the given game install's mod pages. Returns the path
+// to the temp file and its sha256. If the cache DB does not exist or the game
+// has no nexus-linked mod pages, returns empty strings and no error.
+func buildGameScopedCacheDB(
+	ctx context.Context,
+	q *dbq.Queries,
+	cacheDBPath string,
+	gameInstallID int64,
+) (path string, sha256hex string, err error) {
+	if _, err := os.Stat(cacheDBPath); os.IsNotExist(err) {
+		return "", "", nil
+	}
+
+	// Get nexus identifiers for this game's mod pages
+	modPages, err := q.GetNexusLinkedModPages(ctx, gameInstallID)
+	if err != nil {
+		return "", "", fmt.Errorf("get nexus linked mod pages: %w", err)
+	}
+	if len(modPages) == 0 {
+		return "", "", nil
+	}
+
+	// Open source cache DB
+	srcCacheDB, err := sql.Open("sqlite3", cacheDBPath+internal.DB_PRAGMAS)
+	if err != nil {
+		return "", "", fmt.Errorf("open cache db: %w", err)
+	}
+	defer srcCacheDB.Close()
+
+	// Create destination temp file
+	tmp, err := os.CreateTemp("", "modctl-export-cache-*.sqlite")
+	if err != nil {
+		return "", "", fmt.Errorf("create temp cache db: %w", err)
+	}
+	tmpPath := tmp.Name()
+	tmp.Close()
+
+	dstCacheDB, err := sql.Open("sqlite3", tmpPath+internal.DB_PRAGMAS)
+	if err != nil {
+		os.Remove(tmpPath)
+		return "", "", fmt.Errorf("open scoped cache db: %w", err)
+	}
+	defer dstCacheDB.Close()
+
+	if err := nexusclient.InitCacheDB(ctx, dstCacheDB); err != nil {
+		os.Remove(tmpPath)
+		return "", "", fmt.Errorf("init scoped cache db: %w", err)
+	}
+
+	srcQ := dbc.New(srcCacheDB)
+	dstQ := dbc.New(dstCacheDB)
+
+	// Copy rows for each mod page
+	for _, mp := range modPages {
+		domain := mp.NexusGameDomain.String
+		modID := mp.NexusModID.Int64
+
+		if err := ExportCacheModInfo(ctx, srcQ, dstQ, domain, modID); err != nil {
+			os.Remove(tmpPath)
+			return "", "", fmt.Errorf("export cache mod info (%s/%d): %w", domain, modID, err)
+		}
+		if err := ExportCacheFileInfo(ctx, srcQ, dstQ, domain, modID); err != nil {
+			os.Remove(tmpPath)
+			return "", "", fmt.Errorf("export cache file info (%s/%d): %w", domain, modID, err)
+		}
+		if err := ExportCacheFileUpdates(ctx, srcQ, dstQ, domain, modID); err != nil {
+			os.Remove(tmpPath)
+			return "", "", fmt.Errorf("export cache file updates (%s/%d): %w", domain, modID, err)
+		}
+	}
+
+	if err := dstCacheDB.Close(); err != nil {
+		os.Remove(tmpPath)
+		return "", "", fmt.Errorf("close scoped cache db: %w", err)
+	}
+
+	sha, err := hashFile(tmpPath)
+	if err != nil {
+		os.Remove(tmpPath)
+		return "", "", fmt.Errorf("hash scoped cache db: %w", err)
+	}
+
+	return tmpPath, sha, nil
+}
+
+func ExportCacheModInfo(ctx context.Context, src, dst *dbc.Queries, domain string, modID int64) error {
+	row, err := src.GetNexusModInfo(ctx, dbc.GetNexusModInfoParams{
+		NexusGameDomain: domain,
+		NexusModID:      modID,
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return dst.UpsertNexusModInfo(ctx, dbc.UpsertNexusModInfoParams(row))
+}
+
+func ExportCacheFileInfo(ctx context.Context, src, dst *dbc.Queries, domain string, modID int64) error {
+	rows, err := src.GetNexusFileInfoForMod(ctx, dbc.GetNexusFileInfoForModParams{
+		NexusGameDomain: domain,
+		NexusModID:      modID,
+	})
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if err := dst.UpsertNexusFileInfo(ctx, dbc.UpsertNexusFileInfoParams(row)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func ExportCacheFileUpdates(ctx context.Context, src, dst *dbc.Queries, domain string, modID int64) error {
+	rows, err := src.GetNexusFileUpdatesForMod(ctx, dbc.GetNexusFileUpdatesForModParams{
+		NexusGameDomain: domain,
+		NexusModID:      modID,
+	})
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if err := dst.UpsertNexusFileUpdate(ctx, dbc.UpsertNexusFileUpdateParams(row)); err != nil {
+			return err
 		}
 	}
 	return nil

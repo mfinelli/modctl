@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"strings"
 
 	"github.com/mfinelli/modctl/dbq"
@@ -236,6 +237,14 @@ func Game(
 	// Inventory entries (no ID remapping, keyed by archive_sha256 + position)
 	if err := importInventory(ctx, q, bq, oldGameInstallID); err != nil {
 		return res, fmt.Errorf("import inventory: %w", err)
+	}
+
+	// Import nexus cache if present in bundle
+	if bundle.Manifest.NexusCacheSha256 != "" {
+		bundleCachePath := filepath.Join(bundle.BundleDir, "nexus_cache.db")
+		if err := importGameCache(ctx, bundleCachePath, opts.CacheDBPath, bq, oldGameInstallID); err != nil {
+			return res, fmt.Errorf("import nexus cache: %w", err)
+		}
 	}
 
 	// Queue missing inventory scans

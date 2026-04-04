@@ -239,7 +239,6 @@ Version schema from day 1.
 A separate SQLite database at `$XDG_CACHE_HOME/modctl/nexus_cache.db` stores
 cached Nexus API responses. This is intentionally separate from the main DB:
 - It is safe to delete (will be repopulated on next `mods nexus check-updates`)
-- It is excluded from export/import bundles
 - It uses a simple internal version number; if the schema version does not
   match the expected version the cache is blown away and recreated
 
@@ -274,6 +273,7 @@ Rationale:
 A single file (tar + zstd) containing:
 - `manifest.json` - bundle metadata (see below)
 - `modctl.db` - database snapshot
+- `nexus_cache.db` - nexus cache database snapshot
 - `archives/<fan2>/<fullhash>` - referenced archive blobs
 - `backups/<fan2>/<fullhash>` - referenced backup blobs
 
@@ -294,6 +294,8 @@ Import verifies integrity and schema compatibility.
   to verify integrity on import
 - `counts`: `{ "archives": N, "backups": N }`
 - `game` (game-scoped only): `{ "store_id", "store_game_id", "display_name" }`
+- `cache_sha256`: sha256 of the nexus cache database snapshot as it appears
+  in the bundle, used to verify integrity on import
 
 #### Full export
 
@@ -1763,6 +1765,10 @@ This is only appropriate when restoring to the same machine where game
 directories are still intact. `--force` and `--same-machine` are independent
 and can be combined.
 
+The nexus cache database is copied into place after the main database.
+Its schema version is checked independently; if newer than the running
+binary the import is refused.
+
 **Game-scoped import** inserts rows into the existing database with fresh
 IDs assigned by SQLite. A remapping table tracks old→new IDs for each table
 so foreign key references are correctly updated as rows are inserted in
@@ -1772,6 +1778,10 @@ which case the existing game install and all its dependent rows are deleted
 first (cascading via FK). Orphaned blobs from the deleted install are left
 for `gc` to clean up. `--same-machine` is not valid for game-scoped imports
 and will produce an error.
+
+Cache rows for the imported game's mod pages are merged into the existing
+cache database via `INSERT OR REPLACE`. Existing cache entries for other
+games are not affected.
 
 **Importing a game from a full bundle**: passing `--game store_id:store_game_id`
 with a full bundle routes the import through the game-scoped import path,
@@ -1809,6 +1819,8 @@ Checks performed:
 - `export_format_version` is supported (hard error if newer)
 - `PRAGMA quick_check` on the bundle database
 - `PRAGMA foreign_key_check` on the bundle database
+- `cache_sha256` in the manifest matches the actual sha256 of `nexus_cache.db`
+- `PRAGMA quick_check` on the cache database
 - Every blob file in the bundle hashes correctly against its filename
 - Every blob referenced in the bundle database has a corresponding file
 - Every blob file in the bundle has a corresponding database row
@@ -1870,5 +1882,29 @@ complete integrity check.
 
 If the extracted version has a `nexus_file_id` and the mod page has
 `nexus_mod_id` and `nexus_game_domain` recorded, the Nexus URL and IDs
-are printed after extraction. The Nexus cache is not consulted since it
-is not included in bundles.
+are printed after extraction.
+
+### Nexus cache: included in export bundles
+
+The nexus cache database is included in both full and game-scoped export
+bundles. Although it is safe to delete locally, it contains useful data
+(update chains, file metadata) that would otherwise require API calls to
+rebuild on the destination machine.
+
+For full exports, `VACUUM INTO` is used to produce a clean snapshot,
+mirroring the approach used for the main database.
+
+For game-scoped exports, a fresh cache database is created with migrations
+applied, then populated with only the rows for the exported game's mod pages:
+all rows in `nexus_mod_info`, `nexus_file_info`, and `nexus_file_updates`
+where `(nexus_game_domain, nexus_mod_id)` matches a mod page belonging to
+the exported game install.
+
+On full import, the cache database is copied into place directly. On
+game-scoped import, rows are merged into the existing cache database using
+`INSERT OR REPLACE` — safe because all cache tables use Nexus-native primary
+keys with no local ID remapping required.
+
+`fetched_at` timestamps are preserved verbatim on import. The TTL logic in
+`check-updates` will naturally treat stale entries as cold and refresh them
+on the next run.

@@ -21,6 +21,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
@@ -93,6 +94,7 @@ Examples:
 			ModctlVersion: rootCmd.Version,
 			SkipInventory: exportSkipInventory,
 			NoVerify:      exportNoVerify,
+			CacheDBPath:   filepath.Join(viper.GetString("cache_dir"), "nexus_cache.db"),
 		}
 
 		date := time.Now().Format("20060102")

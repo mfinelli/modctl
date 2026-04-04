@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
@@ -139,6 +140,7 @@ Use --dry-run to preview what would be imported without making any changes.`,
 			SkipInventory: importSkipInventory,
 			SameMachine:   importSameMachine,
 			Game:          importGame,
+			CacheDBPath:   filepath.Join(viper.GetString("cache_dir"), "nexus_cache.db"),
 		}
 
 		// Warn if bundle modctl version is newer

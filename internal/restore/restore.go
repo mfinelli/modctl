@@ -50,6 +50,7 @@ type Options struct {
 	DryRun        bool
 	SameMachine   bool
 	Game          string // "store_id:store_game_id", only set when extracting a game from a full bundle
+	CacheDBPath   string
 }
 
 type Result struct {
@@ -128,6 +129,21 @@ func OpenAndValidate(ctx context.Context, bundlePath string) (*Bundle, error) {
 		os.RemoveAll(tmpDir)
 		return nil, fmt.Errorf("bundle database integrity check failed: expected %s got %s",
 			manifest.DBSha256, dbSha)
+	}
+
+	// Verify nexus cache integrity if present in bundle
+	cachePath := filepath.Join(tmpDir, "nexus_cache.db")
+	if manifest.NexusCacheSha256 != "" {
+		cacheSha, err := hashFile(cachePath)
+		if err != nil {
+			os.RemoveAll(tmpDir)
+			return nil, fmt.Errorf("hash bundle nexus cache: %w", err)
+		}
+		if cacheSha != manifest.NexusCacheSha256 {
+			os.RemoveAll(tmpDir)
+			return nil, fmt.Errorf("bundle nexus cache integrity check failed: expected %s got %s",
+				manifest.NexusCacheSha256, cacheSha)
+		}
 	}
 
 	// Open bundle DB
