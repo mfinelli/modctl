@@ -30,6 +30,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
+	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/restore"
 	"github.com/spf13/cobra"
@@ -138,6 +139,26 @@ Exits non-zero if any integrity issues are found. Version warnings
 			}
 		}
 		fmt.Println()
+
+		// nexus cache integrity check
+		if bundle.Manifest.NexusCacheSha256 != "" {
+			fmt.Println(boldStyle.Render("Nexus Cache Integrity"))
+			cachePath := filepath.Join(bundle.BundleDir, "nexus_cache.db")
+			cacheIssues := checkBundleCacheDB(ctx, cachePath)
+			if len(cacheIssues) == 0 {
+				fmt.Println(okStyle.Render("  ✓ quick_check OK"))
+			} else {
+				for _, iss := range cacheIssues {
+					fmt.Println(errStyle.Render("  ✗ " + iss))
+					issues = append(issues, iss)
+				}
+			}
+			fmt.Println()
+		} else {
+			fmt.Println(boldStyle.Render("Nexus Cache Integrity"))
+			fmt.Println(subtleStyle.Render("  (not present in bundle)"))
+			fmt.Println()
+		}
 
 		// blob checks
 		fmt.Println(boldStyle.Render("Blob Integrity"))
@@ -347,5 +368,36 @@ func checkBundleBlobs(ctx context.Context, bundle *restore.Bundle, bq *dbq.Queri
 		}
 	}
 
+	return issues
+}
+
+// checkBundleCacheDB runs quick_check on the nexus cache database.
+func checkBundleCacheDB(ctx context.Context, cachePath string) []string {
+	cacheDB, err := sql.Open("sqlite3", cachePath+internal.DB_PRAGMAS+"&mode=ro")
+	if err != nil {
+		return []string{"open nexus cache db: " + err.Error()}
+	}
+	defer cacheDB.Close()
+
+	rows, err := cacheDB.QueryContext(ctx, "PRAGMA quick_check;")
+	if err != nil {
+		return []string{"quick_check failed: " + err.Error()}
+	}
+	defer rows.Close()
+
+	var issues []string
+	for rows.Next() {
+		var result string
+		if err := rows.Scan(&result); err != nil {
+			issues = append(issues, "quick_check scan error: "+err.Error())
+			continue
+		}
+		if result != "ok" {
+			issues = append(issues, "quick_check: "+result)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		issues = append(issues, "quick_check rows error: "+err.Error())
+	}
 	return issues
 }
