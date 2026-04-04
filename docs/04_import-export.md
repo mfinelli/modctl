@@ -10,11 +10,14 @@ A bundle is a zstd-compressed tar archive containing:
 
 - a snapshot of the modctl database
 - all referenced mod archives, backup, and override blobs
+- a snapshot of the Nexus API cache for the exported game(s)
 - a manifest with metadata and integrity checksums
 
 Everything modctl needs to restore your setup is self-contained in the bundle.
-The Nexus API cache is not included; it is safe to discard and will be
-repopulated automatically when needed.
+The Nexus cache snapshot preserves update chain data and file metadata so the
+destination machine does not need to make API calls to rebuild it. If the cache
+was not present on disk at export time it is simply omitted; `modctl
+check-updates` will repopulate it on the next run.
 
 ## Exporting
 
