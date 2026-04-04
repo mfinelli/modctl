@@ -74,6 +74,28 @@ candidates and ask you to be more specific using a selector.
 If multiple installs exist for the same game you must specify the instance
 explicitly.
 
+### games notes set
+
+Set freeform notes on the active game install. Notes are displayed in
+`modctl games info` and are useful for reminders about manual setup steps
+that modctl cannot automate, such as installing runtime libraries into a
+Proton prefix using protontricks.
+```bash
+modctl games notes set "run protontricks 12345 vcrun2022 before applying mods"
+```
+
+Pass `-` to read the note text from stdin:
+```bash
+echo "remember to install vcrun2022" | modctl games notes set -
+```
+
+### games notes clear
+
+Clear the notes for the active game install.
+```bash
+modctl games notes clear
+```
+
 ## Targets
 
 Each game install has one or more named targets: locations where mods can

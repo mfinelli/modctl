@@ -186,6 +186,12 @@ func renderGameInfo(gi dbq.GameInstall, targets []dbq.Target, profiles []dbq.Pro
 		writeKV(&b, "Last seen:", gi.LastSeenAt.String)
 	}
 
+	// Notes
+	if gi.Notes.Valid && strings.TrimSpace(gi.Notes.String) != "" {
+		b.WriteString("\n" + sectionTitleStyle.Render("Notes") + "\n")
+		b.WriteString("  " + gi.Notes.String + "\n")
+	}
+
 	// Targets
 	b.WriteString("\n" + sectionTitleStyle.Render("Targets") + "\n")
 	if len(targets) == 0 {

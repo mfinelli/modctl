@@ -1182,6 +1182,7 @@ This preserves a clean v1 while allowing richer v2.
   files and compare against the recorded `content_sha256`.
 - `stores list|set-active` (supported integrations)
 - `games list|refresh|info|set-active`
+- `games notes set|clear`
 - `mods import|list|info|remove`
 - `mods scan-inventory`
 - `mods incompatible add|remove|list`

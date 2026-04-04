@@ -355,6 +355,7 @@ func exportGameInstall(ctx context.Context, dst *dbq.Queries, gi dbq.GameInstall
 		InstanceID:      gi.InstanceID,
 		CanonicalGameID: gi.CanonicalGameID,
 		InstallRoot:     gi.InstallRoot,
+		Notes:           gi.Notes,
 		Metadata:        gi.Metadata,
 		LastSeenAt:      gi.LastSeenAt,
 		IsPresent:       gi.IsPresent,

@@ -311,6 +311,7 @@ func importGameInstall(ctx context.Context, dst, src *dbq.Queries, gi *dbq.GameI
 		CanonicalGameID: gi.CanonicalGameID,
 		InstallRoot:     gi.InstallRoot,
 		Metadata:        gi.Metadata,
+		Notes:           gi.Notes,
 		LastSeenAt:      gi.LastSeenAt,
 		IsPresent:       gi.IsPresent,
 		CreatedAt:       gi.CreatedAt,

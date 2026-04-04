@@ -1224,13 +1224,13 @@ VALUES (?, ?, ?, ?, ?, ?, ?);
 -- name: ExportInsertGameInstall :exec
 INSERT INTO game_installs (
     id, store_id, store_game_id, display_name, instance_id,
-    canonical_game_id, install_root, metadata,
+    canonical_game_id, install_root, metadata, notes,
     last_seen_at, is_present,
     applied_profile_id, applied_at, applied_operation_id,
     created_at, updated_at
 ) VALUES (
     ?, ?, ?, ?,
-    ?, ?, ?,
+    ?, ?, ?, ?,
     ?, ?, ?,
     NULL, NULL, NULL,
     ?, ?
@@ -1331,13 +1331,13 @@ SELECT id FROM stores WHERE id = ?;
 -- name: ImportInsertGameInstall :one
 INSERT INTO game_installs (
     store_id, store_game_id, display_name, instance_id,
-    canonical_game_id, install_root, metadata,
+    canonical_game_id, install_root, metadata, notes,
     last_seen_at, is_present,
     applied_profile_id, applied_at, applied_operation_id,
     created_at, updated_at
 ) VALUES (
     ?, ?, ?,
-    ?, ?, ?,
+    ?, ?, ?, ?,
     ?, ?, ?,
     NULL, NULL, NULL,
     ?, ?
@@ -2270,3 +2270,13 @@ JOIN mod_files mf ON mf.id = mfv.mod_file_id
 JOIN mod_pages mp ON mp.id = mf.mod_page_id
 WHERE mp.game_install_id = ?1
   AND mfv.nexus_file_id IS NOT NULL;
+
+-- name: SetGameInstallNotes :exec
+UPDATE game_installs
+SET notes = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE id = ?;
+
+-- name: ClearGameInstallNotes :exec
+UPDATE game_installs
+SET notes = NULL, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE id = ?;

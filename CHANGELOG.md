@@ -10,6 +10,7 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 ### Changes
 
 - Start including the nexus cache in export bundles.
+- Add `games notes` to save arbitrary freeform text to game installs.
 
 ## v0.6.0 - 2026-04-03
 

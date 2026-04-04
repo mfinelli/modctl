@@ -114,6 +114,13 @@ Set the active game:
 	Set the active game install used by subsequent commands. Accepts a
 	numeric ID, a selector, or a game title.
 
+*modctl games notes set* [-] <text>
+	Set freeform notes on the active game install. Pass - as the argument to
+	read note text from stdin.
+
+*modctl games notes clear*
+	Clear the notes for the active game install.
+
 *modctl games targets list*
 	List all install targets for the current game.
 
