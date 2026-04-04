@@ -28,6 +28,7 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/mfinelli/modctl/dbq"
+	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
 )
 
@@ -97,6 +98,15 @@ func Full(
 	}
 	defer os.Remove(dbPath)
 
+	// 1b. Snapshot the nexus cache database
+	cacheDBPath, cacheSha256, err := snapshotCacheDB(ctx, opts.CacheDBPath)
+	if err != nil {
+		return fmt.Errorf("snapshot nexus cache: %w", err)
+	}
+	if cacheDBPath != "" {
+		defer os.Remove(cacheDBPath)
+	}
+
 	// 2. Get schema version
 	schemaVersion, err := currentSchemaVersion(ctx, db)
 	if err != nil {
@@ -125,6 +135,7 @@ func Full(
 		ModctlVersion:       opts.ModctlVersion,
 		SchemaVersion:       schemaVersion,
 		DBSha256:            dbSha256,
+		NexusCacheSha256:    cacheSha256,
 		Counts: ManifestCounts{
 			Archives:  len(archiveBlobs),
 			Backups:   len(backupBlobs),
@@ -138,6 +149,13 @@ func Full(
 	// 5. Write database snapshot
 	if err := writeFileToTar(tw, dbPath, DatabaseFilename); err != nil {
 		return fmt.Errorf("write database: %w", err)
+	}
+
+	// 5b. Write nexus cache snapshot if present
+	if cacheDBPath != "" {
+		if err := writeFileToTar(tw, cacheDBPath, "nexus_cache.db"); err != nil {
+			return fmt.Errorf("write nexus cache: %w", err)
+		}
 	}
 
 	// 6. Write archive blobs
@@ -213,6 +231,42 @@ func snapshotDB(ctx context.Context, db *sql.DB) (path string, sha256hex string,
 	if err != nil {
 		os.Remove(tmpPath)
 		return "", "", fmt.Errorf("hash snapshot: %w", err)
+	}
+
+	return tmpPath, sha, nil
+}
+
+// snapshotCacheDB creates a consistent snapshot of the nexus cache database.
+// Returns the path to the temp file and its sha256. If the cache DB does not
+// exist yet, returns empty strings and no error.
+func snapshotCacheDB(ctx context.Context, cacheDBPath string) (path string, sha256hex string, err error) {
+	if _, err := os.Stat(cacheDBPath); os.IsNotExist(err) {
+		return "", "", nil
+	}
+
+	tmp, err := os.CreateTemp("", "modctl-export-cache-*.sqlite")
+	if err != nil {
+		return "", "", fmt.Errorf("create temp file: %w", err)
+	}
+	tmpPath := tmp.Name()
+	tmp.Close()
+
+	cacheDB, err := sql.Open("sqlite3", cacheDBPath+internal.DB_PRAGMAS)
+	if err != nil {
+		os.Remove(tmpPath)
+		return "", "", fmt.Errorf("open cache db: %w", err)
+	}
+	defer cacheDB.Close()
+
+	if _, err := cacheDB.ExecContext(ctx, "VACUUM INTO ?", tmpPath); err != nil {
+		os.Remove(tmpPath)
+		return "", "", fmt.Errorf("vacuum cache db: %w", err)
+	}
+
+	sha, err := hashFile(tmpPath)
+	if err != nil {
+		os.Remove(tmpPath)
+		return "", "", fmt.Errorf("hash cache snapshot: %w", err)
 	}
 
 	return tmpPath, sha, nil

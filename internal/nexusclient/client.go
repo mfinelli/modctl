@@ -105,6 +105,13 @@ func openCacheDB(ctx context.Context) (*sql.DB, error) {
 	return db, nil
 }
 
+// InitCacheDB initializes or resets the nexus cache database schema.
+// It is exported for use by the exporter when constructing scoped cache
+// databases for export bundles.
+func InitCacheDB(ctx context.Context, db *sql.DB) error {
+	return initCacheDB(ctx, db)
+}
+
 func initCacheDB(ctx context.Context, db *sql.DB) error {
 	if err := applyCacheSchema(ctx, db); err != nil {
 		return err

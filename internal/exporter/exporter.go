@@ -49,6 +49,8 @@ type Options struct {
 	OutputPath string
 	// NoVerify skips rehashing blobs before export
 	NoVerify bool
+	// CacheDBPath is the full path to the nexus_cache.db
+	CacheDBPath string
 }
 
 const (
@@ -77,6 +79,7 @@ type Manifest struct {
 	ModctlVersion       string         `json:"modctl_version"`
 	SchemaVersion       int64          `json:"schema_version"`
 	DBSha256            string         `json:"db_sha256"`
+	NexusCacheSha256    string         `json:"nexus_cache_sha256"`
 	Counts              ManifestCounts `json:"counts"`
 	Game                *ManifestGame  `json:"game,omitempty"`
 }
