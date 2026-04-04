@@ -22,6 +22,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,6 +37,7 @@ import (
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/term"
 )
 
 var (
@@ -288,6 +290,12 @@ to proceed even if the operation would exhaust your API quota.`,
 			}
 		}
 
+		// Get terminal width, fall back to 80 if unavailable
+		termWidth := 80
+		if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
+			termWidth = w
+		}
+
 		// Initial progress line
 		total := len(entries)
 		width := len(strconv.Itoa(total))
@@ -305,7 +313,7 @@ to proceed even if the operation would exhaust your API quota.`,
 			if modsNexusCheckUpdatesPrintAll {
 				fmt.Println(line)
 			} else {
-				fmt.Printf("\r%-*s", 80, line)
+				fmt.Printf("\r%-*s", termWidth, line)
 			}
 		}
 
@@ -448,7 +456,7 @@ to proceed even if the operation would exhaust your API quota.`,
 				if hasUpdate {
 					// Print update line immediately, breaking out of the \r
 					if !modsNexusCheckUpdatesPrintAll {
-						fmt.Print("\r" + strings.Repeat(" ", 80) + "\r")
+						fmt.Print("\r" + strings.Repeat(" ", termWidth) + "\r")
 					}
 					fmt.Printf("  %s\n", nexusUpdateStyle.Render(fmt.Sprintf(
 						"↑ %s / %s: %s → %s",
@@ -469,7 +477,7 @@ to proceed even if the operation would exhaust your API quota.`,
 
 		// Clear progress line
 		if !modsNexusCheckUpdatesPrintAll {
-			fmt.Print("\r" + strings.Repeat(" ", 80) + "\r")
+			fmt.Print("\r" + strings.Repeat(" ", termWidth) + "\r")
 		}
 
 		// Summary
