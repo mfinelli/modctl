@@ -50,6 +50,7 @@ type Options struct {
 	DryRun        bool
 	SameMachine   bool
 	Game          string // "store_id:store_game_id", only set when extracting a game from a full bundle
+	CacheDBPath   string
 }
 
 type Result struct {

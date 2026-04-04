@@ -111,6 +111,14 @@ func Full(
 		}
 	}
 
+	// Import nexus cache if present in bundle
+	if bundle.Manifest.NexusCacheSha256 != "" {
+		bundleCachePath := filepath.Join(bundle.BundleDir, "nexus_cache.db")
+		if err := importFullCache(ctx, bundleCachePath, opts.CacheDBPath); err != nil {
+			return res, fmt.Errorf("import nexus cache: %w", err)
+		}
+	}
+
 	// Scan missing inventories against the restored DB
 	bq := dbq.New(bundle.BundleDB)
 	allVersions, err := bq.ListAllModFileVersions(ctx)

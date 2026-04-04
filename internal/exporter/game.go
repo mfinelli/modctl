@@ -643,15 +643,15 @@ func buildGameScopedCacheDB(
 		domain := mp.NexusGameDomain.String
 		modID := mp.NexusModID.Int64
 
-		if err := exportCacheModInfo(ctx, srcQ, dstQ, domain, modID); err != nil {
+		if err := ExportCacheModInfo(ctx, srcQ, dstQ, domain, modID); err != nil {
 			os.Remove(tmpPath)
 			return "", "", fmt.Errorf("export cache mod info (%s/%d): %w", domain, modID, err)
 		}
-		if err := exportCacheFileInfo(ctx, srcQ, dstQ, domain, modID); err != nil {
+		if err := ExportCacheFileInfo(ctx, srcQ, dstQ, domain, modID); err != nil {
 			os.Remove(tmpPath)
 			return "", "", fmt.Errorf("export cache file info (%s/%d): %w", domain, modID, err)
 		}
-		if err := exportCacheFileUpdates(ctx, srcQ, dstQ, domain, modID); err != nil {
+		if err := ExportCacheFileUpdates(ctx, srcQ, dstQ, domain, modID); err != nil {
 			os.Remove(tmpPath)
 			return "", "", fmt.Errorf("export cache file updates (%s/%d): %w", domain, modID, err)
 		}
@@ -671,7 +671,7 @@ func buildGameScopedCacheDB(
 	return tmpPath, sha, nil
 }
 
-func exportCacheModInfo(ctx context.Context, src, dst *dbc.Queries, domain string, modID int64) error {
+func ExportCacheModInfo(ctx context.Context, src, dst *dbc.Queries, domain string, modID int64) error {
 	row, err := src.GetNexusModInfo(ctx, dbc.GetNexusModInfoParams{
 		NexusGameDomain: domain,
 		NexusModID:      modID,
@@ -685,7 +685,7 @@ func exportCacheModInfo(ctx context.Context, src, dst *dbc.Queries, domain strin
 	return dst.UpsertNexusModInfo(ctx, dbc.UpsertNexusModInfoParams(row))
 }
 
-func exportCacheFileInfo(ctx context.Context, src, dst *dbc.Queries, domain string, modID int64) error {
+func ExportCacheFileInfo(ctx context.Context, src, dst *dbc.Queries, domain string, modID int64) error {
 	rows, err := src.GetNexusFileInfoForMod(ctx, dbc.GetNexusFileInfoForModParams{
 		NexusGameDomain: domain,
 		NexusModID:      modID,
@@ -701,7 +701,7 @@ func exportCacheFileInfo(ctx context.Context, src, dst *dbc.Queries, domain stri
 	return nil
 }
 
-func exportCacheFileUpdates(ctx context.Context, src, dst *dbc.Queries, domain string, modID int64) error {
+func ExportCacheFileUpdates(ctx context.Context, src, dst *dbc.Queries, domain string, modID int64) error {
 	rows, err := src.GetNexusFileUpdatesForMod(ctx, dbc.GetNexusFileUpdatesForModParams{
 		NexusGameDomain: domain,
 		NexusModID:      modID,
