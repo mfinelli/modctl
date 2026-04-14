@@ -50,7 +50,7 @@ This program comes with ABSOLUTELY NO WARRANTY; This program is free
 software, and you are welcome to redistribute it under certain conditions;
 You should have received a copy of the GNU General Public License (version
 3) along with this program. If not, see https://www.gnu.org/licenses/.`,
-	Version: "0.6.0",
+	Version: "0.7.0",
 
 	CompletionOptions: cobra.CompletionOptions{HiddenDefaultCmd: true},
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
