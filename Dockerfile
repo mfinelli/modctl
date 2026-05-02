@@ -1,7 +1,7 @@
 FROM golang:1.26-alpine AS build
 WORKDIR /modctl
 RUN apk add gcc libarchive-tools make musl-dev
-RUN go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0
+RUN go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
 RUN go install github.com/google/go-licenses/v2@latest
 COPY . /modctl/
 RUN make
