@@ -26,7 +26,6 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/blobstore"
-	"go.finelli.dev/util"
 )
 
 // ScanAllResult summarizes the outcome of a ScanAll run
@@ -54,7 +53,7 @@ func ScanOne(
 	if err != nil {
 		return fmt.Errorf("checking inventory status: %w", err)
 	}
-	if util.SqliteIntToBool(already) {
+	if already {
 		log.Info("archive already inventoried, skipping")
 		// Still mark the new mod_file_versions row as scanned
 		if err := queries.MarkArchiveInventoryScanned(ctx, archiveSha256); err != nil {
