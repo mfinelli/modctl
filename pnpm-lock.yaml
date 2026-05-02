@@ -16,8 +16,8 @@ importers:
         version: 0.9.5
     devDependencies:
       realfavicon:
-        specifier: ^0.6.3
-        version: 0.6.3
+        specifier: ^0.8.1
+        version: 0.8.1
       wrangler:
         specifier: ^4.80.0
         version: 4.80.0
@@ -74,8 +74,8 @@ packages:
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
     engines: {node: '>=12'}
 
-  '@emnapi/runtime@1.9.2':
-    resolution: {integrity: sha512-3U4+MIWHImeyu1wnmVygh5WlgfYDtyf0k8AbLhMFxOipihf6nrWC4syIm/SwEeec0mNSafiiNnMJwbza/Is6Lw==}
+  '@emnapi/runtime@1.10.0':
+    resolution: {integrity: sha512-ewvYlk86xUoGI0zQRNq/mC+16R1QeDlKQy21Ki3oSYXNgLb45GV1P6A0M+/s6nyCuNDqe5VpaY84BzXGwVbwFA==}
 
   '@esbuild/aix-ppc64@0.27.3':
     resolution: {integrity: sha512-9fJMTNFTWZMh5qwrBItuziu834eOCUcEqymSH7pY+zoMVEZg3gcPuBNxH1EvfVYe9h0x/Ptw8KBzv7qxb7l8dg==}
@@ -419,17 +419,17 @@ packages:
   '@poppinss/exception@1.2.3':
     resolution: {integrity: sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw==}
 
-  '@realfavicongenerator/check-favicon@0.6.1':
-    resolution: {integrity: sha512-jBV99tdgWvrX2OFs4FMwouVrYzp3M0pPkYg1jAi3kRq5oUWz69Qk8djEqJ1mUMI5mta1vTXFqUUDu9TKM6OSaA==}
+  '@realfavicongenerator/check-favicon@0.8.1':
+    resolution: {integrity: sha512-NyClOqZZXQfdnSgaSrPu6Bvn60JUCZqIHr882uMt4ZMM2N/fYciVHVAYqkHMHl9X1hEsFxaTs9UOtEKsSjNvag==}
 
-  '@realfavicongenerator/generate-favicon@0.6.3':
-    resolution: {integrity: sha512-HZHUaswuXSzpkKuCd8oNq/PtdjY/x+8IEOOResPddm/NpCSRnb5xQuFhxa2xo4OkBTXRUWUNEgZQX4jyi04ytg==}
+  '@realfavicongenerator/generate-favicon@0.8.0':
+    resolution: {integrity: sha512-3Cy774m1TYpthka4r4CGNPNcLKP0giPl07fRnlXCkB5TN3/72Urc+APJlt3UBaEjLJskgFj/z/h/kPtHHtE2KQ==}
 
-  '@realfavicongenerator/image-adapter-node@0.6.3':
-    resolution: {integrity: sha512-24fVKEgxLoAhaIFCVzZmphnXO17ud6a/KSK/5PoSg/19qIDILV4BOxf5Dp5OdMytVAzaQnP5ulYIpd0JTAeb4Q==}
+  '@realfavicongenerator/image-adapter-node@0.8.0':
+    resolution: {integrity: sha512-KCm/oeA470rva9kFcllM1MLiD4QjY8vmnFj2y232W5VWk1dehj3k3h+DXWx+ssQX6MrVwIU6EzDh6SVdqHy7Hg==}
 
-  '@realfavicongenerator/inject-markups@0.6.0':
-    resolution: {integrity: sha512-/hHvBXlmyJnXKTKltBtemlhDPCWFU9ZYkkEGqXaFG3FrLSHCUdR4Yvz0d9bgPW+rQSuzBMp/WAPh5NuepKdSHg==}
+  '@realfavicongenerator/inject-markups@0.8.0':
+    resolution: {integrity: sha512-8mNLASMUG2erylGCTEFPsn2HM3Cep/P+4Az/WSaLrbp3pJXezchTKBlOoHYJi4u1LbRKiCGn55WSOWwxpt336Q==}
 
   '@rollup/plugin-json@6.1.0':
     resolution: {integrity: sha512-EGI2te5ENk1coGeADSIwZ7G2Q8CJS2sF120T7jLw4xFw9n7wIOXHo+kIYRAoVpJAN+kmqZSoO3Fp4JtoNF4ReA==}
@@ -500,8 +500,8 @@ packages:
   boolbase@1.0.0:
     resolution: {integrity: sha512-JZOSA7Mo9sNGB8+UjSgzdLtokWAky1zbztM3WRLCbZ70/3cTANmQmOdR7y2g+J0e2WXywy1yS468tY+IruqEww==}
 
-  brace-expansion@2.0.3:
-    resolution: {integrity: sha512-MCV/fYJEbqx68aE58kv2cA/kiky1G8vux3OR6/jbS+jIMe/6fJWa0DTzJU7dqijOWYwHi1t29FlfYI9uytqlpA==}
+  brace-expansion@2.1.0:
+    resolution: {integrity: sha512-TN1kCZAgdgweJhWWpgKYrQaMNHcDULHkWwQIspdtjV4Y5aurRdZpjAqn6yX3FPqTA9ngHCc4hJxMAMgGfve85w==}
 
   brotli@1.3.3:
     resolution: {integrity: sha512-oTKjJdShmDuGW94SyyaoQvAjf30dZaHnjJ8uAF+u2/vGJkJbJPJAT1gDiOJP5v1Zb6f9KEyW/1HpuaWIXtGHPg==}
@@ -813,8 +813,8 @@ packages:
   queue@6.0.2:
     resolution: {integrity: sha512-iHZWu+q3IdFZFX36ro/lKBkSvfkztY5Y7HMiPlOUjhupPcG2JMfst2KKEpu5XndviX/3UhFbRngUPNKtgvtZiA==}
 
-  realfavicon@0.6.3:
-    resolution: {integrity: sha512-gAf/5z1YN6jpPLiA+xs+9VOdDciABCfAHY0uXf9Bdt3/Q8d1fIvJv/NsCQdjgKzeC4ErCn9IFCr8TNojDiZwoQ==}
+  realfavicon@0.8.1:
+    resolution: {integrity: sha512-xu3HUcPtrORV/nkZrWUM+QYyOawAo7/FX+JkLS77trElmX/lCkudvgl8+BpMZ+YR6PTB8s72m5VGhsndk5GWdw==}
     hasBin: true
 
   restructure@3.0.2:
@@ -895,8 +895,8 @@ packages:
     resolution: {integrity: sha512-BM/JzwwaRXxrLdElV2Uo6cTLEjhSb3WXboncJamZ15NgUURmvlXvxa6xkwIOILIjPNo9i8ku136ZvWV0Uly8+w==}
     engines: {node: '>=20.18.1'}
 
-  undici@7.24.7:
-    resolution: {integrity: sha512-H/nlJ/h0ggGC+uRL3ovD+G0i4bqhvsDOpbDv7At5eFLlj2b41L8QliGbnl2H7SnDiYhENphh1tQFJZf+MyfLsQ==}
+  undici@7.25.0:
+    resolution: {integrity: sha512-xXnp4kTyor2Zq+J1FfPI6Eq3ew5h6Vl0F/8d9XU5zZQf1tX9s2Su1/3PiMmUANFULpmksxkClamIZcaUqryHsQ==}
     engines: {node: '>=20.18.1'}
 
   unenv@2.0.0-rc.24:
@@ -998,7 +998,7 @@ snapshots:
     dependencies:
       '@jridgewell/trace-mapping': 0.3.9
 
-  '@emnapi/runtime@1.9.2':
+  '@emnapi/runtime@1.10.0':
     dependencies:
       tslib: 2.8.1
     optional: true
@@ -1167,7 +1167,7 @@ snapshots:
 
   '@img/sharp-wasm32@0.34.5':
     dependencies:
-      '@emnapi/runtime': 1.9.2
+      '@emnapi/runtime': 1.10.0
     optional: true
 
   '@img/sharp-win32-arm64@0.34.5':
@@ -1214,25 +1214,25 @@ snapshots:
 
   '@poppinss/exception@1.2.3': {}
 
-  '@realfavicongenerator/check-favicon@0.6.1':
+  '@realfavicongenerator/check-favicon@0.8.1':
     dependencies:
       decode-ico: 0.4.1
       node-html-parser: 6.1.13
       robots-parser: 3.0.1
       sharp: 0.34.5
 
-  '@realfavicongenerator/generate-favicon@0.6.3':
+  '@realfavicongenerator/generate-favicon@0.8.0':
     dependencies:
       '@svgdotjs/svg.js': 3.2.5
 
-  '@realfavicongenerator/image-adapter-node@0.6.3':
+  '@realfavicongenerator/image-adapter-node@0.8.0':
     dependencies:
-      '@realfavicongenerator/generate-favicon': 0.6.3
+      '@realfavicongenerator/generate-favicon': 0.8.0
       '@svgdotjs/svg.js': 3.2.5
       sharp: 0.34.5
       svgdom: 0.1.23
 
-  '@realfavicongenerator/inject-markups@0.6.0':
+  '@realfavicongenerator/inject-markups@0.8.0':
     dependencies:
       cheerio: 1.2.0
       pretty: 2.0.0
@@ -1283,7 +1283,7 @@ snapshots:
 
   boolbase@1.0.0: {}
 
-  brace-expansion@2.0.3:
+  brace-expansion@2.1.0:
     dependencies:
       balanced-match: 1.0.2
 
@@ -1315,7 +1315,7 @@ snapshots:
       parse5: 7.3.0
       parse5-htmlparser2-tree-adapter: 7.1.0
       parse5-parser-stream: 7.1.2
-      undici: 7.24.7
+      undici: 7.25.0
       whatwg-mimetype: 4.0.0
 
   clone@2.1.2: {}
@@ -1574,7 +1574,7 @@ snapshots:
 
   minimatch@9.0.9:
     dependencies:
-      brace-expansion: 2.0.3
+      brace-expansion: 2.1.0
 
   minipass@7.1.3: {}
 
@@ -1640,12 +1640,12 @@ snapshots:
     dependencies:
       inherits: 2.0.4
 
-  realfavicon@0.6.3:
+  realfavicon@0.8.1:
     dependencies:
-      '@realfavicongenerator/check-favicon': 0.6.1
-      '@realfavicongenerator/generate-favicon': 0.6.3
-      '@realfavicongenerator/image-adapter-node': 0.6.3
-      '@realfavicongenerator/inject-markups': 0.6.0
+      '@realfavicongenerator/check-favicon': 0.8.1
+      '@realfavicongenerator/generate-favicon': 0.8.0
+      '@realfavicongenerator/image-adapter-node': 0.8.0
+      '@realfavicongenerator/inject-markups': 0.8.0
       '@rollup/plugin-json': 6.1.0
       '@svgdotjs/svg.js': 3.2.5
       '@types/node': 20.19.39
@@ -1744,7 +1744,7 @@ snapshots:
 
   undici@7.24.4: {}
 
-  undici@7.24.7: {}
+  undici@7.25.0: {}
 
   unenv@2.0.0-rc.24:
     dependencies:
