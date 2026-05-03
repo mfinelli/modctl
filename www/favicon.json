@@ -31,5 +31,6 @@
       "themeColor": "#ffffff"
     }
   },
-  "path": "/"
+  "path": "/",
+  "skipMetadataInjection": true
 }
