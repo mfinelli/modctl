@@ -1,7 +1,7 @@
 ---
 minimumReleaseAge: 10080  # 7 days
 
-onlyBuiltDependencies:
-  - esbuild
-  - sharp
-  - workerd
+allorBuilds:
+  esbuild: true
+  sharp: true
+  workerd: true
