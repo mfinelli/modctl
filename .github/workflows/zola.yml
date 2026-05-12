@@ -32,7 +32,7 @@ jobs:
       - run: sudo apt-get update
       - run: sudo apt-get install -y fonts-sixtyfour
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         with:
           version: latest
       - uses: actions/setup-node@v6
