@@ -4,6 +4,11 @@
 
 A deterministic mod manager for Linux.
 
+**NOTE**: this is the developer documentation, if you just want to install and
+get going pre-built packages are available for most distributions:
+https://pkg.modctl.org and the usage documentation is available at:
+https://modctl.org/docs/overview/.
+
 ## Overview
 
 modctl installs mods by extracting archives directly into game directories
