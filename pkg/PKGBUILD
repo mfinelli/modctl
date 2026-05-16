@@ -25,7 +25,7 @@ package() {
   cp -r "$srcdir/licenses" "$pkgdir/usr/share/licenses/modctl/vendor"
   cp -r "$srcdir/docs/." "$pkgdir/usr/share/doc/modctl"
   install -Dm0644 "$srcdir/modctl.1" "$pkgdir/usr/share/man/man1/modctl.1"
-  install -Dm0644 "$srcdir/modctl.bash" "$pkgdir/usr/share/bash-completions/completions/modctl"
+  install -Dm0644 "$srcdir/modctl.bash" "$pkgdir/usr/share/bash-completion/completions/modctl"
   install -Dm0644 "$srcdir/modctl.fish" "$pkgdir/usr/share/fish/vendor_completions.d/modctl.fish"
   install -Dm0644 "$srcdir/modctl.zsh" "$pkgdir/usr/share/zsh/site-functions/_modctl"
 }
