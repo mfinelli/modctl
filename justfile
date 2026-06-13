@@ -2,6 +2,12 @@
 default:
     @just --list
 
+rebuild:
+  make
+  ./modctl completion zsh > ~/.local/share/zsh/completions/_modctl
+  cp ./modctl ~/bin
+  exec zsh
+
 copy-assets:
   cp node_modules/elasticlunr/release/elasticlunr.min.js www/static
   cp node_modules/elasticlunr/LICENSE www/static/LICENSE-elasticlunr.txt
