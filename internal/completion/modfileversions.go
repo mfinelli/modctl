@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
@@ -49,23 +48,18 @@ func ModFileVersionIDs(cmd *cobra.Command, toComplete string) ([]string, cobra.S
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
-	pat := likePrefixPattern(strings.TrimSpace(toComplete))
-	rows, err := q.CompleteModFileVersionsByGameInstall(ctx,
-		dbq.CompleteModFileVersionsByGameInstallParams{
-			GameInstallID: gi.ID,
-			Prefix:        pat,
-		})
+	rows, err := q.CompleteModFileVersionsByGameInstall(ctx, gi.ID)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
 	out := make([]string, 0, len(rows))
 	for _, r := range rows {
-		desc := r.ModPageName + " › " + r.FileLabel
+		desc := r.FileLabel
 		if r.VersionString.Valid && r.VersionString.String != "" {
 			desc += " (" + r.VersionString.String + ")"
 		}
-		out = append(out, fmt.Sprintf("%d\t%s", r.ID, desc))
+		out = append(out, fmt.Sprintf("%s\t%s", r.ModPageName, desc))
 	}
 	return out, cobra.ShellCompDirectiveNoFileComp
 }
@@ -89,8 +83,6 @@ func ModFileVersionIDsForPage(cmd *cobra.Command, modPageArg string, toComplete 
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
-	pat := likePrefixPattern(strings.TrimSpace(toComplete))
-
 	// If a mod page arg was provided, resolve it and filter by page.
 	// If it can't be resolved unambiguously, return nothing.
 	if modPageArg != "" {
@@ -112,7 +104,7 @@ func ModFileVersionIDsForPage(cmd *cobra.Command, modPageArg string, toComplete 
 			dbq.CompleteModFileVersionsByPageAndGameInstallParams{
 				GameInstallID: gi.ID,
 				ID:            pageID,
-				Prefix:        pat,
+				Prefix:        "%",
 			})
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
@@ -130,11 +122,7 @@ func ModFileVersionIDsForPage(cmd *cobra.Command, modPageArg string, toComplete 
 	}
 
 	// No mod page arg: fall back to unfiltered completion
-	rows, err := q.CompleteModFileVersionsByGameInstall(ctx,
-		dbq.CompleteModFileVersionsByGameInstallParams{
-			GameInstallID: gi.ID,
-			Prefix:        pat,
-		})
+	rows, err := q.CompleteModFileVersionsByGameInstall(ctx, gi.ID)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}

@@ -1430,10 +1430,6 @@ FROM mod_file_versions mfv
 JOIN mod_files mf ON mf.id = mfv.mod_file_id
 JOIN mod_pages mp  ON mp.id = mf.mod_page_id
 WHERE mp.game_install_id = ?
-  AND (
-    (lower(mp.name) LIKE lower(sqlc.arg(prefix)) ESCAPE '\')
-    OR (lower(mf.label) LIKE lower(sqlc.arg(prefix)) ESCAPE '\')
-  )
 ORDER BY mp.name COLLATE NOCASE, mf.label COLLATE NOCASE, mfv.id DESC
 LIMIT 20;
 
