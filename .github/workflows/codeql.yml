@@ -38,7 +38,7 @@ jobs:
       - uses: sqlc-dev/setup-sqlc@v5
         with:
           sqlc-version: 1.31.1
-      - uses: github/codeql-action/init@v4
+      - uses: github/codeql-action/init@v4.36.0
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
@@ -53,6 +53,6 @@ jobs:
           make
         if: matrix.build-mode == 'manual'
 
-      - uses: github/codeql-action/analyze@v4
+      - uses: github/codeql-action/analyze@v4.36.0
         with:
           category: /language:${{ matrix.language }}
