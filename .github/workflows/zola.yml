@@ -41,7 +41,7 @@ jobs:
           node-version: lts/*
       - uses: mfinelli/setup-imagemagick@v7
       - uses: extractions/setup-just@v3
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@v2.79.7
         with:
           tool: zola@0.22.1
       - run: pnpm install --frozen-lockfile
