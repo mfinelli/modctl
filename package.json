@@ -5,7 +5,7 @@
   "license": "GPL-3.0-or-later",
   "private": true,
   "dependencies": {
-    "@fontsource-variable/sixtyfour": "^5.2.8",
+    "@fontsource-variable/sixtyfour": "^5.3.0",
     "elasticlunr": "^0.9.5"
   },
   "devDependencies": {

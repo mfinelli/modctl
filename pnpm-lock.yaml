@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@fontsource-variable/sixtyfour':
-        specifier: ^5.2.8
-        version: 5.2.8
+        specifier: ^5.3.0
+        version: 5.3.0
       elasticlunr:
         specifier: ^0.9.5
         version: 0.9.5
@@ -233,8 +233,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@fontsource-variable/sixtyfour@5.2.8':
-    resolution: {integrity: sha512-rxyTJIkniNApwc+SGRvAwxXWzMCRM09eCbq64lPZzH0hQ4jsm4fHrjs7cEm/gNHNWJc2VQ13Ynr5lBE310IHtg==}
+  '@fontsource-variable/sixtyfour@5.3.0':
+    resolution: {integrity: sha512-9YgLl/OAWGs+mrhnr/Alqu5+Kv4Q0myBNS1yWDKgD9NBYdEp1Y6NgOvyHtSzKFOy5BczpAlfKZpYTq+dtX2tLA==}
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -1081,7 +1081,7 @@ snapshots:
   '@esbuild/win32-x64@0.27.3':
     optional: true
 
-  '@fontsource-variable/sixtyfour@5.2.8': {}
+  '@fontsource-variable/sixtyfour@5.3.0': {}
 
   '@img/colour@1.1.0': {}
 
