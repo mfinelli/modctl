@@ -46,7 +46,6 @@ func applyXML(entries []Entry, input []byte) (Result, error) {
 		CanonicalEndTags: false,
 		CanonicalText:    false,
 		CanonicalAttrVal: false,
-		UseCRLF:          false,
 	}
 
 	if len(input) == 0 {

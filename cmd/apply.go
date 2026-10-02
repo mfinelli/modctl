@@ -238,7 +238,6 @@ Use --dry-run to preview the plan without making any changes. Add the
 			countRemove    int
 			countRestore   int
 			countBackedUp  int
-			countFailed    int
 		)
 
 		// markFailed marks the operation as failed and returns the error
@@ -334,7 +333,6 @@ Use --dry-run to preview the plan without making any changes. Add the
 
 					result, err := ext.DeployFile(ctx, db, q, planOp, stagingPath, plan.TargetRoot, gi.ID, plan.TargetID, p.ID, op.ID)
 					if err != nil {
-						countFailed++
 						if applyVerbose {
 							fmt.Println(warnStyle.Render(fmt.Sprintf("    ✗ %v", err)))
 						}
@@ -369,7 +367,6 @@ Use --dry-run to preview the plan without making any changes. Add the
 				if planOp.OverrideType != "full_file" {
 					dbEntries, err := q.ListOverridePatchEntries(ctx, planOp.OverrideID.Int64)
 					if err != nil {
-						countFailed++
 						return markFailed(fmt.Errorf("load patch entries for %q: %w", planOp.DestPath, err))
 					}
 					for _, e := range dbEntries {
@@ -389,7 +386,6 @@ Use --dry-run to preview the plan without making any changes. Add the
 					patchEntries,
 				)
 				if err != nil {
-					countFailed++
 					return markFailed(fmt.Errorf("deploy override %q: %w", planOp.DestPath, err))
 				}
 
@@ -409,7 +405,6 @@ Use --dry-run to preview the plan without making any changes. Add the
 			for _, planOp := range removeOps {
 				printOp(redStyle.Render("-"), planOp.DestPath, "")
 				if _, err := ext.RemoveFile(ctx, db, q, planOp, plan.TargetRoot, gi.ID, plan.TargetID, op.ID); err != nil {
-					countFailed++
 					return markFailed(fmt.Errorf("remove %q: %w", planOp.DestPath, err))
 				}
 				countRemove++
@@ -420,7 +415,6 @@ Use --dry-run to preview the plan without making any changes. Add the
 			for _, planOp := range restoreOps {
 				printOp(cyanStyle.Render("↩"), planOp.DestPath, "")
 				if _, err := ext.RestoreFile(ctx, db, q, planOp, plan.TargetRoot, gi.ID, plan.TargetID, op.ID); err != nil {
-					countFailed++
 					return markFailed(fmt.Errorf("restore %q: %w", planOp.DestPath, err))
 				}
 				countRestore++
@@ -505,10 +499,6 @@ Use --dry-run to preview the plan without making any changes. Add the
 				fmt.Println(warnStyle.Render("    ⚠  " + w))
 			}
 		}
-		if countFailed > 0 {
-			fmt.Println(warnStyle.Render(fmt.Sprintf("  failed:      %d", countFailed)))
-		}
-
 		return nil
 	},
 }

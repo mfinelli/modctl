@@ -226,7 +226,6 @@ Use --dry-run to preview the plan without making any changes.`,
 		var (
 			countRemove  int
 			countRestore int
-			countFailed  int
 		)
 
 		width := len(strconv.Itoa(total))
@@ -266,7 +265,6 @@ Use --dry-run to preview the plan without making any changes.`,
 				case planner.PlanOpRemove:
 					printOp(redStyle.Render("-"), planOp.DestPath)
 					if _, err := ext.RemoveFile(ctx, db, q, planOp, plan.TargetRoot, gi.ID, plan.TargetID, op.ID); err != nil {
-						countFailed++
 						return markFailed(fmt.Errorf("remove %q: %w", planOp.DestPath, err))
 					}
 					countRemove++
@@ -275,7 +273,6 @@ Use --dry-run to preview the plan without making any changes.`,
 				case planner.PlanOpRestoreBackup:
 					printOp(cyanStyle.Render("↩"), planOp.DestPath)
 					if _, err := ext.RestoreFile(ctx, db, q, planOp, plan.TargetRoot, gi.ID, plan.TargetID, op.ID); err != nil {
-						countFailed++
 						return markFailed(fmt.Errorf("restore %q: %w", planOp.DestPath, err))
 					}
 					countRestore++
@@ -338,10 +335,6 @@ Use --dry-run to preview the plan without making any changes.`,
 				fmt.Println(warnStyle.Render("    ⚠  " + w))
 			}
 		}
-		if countFailed > 0 {
-			fmt.Println(warnStyle.Render(fmt.Sprintf("  failed:    %d", countFailed)))
-		}
-
 		return nil
 	},
 }
