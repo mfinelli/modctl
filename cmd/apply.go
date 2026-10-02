@@ -569,11 +569,16 @@ func printApplyPlan(
 			} else if op.SkipBackup {
 				detail = subtle.Render("(skip-backup)")
 			}
-			winner := op.File.Winner()
-			modInfo := formatModInfo(winner)
+			modInfo := ""
+			if op.File != nil {
+				winner := op.File.Winner()
+				modInfo = formatModInfo(winner)
+			} else if op.OverrideID.Valid {
+				modInfo = subtle.Render("(override)")
+			}
 			fmt.Printf("  %s %-50s %s %s\n", symbol, op.DestPath, modInfo, detail)
 			countWrite++
-			if len(op.File.Conflicts) > 1 {
+			if op.File != nil && len(op.File.Conflicts) > 1 {
 				countConflict++
 				if showConflicts {
 					printConflictLosers(op.File, subtle)
@@ -589,11 +594,16 @@ func printApplyPlan(
 			} else if op.SkipBackup {
 				detail = subtle.Render("(skip-backup)")
 			}
-			winner := op.File.Winner()
-			modInfo := formatModInfo(winner)
+			modInfo := ""
+			if op.File != nil {
+				winner := op.File.Winner()
+				modInfo = formatModInfo(winner)
+			} else if op.OverrideID.Valid {
+				modInfo = subtle.Render("(override)")
+			}
 			fmt.Printf("  %s %-50s %s %s\n", symbol, op.DestPath, modInfo, detail)
 			countOverwrite++
-			if len(op.File.Conflicts) > 1 {
+			if op.File != nil && len(op.File.Conflicts) > 1 {
 				countConflict++
 				if showConflicts {
 					printConflictLosers(op.File, subtle)

@@ -280,7 +280,10 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 
 	// Load overrides for this profile and overlay them on top of the mod
 	// winner set.
-	overrides, err := q.ListOverridesForApply(ctx, profileID)
+	overrides, err := q.ListOverridesForApply(ctx, dbq.ListOverridesForApplyParams{
+		ProfileID: profileID,
+		TargetID: target.ID,
+	})
 	if err != nil {
 		return Plan{}, fmt.Errorf("load overrides: %w", err)
 	}

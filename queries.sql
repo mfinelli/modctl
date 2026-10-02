@@ -1757,7 +1757,8 @@ SELECT
     b.size_bytes
 FROM overrides o
 LEFT JOIN blobs b ON b.sha256 = o.blob_sha256
-WHERE o.profile_id = ?
+WHERE o.profile_id = sqlc.arg(profile_id)
+  AND o.target_id = sqlc.arg(target_id)
 ORDER BY o.relpath ASC;
 
 -- name: CopyOverridesToProfile :exec
