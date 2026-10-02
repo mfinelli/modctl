@@ -43,7 +43,7 @@ jobs:
       - uses: extractions/setup-just@v3
       - uses: taiki-e/install-action@v2
         with:
-          tool: zola@0.22.1
+          tool: zola@0.23.6
       - run: pnpm install --frozen-lockfile
       - run: just zola-build
         env:

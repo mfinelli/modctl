@@ -99,12 +99,12 @@
 
         <!-- Prev / next page navigation -->
         <nav class="docs-pagination" aria-label="Page navigation">
-          {% if page.lower %}
+          {% if page is defined and page.lower %}
           <a href="{{ page.lower.permalink | safe }}" class="pagination-prev">
             &larr; {{ page.lower.title }}
           </a>
           {% endif %}
-          {% if page.higher %}
+          {% if page is defined and page.higher %}
           <a href="{{ page.higher.permalink | safe }}" class="pagination-next">
             {{ page.higher.title }} &rarr;
           </a>
