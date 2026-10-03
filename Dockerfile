@@ -1,4 +1,4 @@
-FROM golang:1.26-alpine AS build
+FROM golang:1.27-alpine AS build
 WORKDIR /modctl
 RUN apk add gcc libarchive-tools make musl-dev
 RUN go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
