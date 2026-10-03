@@ -5,6 +5,16 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 
 `modctl` adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## unreleased
+
+This is another pre-release that fixes some bugs found during testing.
+
+### Changes
+
+- Fix mod file versions shell completions
+- Fix segfault when planning with a new override file (i.e., a new file that
+  doesn't override an existing game file)
+
 ## v0.7.0 - 2026-04-14
 
 This is another pre-release that adds new features.
