@@ -5,11 +5,11 @@
   "license": "GPL-3.0-or-later",
   "private": true,
   "dependencies": {
-    "@fontsource-variable/sixtyfour": "^5.2.8",
+    "@fontsource-variable/sixtyfour": "^5.3.0",
     "elasticlunr": "^0.9.5"
   },
   "devDependencies": {
-    "realfavicon": "^0.8.3",
-    "wrangler": "^4.87.0"
+    "realfavicon": "^0.9.3",
+    "wrangler": "^4.141.0"
   }
 }
