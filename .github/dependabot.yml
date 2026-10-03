@@ -5,8 +5,6 @@ updates:
     directory: /
     schedule:
       interval: monthly
-    cooldown:
-      default-days: 10
   - package-ecosystem: gomod
     directory: /
     schedule:

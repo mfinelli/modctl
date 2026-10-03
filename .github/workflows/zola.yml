@@ -31,16 +31,16 @@ jobs:
     steps:
       - run: sudo apt-get update
       - run: sudo apt-get install -y fonts-sixtyfour
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:
           version: latest
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           cache: pnpm
           node-version: lts/*
       - uses: mfinelli/setup-imagemagick@v7
-      - uses: extractions/setup-just@v3
+      - uses: extractions/setup-just@v4
       - uses: taiki-e/install-action@v2
         with:
           tool: zola@0.23.6
