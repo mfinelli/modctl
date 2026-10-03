@@ -15,6 +15,7 @@ This is another pre-release that fixes some bugs found during testing.
 - Fix segfault when planning with a new override file (i.e., a new file that
   doesn't override an existing game file).
 - Fix game-scoped exports that include overrides.
+- Fix profile remap preview error.
 
 ## v0.7.0 - 2026-04-14
 

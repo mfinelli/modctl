@@ -63,10 +63,12 @@ func ResolveModFileVersionArg(ctx context.Context, q *dbq.Queries, gi dbq.GameIn
 		return dbq.GetModFileVersionByIDRow{}, fmt.Errorf("no mod file versions found for %q in game %q", arg, gi.DisplayName)
 	case 1:
 		return dbq.GetModFileVersionByIDRow{
-			ID:            rows[0].ID,
-			ModPageName:   rows[0].ModPageName,
-			FileLabel:     rows[0].FileLabel,
-			VersionString: rows[0].VersionString,
+			ID:                 rows[0].ID,
+			ModPageName:        rows[0].ModPageName,
+			FileLabel:          rows[0].FileLabel,
+			VersionString:      rows[0].VersionString,
+			InventoryScannedAt: rows[0].InventoryScannedAt,
+			ArchiveSha256:      rows[0].ArchiveSha256,
 		}, nil
 	default:
 		var b strings.Builder
