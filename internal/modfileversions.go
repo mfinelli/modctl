@@ -83,3 +83,56 @@ func ResolveModFileVersionArg(ctx context.Context, q *dbq.Queries, gi dbq.GameIn
 		return dbq.GetModFileVersionByIDRow{}, errors.New(strings.TrimRight(b.String(), "\n"))
 	}
 }
+
+// ResolveEnabledProfileVersionArg resolves a mod file version argument for a
+// command that acts on the enabled version of a mod in a profile (e.g.,
+// disable). It behaves like ResolveModFileVersionArg except that when the
+// argument is a mod page name matching several versions, the candidates are
+// narrowed to the versions that are enabled in the given profile:
+//   - exactly one enabled version: that version is returned
+//   - several enabled versions: an error listing only those is returned
+//   - none enabled: resolution falls back to ResolveModFileVersionArg so the
+//     usual not-in-profile/already-disabled/ambiguity handling applies
+func ResolveEnabledProfileVersionArg(ctx context.Context, q *dbq.Queries, gi dbq.GameInstall, profile *dbq.Profile, arg string) (int64, error) {
+	if _, ok := ParseInt64(arg); !ok {
+		rows, err := q.ListProfileVersionsByModPageName(ctx, dbq.ListProfileVersionsByModPageNameParams{
+			ProfileID:     profile.ID,
+			GameInstallID: gi.ID,
+			Name:          arg,
+		})
+		if err != nil {
+			return 0, fmt.Errorf("list profile versions by name: %w", err)
+		}
+
+		var enabled []dbq.ListProfileVersionsByModPageNameRow
+		for _, r := range rows {
+			if r.Enabled != 0 {
+				enabled = append(enabled, r)
+			}
+		}
+
+		switch len(enabled) {
+		case 0:
+			// fall through to the generic resolver
+		case 1:
+			return enabled[0].ID, nil
+		default:
+			var b strings.Builder
+			fmt.Fprintf(&b, "Multiple enabled versions of %q in profile %q. Specify a numeric ID:\n\n", arg, profile.Name)
+			for _, r := range enabled {
+				version := "(no version)"
+				if r.VersionString.Valid && r.VersionString.String != "" {
+					version = r.VersionString.String
+				}
+				fmt.Fprintf(&b, "  %-6d  %s › %s (%s)\n", r.ID, r.ModPageName, r.FileLabel, version)
+			}
+			return 0, errors.New(strings.TrimRight(b.String(), "\n"))
+		}
+	}
+
+	mfv, err := ResolveModFileVersionArg(ctx, q, gi, arg)
+	if err != nil {
+		return 0, err
+	}
+	return mfv.ID, nil
+}

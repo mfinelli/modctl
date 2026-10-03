@@ -1455,6 +1455,22 @@ WHERE mp.game_install_id = ?
   AND lower(mp.name) = lower(sqlc.arg(name))
 ORDER BY mf.label COLLATE NOCASE, mfv.id DESC;
 
+-- name: ListProfileVersionsByModPageName :many
+SELECT
+    mfv.id,
+    mp.name   AS mod_page_name,
+    mf.label  AS file_label,
+    mfv.version_string,
+    pi.enabled AS enabled
+FROM profile_items pi
+JOIN mod_file_versions mfv ON mfv.id = pi.mod_file_version_id
+JOIN mod_files mf ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp  ON mp.id = mf.mod_page_id
+WHERE pi.profile_id = sqlc.arg(profile_id)
+  AND mp.game_install_id = sqlc.arg(game_install_id)
+  AND lower(mp.name) = lower(sqlc.arg(name))
+ORDER BY mf.label COLLATE NOCASE, mfv.id DESC;
+
 -- name: GetModFileVersionByID :one
 SELECT
     mfv.id,

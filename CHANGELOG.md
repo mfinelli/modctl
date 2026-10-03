@@ -16,6 +16,8 @@ This is another pre-release that fixes some bugs found during testing.
   doesn't override an existing game file).
 - Fix game-scoped exports that include overrides.
 - Fix profile remap preview error.
+- Fix `profiles disable` erroring when a mod has multiple versions but only
+  one is enabled.
 
 ## v0.7.0 - 2026-04-14
 

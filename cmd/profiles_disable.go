@@ -109,12 +109,12 @@ versions are ignored when computing the applied mod set.`,
 			})
 		}
 
-		mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfvID, err := internal.ResolveEnabledProfileVersionArg(ctx, q, gi, &p, args[0])
 		if err != nil {
 			return err
 		}
 
-		return internal.SetProfileItemEnabled(ctx, &p, q, mfv.ID, false)
+		return internal.SetProfileItemEnabled(ctx, &p, q, mfvID, false)
 	},
 }
 
