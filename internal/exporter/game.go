@@ -377,6 +377,10 @@ func exportTargets(ctx context.Context, src, dst *dbq.Queries, gameInstallID int
 	return nil
 }
 
+// exportBlobs records the blob rows for the game's archive and override blobs
+// in the scoped database. The override rows must exist before exportOverrides
+// runs: overrides.blob_sha256 references blobs(sha256). Only the archive count
+// is returned; override counts are reported by exportOverrides.
 func exportBlobs(ctx context.Context, src, dst *dbq.Queries, gameInstallID int64) (archiveCount int, err error) {
 	archiveRows, err := src.ExportGetArchiveBlobsForGameInstall(ctx, gameInstallID)
 	if err != nil {
@@ -387,6 +391,16 @@ func exportBlobs(ctx context.Context, src, dst *dbq.Queries, gameInstallID int64
 			return 0, fmt.Errorf("insert archive blob %s: %w", row.Sha256, err)
 		}
 		archiveCount++
+	}
+
+	overrideRows, err := src.ExportGetOverrideBlobsForGameInstall(ctx, gameInstallID)
+	if err != nil {
+		return 0, fmt.Errorf("get override blobs: %w", err)
+	}
+	for _, row := range overrideRows {
+		if err := dst.ExportInsertBlob(ctx, dbq.ExportInsertBlobParams(row)); err != nil {
+			return 0, fmt.Errorf("insert override blob %s: %w", row.Sha256, err)
+		}
 	}
 
 	return archiveCount, nil

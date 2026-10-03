@@ -1150,6 +1150,13 @@ FROM blobs b
 JOIN backups bk ON bk.backup_blob_sha256 = b.sha256
 WHERE bk.game_install_id = ?;
 
+-- name: ExportGetOverrideBlobsForGameInstall :many
+SELECT DISTINCT b.sha256, b.kind, b.size_bytes, b.original_name, b.verified_at, b.created_at
+FROM blobs b
+JOIN overrides o ON o.blob_sha256 = b.sha256
+JOIN profiles p ON p.id = o.profile_id
+WHERE p.game_install_id = ?;
+
 -- name: ExportGetModPagesForGameInstall :many
 SELECT * FROM mod_pages WHERE game_install_id = ?;
 
