@@ -16,8 +16,8 @@ importers:
         version: 0.9.5
     devDependencies:
       realfavicon:
-        specifier: ^0.8.3
-        version: 0.8.3
+        specifier: ^0.9.3
+        version: 0.9.3
       wrangler:
         specifier: ^4.87.0
         version: 4.87.0
@@ -419,17 +419,17 @@ packages:
   '@poppinss/exception@1.2.3':
     resolution: {integrity: sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw==}
 
-  '@realfavicongenerator/check-favicon@0.8.2':
-    resolution: {integrity: sha512-6NjdOr62vS8L1LU4rfTR4miB10ZBZG8PkrLp9LttftzIH85upZv9al7ktPajHOaQzAK1GCzGXYi/oVnhogaheQ==}
+  '@realfavicongenerator/check-favicon@0.9.3':
+    resolution: {integrity: sha512-C7cjO1TgU6NcvGrFVd1PeoiKlmrBdWglE59yGPK3npJR/C1A2lVETR1mNUVkB2KfZMMYLPRFDNMcZEXJMrWXlQ==}
 
-  '@realfavicongenerator/generate-favicon@0.8.3':
-    resolution: {integrity: sha512-RfmgfrwelWidyZqzonweiPeHoMv+DcEnir1OvoKM9d6YxivJXx9EY3YyY591F1vChJdaDsTUhWsVXbTkBgjIuA==}
+  '@realfavicongenerator/generate-favicon@0.9.0':
+    resolution: {integrity: sha512-Fez/4q+w02OWL3daQ71rDmTRymgbeT457sz/6kQL+lJ9yZf0EWziKIDbSBJ5145JaJuqSkDk7eaoz/migAw3HA==}
 
-  '@realfavicongenerator/image-adapter-node@0.8.3':
-    resolution: {integrity: sha512-/T1Eovdo9jgV2epfeLsQY0kvOj/zOthzAnLSgp9mb6qPuV/mw2E02X6Ufzsfh4L/25Qjatc8YDzzD7bLIxt0Nw==}
+  '@realfavicongenerator/image-adapter-node@0.9.0':
+    resolution: {integrity: sha512-MAemmKAPMRqf/7QnWmJV2GBjny6QejZhE8z0cQiaDVlZJy39pCocZ/fFqIqH2tDS0GMReaAIP+vSD1FA3j5ufw==}
 
-  '@realfavicongenerator/inject-markups@0.8.0':
-    resolution: {integrity: sha512-8mNLASMUG2erylGCTEFPsn2HM3Cep/P+4Az/WSaLrbp3pJXezchTKBlOoHYJi4u1LbRKiCGn55WSOWwxpt336Q==}
+  '@realfavicongenerator/inject-markups@0.9.0':
+    resolution: {integrity: sha512-7tgLReh4I49JyrTx98iJSXaZp+sXGw3FUOWD428u5q9iPnM5JdLkbwFwyDUKZHGG4gmXnuTIIIS1wBnWlBVCGA==}
 
   '@rollup/plugin-json@6.1.0':
     resolution: {integrity: sha512-EGI2te5ENk1coGeADSIwZ7G2Q8CJS2sF120T7jLw4xFw9n7wIOXHo+kIYRAoVpJAN+kmqZSoO3Fp4JtoNF4ReA==}
@@ -813,8 +813,8 @@ packages:
   queue@6.0.2:
     resolution: {integrity: sha512-iHZWu+q3IdFZFX36ro/lKBkSvfkztY5Y7HMiPlOUjhupPcG2JMfst2KKEpu5XndviX/3UhFbRngUPNKtgvtZiA==}
 
-  realfavicon@0.8.3:
-    resolution: {integrity: sha512-s09zdtXPsZvjZXDHyXhy+sx/nvcVipUAYgcSn+G+p71cYJ2vGQCVDeTtS6NzvxvoaVfvNmfomFgkUO+jU33ZqQ==}
+  realfavicon@0.9.3:
+    resolution: {integrity: sha512-adCogPdjdAcSMSGGKWOVzPbvA5BOAj4pkplL4543Qt9sfbWnSKQxq4b+0ss3P0ZzoqYoX7QVnCefAFU+0l4lCw==}
     hasBin: true
 
   restructure@3.0.2:
@@ -1214,25 +1214,25 @@ snapshots:
 
   '@poppinss/exception@1.2.3': {}
 
-  '@realfavicongenerator/check-favicon@0.8.2':
+  '@realfavicongenerator/check-favicon@0.9.3':
     dependencies:
       decode-ico: 0.4.1
       node-html-parser: 6.1.13
       robots-parser: 3.0.1
       sharp: 0.34.5
 
-  '@realfavicongenerator/generate-favicon@0.8.3':
+  '@realfavicongenerator/generate-favicon@0.9.0':
     dependencies:
       '@svgdotjs/svg.js': 3.2.5
 
-  '@realfavicongenerator/image-adapter-node@0.8.3':
+  '@realfavicongenerator/image-adapter-node@0.9.0':
     dependencies:
-      '@realfavicongenerator/generate-favicon': 0.8.3
+      '@realfavicongenerator/generate-favicon': 0.9.0
       '@svgdotjs/svg.js': 3.2.5
       sharp: 0.34.5
       svgdom: 0.1.23
 
-  '@realfavicongenerator/inject-markups@0.8.0':
+  '@realfavicongenerator/inject-markups@0.9.0':
     dependencies:
       cheerio: 1.2.0
       pretty: 2.0.0
@@ -1640,12 +1640,12 @@ snapshots:
     dependencies:
       inherits: 2.0.4
 
-  realfavicon@0.8.3:
+  realfavicon@0.9.3:
     dependencies:
-      '@realfavicongenerator/check-favicon': 0.8.2
-      '@realfavicongenerator/generate-favicon': 0.8.3
-      '@realfavicongenerator/image-adapter-node': 0.8.3
-      '@realfavicongenerator/inject-markups': 0.8.0
+      '@realfavicongenerator/check-favicon': 0.9.3
+      '@realfavicongenerator/generate-favicon': 0.9.0
+      '@realfavicongenerator/image-adapter-node': 0.9.0
+      '@realfavicongenerator/inject-markups': 0.9.0
       '@rollup/plugin-json': 6.1.0
       '@svgdotjs/svg.js': 3.2.5
       '@types/node': 20.19.39
