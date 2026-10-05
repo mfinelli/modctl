@@ -400,6 +400,14 @@ func TestParseLine(t *testing.T) {
 		}
 	})
 
+	t.Run("bad size error names the size field", func(t *testing.T) {
+		t.Parallel()
+
+		line := "-rw-r--r--  0 0      0      notanum Jan  1 00:00 Data/file.esp"
+		entry := parseLine(line, 0)
+		assert.Contains(t, entry.ParseError, `could not parse size "notanum"`)
+	})
+
 	t.Run("position is set correctly", func(t *testing.T) {
 		t.Parallel()
 

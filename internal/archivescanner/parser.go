@@ -135,7 +135,7 @@ func parseLine(line string, position int) Entry {
 	size, err := strconv.ParseInt(fields[4], 10, 64)
 	if err != nil {
 		// Non-fatal: record what we can, flag the parse issue
-		entry.ParseError = fmt.Sprintf("could not parse size %q: %v", fields[3], err)
+		entry.ParseError = fmt.Sprintf("could not parse size %q: %v", fields[4], err)
 	} else {
 		entry.SizeBytes = size
 	}
