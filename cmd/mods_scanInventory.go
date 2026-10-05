@@ -30,6 +30,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+var modsScanInventoryRescan bool
+
 var modsScanInventoryCmd = &cobra.Command{
 	Use:   "scan-inventory",
 	Short: "Scan archive contents for all mods that have not yet been inventoried",
@@ -41,7 +43,12 @@ without re-reading archives from disk.
 
 Scanning is performed automatically during 'mods import'. Use this command
 to populate inventory for archives that were skipped during import, or if a
-previous scan was interrupted.`,
+previous scan was interrupted.
+
+Pass --rescan to re-read every archive, including ones that were already
+inventoried, and replace their recorded contents. This is needed to pick up
+fixes to how archive contents are read. An archive that fails to rescan keeps
+its existing inventory.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -78,7 +85,12 @@ previous scan was interrupted.`,
 			BsdtarPath: viper.GetString("bsdtar"),
 		}
 
-		result, err := archivescanner.ScanAll(
+		scanAll := archivescanner.ScanAll
+		if modsScanInventoryRescan {
+			scanAll = archivescanner.RescanAll
+		}
+
+		result, err := scanAll(
 			ctx,
 			db,
 			q,
@@ -91,12 +103,21 @@ previous scan was interrupted.`,
 		}
 
 		if result.Scanned == 0 && result.Failed == 0 {
-			fmt.Println(subtleStyle.Render("  all archives already inventoried, nothing to do"))
+			if modsScanInventoryRescan {
+				fmt.Println(subtleStyle.Render("  no archives to rescan"))
+			} else {
+				fmt.Println(subtleStyle.Render("  all archives already inventoried, nothing to do"))
+			}
 			return nil
 		}
 
-		fmt.Println(boldStyle.Render("Inventory scan complete:"))
-		fmt.Printf("  scanned: %d\n", result.Scanned)
+		if modsScanInventoryRescan {
+			fmt.Println(boldStyle.Render("Inventory rescan complete:"))
+			fmt.Printf("  rescanned: %d\n", result.Scanned)
+		} else {
+			fmt.Println(boldStyle.Render("Inventory scan complete:"))
+			fmt.Printf("  scanned: %d\n", result.Scanned)
+		}
 
 		if result.Failed > 0 {
 			fmt.Println(warnStyle.Render(fmt.Sprintf("  failed:  %d (see logs for details)", result.Failed)))
@@ -109,4 +130,7 @@ previous scan was interrupted.`,
 
 func init() {
 	modsCmd.AddCommand(modsScanInventoryCmd)
+
+	modsScanInventoryCmd.Flags().BoolVar(&modsScanInventoryRescan, "rescan", false,
+		"Re-read all archives, replacing existing inventory")
 }

@@ -195,8 +195,11 @@ Set the active game:
 	to be removed is referenced by a profile, the command refuses unless
 	\--force is passed, which removes the profile items via cascade.
 
-*modctl mods scan-inventory*
+*modctl mods scan-inventory* [--rescan]
 	Scan archive contents for all mods that have not yet been inventoried.
+	Pass --rescan to re-read every archive, including ones already
+	inventoried, and replace their recorded contents. An archive that
+	fails to rescan keeps its existing inventory.
 
 *modctl mods nexus link* [--version-id <id>] [--nexus-url <url>] [--label <label>] [--file-version <version>] [--file-name <name>]
 	Attempt to link unlinked mods to their Nexus pages. Without

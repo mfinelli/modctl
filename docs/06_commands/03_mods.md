@@ -117,6 +117,18 @@ Inventory scanning runs automatically during `mods import`. Use this command
 to backfill archives that were imported with `--skip-inventory`, or to resume
 a scan that was interrupted.
 
+| Flag       | Description                                                       |
+|------------|-------------------------------------------------------------------|
+| `--rescan` | Re-read all archives and replace their existing inventory         |
+
+Pass `--rescan` to re-read every archive, including ones that were already
+inventoried. This is needed after an update that changes how archive contents
+are read. Each archive is replaced independently: if one fails to scan, its
+existing inventory is kept.
+```bash
+modctl mods scan-inventory --rescan
+```
+
 ## Nexus integration
 
 ### mods nexus link

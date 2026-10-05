@@ -12,8 +12,12 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 - Add the `strip_whitespace` remap rule to remove leading and trailing
   whitespace from every path segment.
 - Fix archive inventory scans dropping leading/trailing and repeated
-  whitespace in entry paths. Archives inventoried before this fix must be
-  re-imported (or have their inventory cleared) to pick it up.
+  whitespace in entry paths. Archives inventoried before this fix keep the
+  incorrect paths until rescanned with `modctl mods scan-inventory --rescan`.
+  Overrides created against a file whose path was affected will no longer
+  match their base file after the rescan.
+- Add `mods scan-inventory --rescan` to re-read every archive and replace its
+  recorded inventory.
 
 ## v0.7.1 - 2026-10-03
 
