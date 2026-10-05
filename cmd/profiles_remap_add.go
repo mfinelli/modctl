@@ -50,17 +50,24 @@ Rule types and their expected values:
   dest_prefix <path>     Install all entries under the given subfolder.
   include_glob <pattern> Only install entries matching the glob pattern.
   exclude_glob <pattern> Skip entries matching the glob pattern.
+  strip_whitespace       Remove leading and trailing whitespace from every
+                         path segment (directories and filename). Takes no
+                         value. Entries with a segment that is only
+                         whitespace are skipped.
 
 Rules are applied in position order. By default a new rule is appended
 after all existing rules. Use --position to insert at a specific position.
+Add strip_whitespace before rules that need to match the cleaned-up names,
+such as select_subdir and the glob rules.
 
 Examples:
   modctl profiles remap add 42 strip_components 1
   modctl profiles remap add 42 select_subdir Data
   modctl profiles remap add 42 dest_prefix Data/mymod
   modctl profiles remap add 42 include_glob "*.esp"
-  modctl profiles remap add 42 exclude_glob "*.txt"`,
-	Args: cobra.ExactArgs(3),
+  modctl profiles remap add 42 exclude_glob "*.txt"
+  modctl profiles remap add 42 strip_whitespace`,
+	Args: cobra.RangeArgs(2, 3),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		switch len(args) {
 		case 0:
@@ -72,6 +79,7 @@ Examples:
 				"dest_prefix",
 				"include_glob",
 				"exclude_glob",
+				"strip_whitespace",
 			}, cobra.ShellCompDirectiveNoFileComp
 		default:
 			return nil, cobra.ShellCompDirectiveNoFileComp
@@ -82,7 +90,10 @@ Examples:
 		ctx := cmd.Context()
 
 		ruleType := args[1]
-		rawValue := args[2]
+		rawValue := ""
+		if len(args) > 2 {
+			rawValue = args[2]
+		}
 
 		intVal, textVal, err := parseRemapRuleValue(ruleType, rawValue)
 		if err != nil {
@@ -164,6 +175,13 @@ func init() {
 // correct typed fields for the DB.
 func parseRemapRuleValue(ruleType, rawValue string) (sql.NullInt64, sql.NullString, error) {
 	switch ruleType {
+	case "strip_whitespace":
+		if rawValue != "" {
+			return sql.NullInt64{}, sql.NullString{},
+				fmt.Errorf("strip_whitespace does not take a value, got %q", rawValue)
+		}
+		return sql.NullInt64{}, sql.NullString{}, nil
+
 	case "strip_components":
 		n, err := strconv.ParseInt(rawValue, 10, 64)
 		if err != nil || n < 0 {
@@ -181,6 +199,6 @@ func parseRemapRuleValue(ruleType, rawValue string) (sql.NullInt64, sql.NullStri
 
 	default:
 		return sql.NullInt64{}, sql.NullString{},
-			fmt.Errorf("unknown rule type %q; valid types are: strip_components, select_subdir, dest_prefix, include_glob, exclude_glob", ruleType)
+			fmt.Errorf("unknown rule type %q; valid types are: strip_components, select_subdir, dest_prefix, include_glob, exclude_glob, strip_whitespace", ruleType)
 	}
 }

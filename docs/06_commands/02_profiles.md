@@ -229,6 +229,7 @@ modctl profiles remap add "Appearance Menu Mod" select_subdir Data
 modctl profiles remap add "Appearance Menu Mod" dest_prefix Data/mymod
 modctl profiles remap add "Appearance Menu Mod" include_glob "*.esp"
 modctl profiles remap add "Appearance Menu Mod" exclude_glob "*.txt"
+modctl profiles remap add "Appearance Menu Mod" strip_whitespace
 ```
 
 | Flag             | Description                                                 |

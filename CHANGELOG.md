@@ -5,6 +5,16 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 
 `modctl` adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## unreleased
+
+### Changes
+
+- Add the `strip_whitespace` remap rule to remove leading and trailing
+  whitespace from every path segment.
+- Fix archive inventory scans dropping leading/trailing and repeated
+  whitespace in entry paths. Archives inventoried before this fix must be
+  re-imported (or have their inventory cleared) to pick it up.
+
 ## v0.7.1 - 2026-10-03
 
 This is another pre-release that fixes some bugs found during testing.

@@ -294,9 +294,10 @@ Set the active game:
 *modctl profiles remap list* <mod>
 	List remap rules for a mod version in the active profile.
 
-*modctl profiles remap add* [--position <n>] <mod> <rule-type> <value>
+*modctl profiles remap add* [--position <n>] <mod> <rule-type> [<value>]
 	Add a remap rule. Rule types: _strip_components_, _select_subdir_,
-	_dest_prefix_, _include_glob_, _exclude_glob_.
+	_dest_prefix_, _include_glob_, _exclude_glob_, _strip_whitespace_.
+	_strip_whitespace_ takes no value.
 
 *modctl profiles remap remove* <mod> <position>
 	Remove a remap rule at a specific position.

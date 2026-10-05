@@ -87,6 +87,23 @@ modctl profiles remap add "My Mod" exclude_glob "*.txt"
 You can add multiple include and exclude rules. They are evaluated in position
 order along with all other rules.
 
+### strip_whitespace
+
+Removes leading and trailing whitespace from every path segment, both
+directories and the filename:
+```bash
+modctl profiles remap add "My Mod" strip_whitespace
+```
+
+Some archives are packaged with stray spaces in names, such as a file called
+` My Mod.pak` with a leading space, which the game may not be able to load. This
+rule installs it as `My Mod.pak`. The rule takes no value.
+
+Rules are applied in position order, so add `strip_whitespace` before any
+`select_subdir`, `include_glob` or `exclude_glob` rule that needs to match the
+cleaned-up names. An entry with a path segment that consists only of whitespace
+is skipped; use `remap preview --show-filtered` to see which entries those are.
+
 ## Viewing and managing rules
 
 To see the current remap rules for a mod version in the active profile:

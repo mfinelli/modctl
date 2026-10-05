@@ -264,6 +264,39 @@ func TestParseLine(t *testing.T) {
 				wantPath: "Data/meshes/My Mod Folder/cool mesh.nif",
 			},
 			{
+				// libarchive prints a single separator space before the
+				// path, so the second space here belongs to the filename
+				desc:     "leading space on root-level filename",
+				line:     "-rw-rw-r--  0 0      0     6213511 May  7 16:12  Best in Party Skills.pak",
+				wantPath: " Best in Party Skills.pak",
+			},
+			{
+				desc:     "leading space on filename in subdirectory",
+				line:     "-rw-r--r--  0 0      0      123456 Jan  1 00:00 Data/ foo.dll",
+				wantPath: "Data/ foo.dll",
+			},
+			{
+				desc:     "trailing space on filename",
+				line:     "-rw-r--r--  0 0      0      123456 Jan  1 00:00 Data/foo.dll ",
+				wantPath: "Data/foo.dll ",
+			},
+			{
+				desc:     "leading and trailing space",
+				line:     "-rw-r--r--  0 0      0      123456 Jan  1 00:00  foo.dll ",
+				wantPath: " foo.dll ",
+			},
+			{
+				desc:     "repeated spaces inside path",
+				line:     "-rw-r--r--  0 0      0      123456 Jan  1 00:00 Data/cool  mesh.nif",
+				wantPath: "Data/cool  mesh.nif",
+			},
+			{
+				desc:       "symlink with leading space on path",
+				line:       "lrwxrwxrwx  0 0      0           0 Jan  1 00:00  My Link -> My Target/file.esp",
+				wantPath:   " My Link",
+				wantTarget: "My Target/file.esp",
+			},
+			{
 				desc:       "symlink with simple paths",
 				line:       "lrwxrwxrwx  0 0      0           0 Jan  1 00:00 Data/link.esp -> ../other/real.esp",
 				wantPath:   "Data/link.esp",
@@ -333,6 +366,11 @@ func TestParseLine(t *testing.T) {
 			{
 				desc:     "too few fields",
 				line:     "-rw-r--r--  0 0 0",
+				wantType: EntryTypeOther,
+			},
+			{
+				desc:     "no path after metadata fields",
+				line:     "-rw-r--r--  0 0      0      123456 Jan  1 00:00",
 				wantType: EntryTypeOther,
 			},
 			{
