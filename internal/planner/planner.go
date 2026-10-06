@@ -122,6 +122,7 @@ type Plan struct {
 	GameInstallID int64
 	ProfileID     int64 // 0 for unapply plans
 	TargetID      int64
+	TargetName    string
 	TargetRoot    string
 	Files         []PlanFile // one per destination path, apply plans only
 	Ops           []PlanOp
@@ -156,6 +157,7 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 		GameInstallID: gameInstallID,
 		ProfileID:     profileID,
 		TargetID:      target.ID,
+		TargetName:    target.Name,
 		TargetRoot:    target.RootPath,
 	}
 
@@ -551,6 +553,7 @@ func BuildUnapplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID int64, 
 	plan := Plan{
 		GameInstallID: gameInstallID,
 		TargetID:      target.ID,
+		TargetName:    target.Name,
 		TargetRoot:    target.RootPath,
 	}
 

@@ -20,6 +20,13 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
   recorded inventory.
 - Add `mods notes set|clear` to attach freeform notes to a mod page. Notes are
   shown by `mods info`.
+- Add `games targets disable|enable` to turn an install target off for games
+  that only use one of `game_dir`/`proton_prefix`. Apply skips disabled
+  targets, and a target can't be disabled while files are installed to it,
+  profile items or overrides use it, or it is the only enabled target.
+- `profiles add` and `profiles preview` default to the only enabled target
+  when `game_dir` is disabled, and refuse disabled targets.
+- Apply and unapply output now shows which target is being processed.
 
 ## v0.7.1 - 2026-10-03
 

@@ -149,12 +149,18 @@ Use --dry-run to preview the plan without making any changes. Add the
 		}
 		defer unlock()
 
-		targets, err := q.ListTargetsForGameInstall(ctx, gi.ID)
+		allTargets, err := q.ListTargetsForGameInstall(ctx, gi.ID)
 		if err != nil {
 			return fmt.Errorf("list targets: %w", err)
 		}
-		if len(targets) == 0 {
+		if len(allTargets) == 0 {
 			return fmt.Errorf("no targets found for game install %d", gi.ID)
+		}
+
+		// Disabled targets are skipped entirely
+		targets := internal.EnabledTargets(allTargets)
+		if len(targets) == 0 {
+			return fmt.Errorf("no enabled targets for game install %d; run `modctl games targets enable <name>`", gi.ID)
 		}
 
 		var plans []planner.Plan
@@ -188,7 +194,16 @@ Use --dry-run to preview the plan without making any changes. Add the
 		}
 
 		// Real apply
-		fmt.Println(boldStyle.Render(fmt.Sprintf("Applying %q → %s", p.Name, gi.DisplayName)))
+		targetNames := make([]string, len(plans))
+		for i, plan := range plans {
+			targetNames[i] = plan.TargetName
+		}
+		targetLabel := "target"
+		if len(plans) > 1 {
+			targetLabel = "targets"
+		}
+		fmt.Println(boldStyle.Render(fmt.Sprintf("Applying %q → %s", p.Name, gi.DisplayName)) +
+			"  " + subtleStyle.Render(fmt.Sprintf("(%s: %s)", targetLabel, strings.Join(targetNames, ", "))))
 		fmt.Println()
 
 		bs := blobstore.Store{
@@ -259,8 +274,19 @@ Use --dry-run to preview the plan without making any changes. Add the
 			fmt.Printf("  [%*d/%d] ...", width, 0, total)
 		}
 
+		// With several targets in one run, say which one each op belongs to
+		multiTarget := len(plans) > 1
+		var currentTarget string
+
 		printOp := func(symbol, path, detail string) {
 			current++
+			if multiTarget {
+				if detail != "" {
+					detail = currentTarget + "  " + detail
+				} else {
+					detail = currentTarget
+				}
+			}
 			line := fmt.Sprintf("  "+fmtCounter+" %s %s", current, total, symbol, path)
 			if detail != "" {
 				line += subtleStyle.Render("  " + detail)
@@ -273,6 +299,11 @@ Use --dry-run to preview the plan without making any changes. Add the
 		}
 
 		for _, plan := range plans {
+			currentTarget = plan.TargetName
+			if multiTarget && applyVerbose {
+				fmt.Println(subtleStyle.Render(fmt.Sprintf("  target: %s", plan.TargetName)))
+			}
+
 			archiveMap := make(map[string]*archiveGroup)
 			var archiveOrder []string
 			var overrideOps []planner.PlanOp
@@ -546,7 +577,8 @@ func printApplyPlan(
 	showConflicts bool,
 	bold, subtle, warn, green, red, yellow, cyan lipgloss.Style,
 ) {
-	fmt.Println(bold.Render(fmt.Sprintf("Apply plan for %q → %s", profileName, gameName)))
+	fmt.Println(bold.Render(fmt.Sprintf("Apply plan for %q → %s", profileName, gameName)) +
+		"  " + subtle.Render(fmt.Sprintf("(target: %s)", plan.TargetName)))
 	fmt.Println()
 
 	var (

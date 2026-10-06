@@ -105,6 +105,9 @@ winner for this path in the active profile.`,
 		if err != nil {
 			return fmt.Errorf("resolve game_dir target: %w", err)
 		}
+		if err := internal.EnsureTargetEnabled(target); err != nil {
+			return err
+		}
 
 		// check for existing override unless --force
 		if !profilesOverridesSetForce {

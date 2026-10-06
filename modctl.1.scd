@@ -136,6 +136,17 @@ Set the active game:
 	currently installed to that target (unapply first). Cannot remove
 	auto-discovered targets such as _game_dir_ or _proton_prefix_.
 
+*modctl games targets disable* <name>
+	Disable an install target so that apply and unapply skip it. Useful
+	for games that only use one of _game_dir_ and _proton_prefix_. Refuses
+	if any files are currently installed to the target (unapply first), if
+	profile items or overrides still use it, or if it is the only enabled
+	target. When _game_dir_ is disabled, *profiles add* and *profiles
+	preview* default to the only enabled target.
+
+*modctl games targets enable* <name>
+	Enable a target that was previously disabled.
+
 *modctl games backups list* [--target <target>]
 	List all files that modctl has backed up for the current game. Pass
 	\--target to filter by a specific install target.

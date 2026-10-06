@@ -175,6 +175,14 @@ Use --dry-run to preview the plan without making any changes.`,
 			return nil
 		}
 
+		// Only targets that have something to undo are worth mentioning
+		var activeTargets []string
+		for _, plan := range plans {
+			if len(plan.Ops) > 0 {
+				activeTargets = append(activeTargets, plan.TargetName)
+			}
+		}
+
 		// TODO extract these styles somewhere
 		boldStyle := lipgloss.NewStyle().Bold(true)
 		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
@@ -185,6 +193,9 @@ Use --dry-run to preview the plan without making any changes.`,
 		// Dry-run output
 		if unapplyDryRun {
 			for _, plan := range plans {
+				if len(plan.Ops) == 0 {
+					continue
+				}
 				printUnapplyPlan(plan, gi.DisplayName, appliedProfileName, boldStyle, subtleStyle, warnStyle, redStyle, cyanStyle)
 			}
 			return nil
@@ -195,7 +206,12 @@ Use --dry-run to preview the plan without making any changes.`,
 		if appliedProfileName != "" {
 			header += fmt.Sprintf("  %s", subtleStyle.Render("(last applied: \""+appliedProfileName+"\")"))
 		}
-		fmt.Println(boldStyle.Render(header))
+		targetLabel := "target"
+		if len(activeTargets) > 1 {
+			targetLabel = "targets"
+		}
+		fmt.Println(boldStyle.Render(header) +
+			"  " + subtleStyle.Render(fmt.Sprintf("(%s: %s)", targetLabel, strings.Join(activeTargets, ", "))))
 		fmt.Println()
 
 		bs := blobstore.Store{
@@ -236,9 +252,16 @@ Use --dry-run to preview the plan without making any changes.`,
 			fmt.Printf("  [%*d/%d] ...", width, 0, total)
 		}
 
+		// With several targets in one run, say which one each op belongs to
+		multiTarget := len(activeTargets) > 1
+		var currentTarget string
+
 		printOp := func(symbol, path string) {
 			current++
 			line := fmt.Sprintf("  "+fmtCounter+" %s %s", current, total, symbol, path)
+			if multiTarget {
+				line += subtleStyle.Render("  " + currentTarget)
+			}
 			if unapplyPrintOps {
 				fmt.Println(line)
 			} else {
@@ -258,6 +281,11 @@ Use --dry-run to preview the plan without making any changes.`,
 		var allWarnings []string
 
 		for _, plan := range plans {
+			currentTarget = plan.TargetName
+			if multiTarget && unapplyPrintOps && len(plan.Ops) > 0 {
+				fmt.Println(subtleStyle.Render(fmt.Sprintf("  target: %s", plan.TargetName)))
+			}
+
 			var removedPaths []string
 
 			for _, planOp := range plan.Ops {
@@ -372,7 +400,8 @@ func printUnapplyPlan(
 	if appliedProfileName != "" {
 		header += "  " + subtle.Render("(last applied: \""+appliedProfileName+"\")")
 	}
-	fmt.Println(bold.Render(header))
+	header = bold.Render(header) + "  " + subtle.Render(fmt.Sprintf("(target: %s)", plan.TargetName))
+	fmt.Println(header)
 	fmt.Println()
 
 	var countRemove, countRestore int

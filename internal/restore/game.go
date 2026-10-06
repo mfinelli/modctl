@@ -334,6 +334,7 @@ func importTargets(ctx context.Context, dst, src *dbq.Queries, newGameInstallID,
 			Metadata:      t.Metadata,
 			CreatedAt:     t.CreatedAt,
 			UpdatedAt:     t.UpdatedAt,
+			Enabled:       t.Enabled,
 		})
 		if err != nil {
 			return fmt.Errorf("insert target %q: %w", t.Name, err)

@@ -503,6 +503,9 @@ func checkGameInstalls(ctx context.Context) error {
 
 		allOk := true
 		for _, t := range targets {
+			if !internal.TargetEnabled(t) {
+				continue
+			}
 			testFile := filepath.Join(t.RootPath, ".modctl-doctor-write-test")
 			if err := os.WriteFile(testFile, []byte("ok"), 0o600); err != nil {
 				fmt.Println(errStyle.Render(fmt.Sprintf(
