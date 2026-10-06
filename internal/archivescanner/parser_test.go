@@ -264,6 +264,39 @@ func TestParseLine(t *testing.T) {
 				wantPath: "Data/meshes/My Mod Folder/cool mesh.nif",
 			},
 			{
+				// libarchive prints a single separator space before the
+				// path, so the second space here belongs to the filename
+				desc:     "leading space on root-level filename",
+				line:     "-rw-rw-r--  0 0      0     6213511 May  7 16:12  Best in Party Skills.pak",
+				wantPath: " Best in Party Skills.pak",
+			},
+			{
+				desc:     "leading space on filename in subdirectory",
+				line:     "-rw-r--r--  0 0      0      123456 Jan  1 00:00 Data/ foo.dll",
+				wantPath: "Data/ foo.dll",
+			},
+			{
+				desc:     "trailing space on filename",
+				line:     "-rw-r--r--  0 0      0      123456 Jan  1 00:00 Data/foo.dll ",
+				wantPath: "Data/foo.dll ",
+			},
+			{
+				desc:     "leading and trailing space",
+				line:     "-rw-r--r--  0 0      0      123456 Jan  1 00:00  foo.dll ",
+				wantPath: " foo.dll ",
+			},
+			{
+				desc:     "repeated spaces inside path",
+				line:     "-rw-r--r--  0 0      0      123456 Jan  1 00:00 Data/cool  mesh.nif",
+				wantPath: "Data/cool  mesh.nif",
+			},
+			{
+				desc:       "symlink with leading space on path",
+				line:       "lrwxrwxrwx  0 0      0           0 Jan  1 00:00  My Link -> My Target/file.esp",
+				wantPath:   " My Link",
+				wantTarget: "My Target/file.esp",
+			},
+			{
 				desc:       "symlink with simple paths",
 				line:       "lrwxrwxrwx  0 0      0           0 Jan  1 00:00 Data/link.esp -> ../other/real.esp",
 				wantPath:   "Data/link.esp",
@@ -336,6 +369,11 @@ func TestParseLine(t *testing.T) {
 				wantType: EntryTypeOther,
 			},
 			{
+				desc:     "no path after metadata fields",
+				line:     "-rw-r--r--  0 0      0      123456 Jan  1 00:00",
+				wantType: EntryTypeOther,
+			},
+			{
 				desc:     "bad size field still extracts path",
 				line:     "-rw-r--r--  0 0      0      notanum Jan  1 00:00 Data/file.esp",
 				wantType: EntryTypeFile,
@@ -360,6 +398,14 @@ func TestParseLine(t *testing.T) {
 				}
 			})
 		}
+	})
+
+	t.Run("bad size error names the size field", func(t *testing.T) {
+		t.Parallel()
+
+		line := "-rw-r--r--  0 0      0      notanum Jan  1 00:00 Data/file.esp"
+		entry := parseLine(line, 0)
+		assert.Contains(t, entry.ParseError, `could not parse size "notanum"`)
 	})
 
 	t.Run("position is set correctly", func(t *testing.T) {

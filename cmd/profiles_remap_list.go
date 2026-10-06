@@ -153,6 +153,8 @@ func formatRemapRule(rule dbq.ListRemapRulesForProfileItemRow) string {
 		return fmt.Sprintf("  [%d] include_glob: %q", rule.Position, rule.TextValue.String)
 	case "exclude_glob":
 		return fmt.Sprintf("  [%d] exclude_glob: %q", rule.Position, rule.TextValue.String)
+	case "strip_whitespace":
+		return fmt.Sprintf("  [%d] strip_whitespace", rule.Position)
 	default:
 		return fmt.Sprintf("  [%d] %s", rule.Position, rule.RuleType)
 	}

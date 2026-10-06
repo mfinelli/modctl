@@ -195,8 +195,11 @@ Set the active game:
 	to be removed is referenced by a profile, the command refuses unless
 	\--force is passed, which removes the profile items via cascade.
 
-*modctl mods scan-inventory*
+*modctl mods scan-inventory* [--rescan]
 	Scan archive contents for all mods that have not yet been inventoried.
+	Pass --rescan to re-read every archive, including ones already
+	inventoried, and replace their recorded contents. An archive that
+	fails to rescan keeps its existing inventory.
 
 *modctl mods nexus link* [--version-id <id>] [--nexus-url <url>] [--label <label>] [--file-version <version>] [--file-name <name>]
 	Attempt to link unlinked mods to their Nexus pages. Without
@@ -294,9 +297,10 @@ Set the active game:
 *modctl profiles remap list* <mod>
 	List remap rules for a mod version in the active profile.
 
-*modctl profiles remap add* [--position <n>] <mod> <rule-type> <value>
+*modctl profiles remap add* [--position <n>] <mod> <rule-type> [<value>]
 	Add a remap rule. Rule types: _strip_components_, _select_subdir_,
-	_dest_prefix_, _include_glob_, _exclude_glob_.
+	_dest_prefix_, _include_glob_, _exclude_glob_, _strip_whitespace_.
+	_strip_whitespace_ takes no value.
 
 *modctl profiles remap remove* <mod> <position>
 	Remove a remap rule at a specific position.

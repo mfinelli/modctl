@@ -441,6 +441,32 @@ SET inventory_scanned_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 WHERE archive_sha256 = ?
   AND inventory_scanned_at IS NULL;
 
+-- name: RefreshArchiveInventoryScanned :exec
+-- Unlike MarkArchiveInventoryScanned this also updates versions that were
+-- already scanned: used after an archive's inventory has been replaced.
+UPDATE mod_file_versions
+SET inventory_scanned_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE archive_sha256 = ?;
+
+-- name: ListArchiveBlobs :many
+SELECT
+    b.sha256,
+    b.original_name,
+    b.size_bytes
+FROM blobs b
+WHERE b.kind = 'archive'
+ORDER BY b.sha256;
+
+-- name: ListHashedInventoryEntriesForArchive :many
+SELECT position, entry_type, size_bytes, content_sha256
+FROM archive_inventory_entries
+WHERE archive_sha256 = ?
+  AND content_sha256 IS NOT NULL;
+
+-- name: DeleteInventoryEntriesForArchive :exec
+DELETE FROM archive_inventory_entries
+WHERE archive_sha256 = ?;
+
 -- name: IsArchiveInventoried :one
 SELECT EXISTS (
   SELECT TRUE

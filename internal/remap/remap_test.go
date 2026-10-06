@@ -68,6 +68,13 @@ func excludeRule(pos int64, pattern string) dbq.RemapRule {
 		TextValue: sql.NullString{String: pattern, Valid: true},
 	}
 }
+func stripWhitespaceRule(pos int64) dbq.RemapRule {
+	return dbq.RemapRule{
+		Position: pos,
+		RuleType: "strip_whitespace",
+	}
+}
+
 func TestApply(t *testing.T) {
 	t.Parallel()
 
@@ -316,8 +323,116 @@ func TestApply(t *testing.T) {
 		}
 	})
 
+	t.Run("strip_whitespace", func(t *testing.T) {
+		t.Parallel()
+
+		cases := []struct {
+			name     string
+			input    string
+			wantPath string
+			wantSkip bool
+		}{
+			{
+				name:     "leading space on root-level filename",
+				input:    " Best in Party Skills.pak",
+				wantPath: "Best in Party Skills.pak",
+			},
+			{
+				name:     "trailing space on filename",
+				input:    "Data/foo.dll ",
+				wantPath: "Data/foo.dll",
+			},
+			{
+				name:     "leading space on filename in subdirectory",
+				input:    "Data/ foo.dll",
+				wantPath: "Data/foo.dll",
+			},
+			{
+				name:     "leading and trailing on directory",
+				input:    " Data /textures/foo.dds",
+				wantPath: "Data/textures/foo.dds",
+			},
+			{
+				name:     "directory and filename",
+				input:    "Data / foo.dll ",
+				wantPath: "Data/foo.dll",
+			},
+			{
+				name:     "tabs and non-breaking spaces",
+				input:    "\tData\u00a0/foo.dll\t",
+				wantPath: "Data/foo.dll",
+			},
+			{
+				name:     "interior whitespace is preserved",
+				input:    "My Mod/ cool  mesh.nif",
+				wantPath: "My Mod/cool  mesh.nif",
+			},
+			{
+				name:     "nothing to strip is noop",
+				input:    "Data/textures/foo.dds",
+				wantPath: "Data/textures/foo.dds",
+			},
+			{
+				name:     "directory entry trailing slash is kept",
+				input:    "Data /textures/",
+				wantPath: "Data/textures/",
+			},
+			{
+				name:     "whitespace-only directory segment skips",
+				input:    "Data/ /foo.dll",
+				wantSkip: true,
+			},
+			{
+				name:     "whitespace-only filename skips",
+				input:    "Data/ ",
+				wantSkip: true,
+			},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				result, err := Apply([]dbq.RemapRule{stripWhitespaceRule(0)}, tc.input)
+				require.NoError(t, err)
+				assert.Equal(t, tc.wantSkip, result.Skip)
+				if tc.wantSkip {
+					assert.Contains(t, result.SkipReason, "strip_whitespace")
+					assert.Empty(t, result.Path)
+				} else {
+					assert.Equal(t, tc.wantPath, result.Path)
+				}
+			})
+		}
+	})
+
 	t.Run("composition", func(t *testing.T) {
 		t.Parallel()
+
+		t.Run("strip_whitespace then select_subdir matches cleaned name", func(t *testing.T) {
+			t.Parallel()
+			rules := []dbq.RemapRule{stripWhitespaceRule(0), subdirRule(1, "Data")}
+			result, err := Apply(rules, " Data /foo.esp")
+			require.NoError(t, err)
+			assert.False(t, result.Skip)
+			assert.Equal(t, "foo.esp", result.Path)
+		})
+
+		t.Run("select_subdir before strip_whitespace does not match", func(t *testing.T) {
+			t.Parallel()
+			rules := []dbq.RemapRule{subdirRule(0, "Data"), stripWhitespaceRule(1)}
+			result, err := Apply(rules, " Data /foo.esp")
+			require.NoError(t, err)
+			assert.True(t, result.Skip)
+		})
+
+		t.Run("strip_whitespace then include_glob", func(t *testing.T) {
+			t.Parallel()
+			rules := []dbq.RemapRule{stripWhitespaceRule(0), includeRule(1, "*.pak")}
+			result, err := Apply(rules, " Best in Party Skills.pak")
+			require.NoError(t, err)
+			assert.False(t, result.Skip)
+			assert.Equal(t, "Best in Party Skills.pak", result.Path)
+		})
 
 		t.Run("strip then select_subdir sees stripped path", func(t *testing.T) {
 			t.Parallel()

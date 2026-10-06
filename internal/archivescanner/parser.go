@@ -93,17 +93,23 @@ func Parse(r io.Reader) ([]Entry, error) {
 // bsdtar uses this same format across zip, rar, 7z, tar.gz and other
 // archive types since libarchive normalises the listing. uid/gid may be
 // numeric or named depending on archive type and creating platform.
+//
+// The path is taken verbatim from the line: it starts after the single
+// separator following the time/year field. Leading, trailing and repeated
+// whitespace inside the path is significant (an archive can contain a file
+// literally named " foo.dll") and must survive so that the recorded path
+// matches what bsdtar extracts.
 func parseLine(line string, position int) Entry {
 	entry := Entry{
 		Position: position,
 		Type:     EntryTypeOther,
 	}
 
-	fields := strings.Fields(line)
+	fields, pathAndTarget, ok := splitListingLine(line)
 
 	// Minimum viable line: perms + links + uid + gid + size + month + day + time + path
-	if len(fields) < 9 {
-		entry.ParseError = fmt.Sprintf("too few fields (%d): %q", len(fields), line)
+	if !ok {
+		entry.ParseError = fmt.Sprintf("too few fields (%d): %q", len(strings.Fields(line)), line)
 		return entry
 	}
 
@@ -129,14 +135,13 @@ func parseLine(line string, position int) Entry {
 	size, err := strconv.ParseInt(fields[4], 10, 64)
 	if err != nil {
 		// Non-fatal: record what we can, flag the parse issue
-		entry.ParseError = fmt.Sprintf("could not parse size %q: %v", fields[3], err)
+		entry.ParseError = fmt.Sprintf("could not parse size %q: %v", fields[4], err)
 	} else {
 		entry.SizeBytes = size
 	}
 
-	// Everything from field 8 onward is the path, possibly followed by
-	// " -> target" for symlinks. Re-joining handles paths with spaces
-	pathAndTarget := strings.Join(fields[8:], " ")
+	// pathAndTarget (everything after the metadata fields) is the path,
+	// possibly followed by " -> target" for symlinks.
 
 	if entry.Type == EntryTypeSymlink {
 		// Symlink format: "some/path -> target/path"
@@ -155,4 +160,40 @@ func parseLine(line string, position int) Entry {
 	}
 
 	return entry
+}
+
+// listingMetaFields is the number of whitespace-separated metadata fields
+// that precede the path in a `bsdtar -tvv` line (see parseLine).
+const listingMetaFields = 8
+
+// splitListingLine splits a `bsdtar -tvv` line into its leading metadata
+// fields and the remainder (path and optional symlink target) without
+// altering the remainder's whitespace. Metadata fields are separated by one
+// or more spaces (columns are padded); the remainder begins after exactly
+// one separator following the last metadata field. ok is false if the line
+// has fewer than listingMetaFields fields or no remainder.
+func splitListingLine(line string) (fields []string, rest string, ok bool) {
+	isSpace := func(b byte) bool { return b == ' ' || b == '\t' }
+
+	i := 0
+	fields = make([]string, 0, listingMetaFields)
+	for len(fields) < listingMetaFields {
+		for i < len(line) && isSpace(line[i]) {
+			i++
+		}
+		start := i
+		for i < len(line) && !isSpace(line[i]) {
+			i++
+		}
+		if start == i {
+			return nil, "", false
+		}
+		fields = append(fields, line[start:i])
+	}
+
+	// skip exactly one separator; whatever follows is the path
+	if i+1 >= len(line) {
+		return nil, "", false
+	}
+	return fields, line[i+1:], true
 }

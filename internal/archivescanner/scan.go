@@ -62,6 +62,40 @@ func ScanOne(
 		return nil
 	}
 
+	return scanArchive(ctx, sqldb, store, scanner, archiveSha256, log, false)
+}
+
+// RescanOne re-reads a single archive and replaces its recorded inventory,
+// even if it was already inventoried. The archive is scanned first and only
+// then is the old inventory swapped for the new one in a single short
+// transaction, so a failed scan leaves the existing inventory untouched and
+// the database write lock is never held while bsdtar runs. Content hashes
+// cached on the old entries are carried over where they are still valid, and
+// the scanned timestamp of every version of the archive is refreshed.
+func RescanOne(
+	ctx context.Context,
+	sqldb *sql.DB,
+	store blobstore.Store,
+	scanner Scanner,
+	archiveSha256 string,
+	logger *slog.Logger,
+) error {
+	log := logger.With("sha256", archiveSha256)
+	return scanArchive(ctx, sqldb, store, scanner, archiveSha256, log, true)
+}
+
+// scanArchive runs bsdtar against an archive and commits the result. With
+// replace set, any existing inventory for the archive is replaced; otherwise
+// the archive is expected to have none.
+func scanArchive(
+	ctx context.Context,
+	sqldb *sql.DB,
+	store blobstore.Store,
+	scanner Scanner,
+	archiveSha256 string,
+	log *slog.Logger,
+	replace bool,
+) error {
 	archivePath, err := store.PathFor(blobstore.KindArchive, archiveSha256)
 	if err != nil {
 		return fmt.Errorf("resolving blob path: %w", err)
@@ -76,11 +110,15 @@ func ScanOne(
 		log.Warn("bsdtar warnings during scan", "warnings", scanResult.Warnings)
 	}
 
-	if err := commitArchiveInventory(ctx, sqldb, archiveSha256, scanResult.Entries, log); err != nil {
+	if err := commitArchiveInventory(ctx, sqldb, archiveSha256, scanResult.Entries, replace, log); err != nil {
 		return fmt.Errorf("committing inventory: %w", err)
 	}
 
-	log.Info("scanned archive", "entries", len(scanResult.Entries))
+	if replace {
+		log.Info("rescanned archive", "entries", len(scanResult.Entries))
+	} else {
+		log.Info("scanned archive", "entries", len(scanResult.Entries))
+	}
 	return nil
 }
 
@@ -101,22 +139,59 @@ func ScanAll(
 		return ScanAllResult{}, fmt.Errorf("listing unscanned archives: %w", err)
 	}
 
+	refs := make([]archiveRef, len(archives))
+	for i, a := range archives {
+		refs[i] = archiveRef{sha256: a.Sha256, originalName: a.OriginalName.String}
+	}
+
+	return scanEach(refs, logger, func(sha256 string) error {
+		return ScanOne(ctx, sqldb, queries, store, scanner, sha256, logger)
+	}), nil
+}
+
+// RescanAll re-reads every archive in the blob store and replaces its
+// recorded inventory (see RescanOne). Each archive is handled in its own
+// transaction, and individual failures are logged but do not abort the run;
+// an archive that fails keeps its existing inventory.
+func RescanAll(
+	ctx context.Context,
+	sqldb *sql.DB,
+	queries *dbq.Queries,
+	store blobstore.Store,
+	scanner Scanner,
+	logger *slog.Logger,
+) (ScanAllResult, error) {
+	archives, err := queries.ListArchiveBlobs(ctx)
+	if err != nil {
+		return ScanAllResult{}, fmt.Errorf("listing archives: %w", err)
+	}
+
+	refs := make([]archiveRef, len(archives))
+	for i, a := range archives {
+		refs[i] = archiveRef{sha256: a.Sha256, originalName: a.OriginalName.String}
+	}
+
+	return scanEach(refs, logger, func(sha256 string) error {
+		return RescanOne(ctx, sqldb, store, scanner, sha256, logger)
+	}), nil
+}
+
+// archiveRef identifies an archive for logging purposes
+type archiveRef struct {
+	sha256       string
+	originalName string
+}
+
+// scanEach applies scan to each archive, counting successes and failures.
+// A failure is logged and does not stop the run.
+func scanEach(archives []archiveRef, logger *slog.Logger, scan func(sha256 string) error) ScanAllResult {
 	var result ScanAllResult
 
 	for _, archive := range archives {
-		err := ScanOne(
-			ctx,
-			sqldb,
-			queries,
-			store,
-			scanner,
-			archive.Sha256,
-			logger,
-		)
-		if err != nil {
+		if err := scan(archive.sha256); err != nil {
 			logger.Warn("failed to scan archive, skipping",
-				"sha256", archive.Sha256,
-				"original_name", archive.OriginalName,
+				"sha256", archive.sha256,
+				"original_name", archive.originalName,
 				"err", err,
 			)
 			result.Failed++
@@ -125,16 +200,20 @@ func ScanAll(
 		result.Scanned++
 	}
 
-	return result, nil
+	return result
 }
 
 // commitArchiveInventory inserts all entries for a single archive and marks
-// it as scanned within a single transaction.
+// it as scanned within a single transaction. With replace set, the archive's
+// existing entries are deleted first (within the same transaction), cached
+// content hashes that are still valid are restored onto the new entries, and
+// the scanned timestamp of every version of the archive is refreshed.
 func commitArchiveInventory(
 	ctx context.Context,
 	sqldb *sql.DB,
 	archiveSha256 string,
 	entries []Entry,
+	replace bool,
 	log *slog.Logger,
 ) error {
 	tx, err := sqldb.BeginTx(ctx, nil)
@@ -148,6 +227,29 @@ func commitArchiveInventory(
 	}()
 
 	qtx := dbq.New(tx)
+
+	var cached []cachedHash
+	if replace {
+		rows, err := qtx.ListHashedInventoryEntriesForArchive(ctx, archiveSha256)
+		if err != nil {
+			return fmt.Errorf("reading cached content hashes: %w", err)
+		}
+		for _, r := range rows {
+			if !r.ContentSha256.Valid || !r.SizeBytes.Valid {
+				continue
+			}
+			cached = append(cached, cachedHash{
+				Position: r.Position,
+				Type:     r.EntryType,
+				Size:     r.SizeBytes.Int64,
+				Sha256:   r.ContentSha256.String,
+			})
+		}
+
+		if err := qtx.DeleteInventoryEntriesForArchive(ctx, archiveSha256); err != nil {
+			return fmt.Errorf("deleting existing inventory: %w", err)
+		}
+	}
 
 	for _, e := range entries {
 		params := dbq.InsertArchiveInventoryEntryParams{
@@ -164,7 +266,21 @@ func commitArchiveInventory(
 		}
 	}
 
-	if err := qtx.MarkArchiveInventoryScanned(ctx, archiveSha256); err != nil {
+	if replace {
+		for position, sha := range carryForwardHashes(cached, entries) {
+			if err := qtx.SetInventoryEntryContentSha256(ctx, dbq.SetInventoryEntryContentSha256Params{
+				ContentSha256: sql.NullString{String: sha, Valid: true},
+				ArchiveSha256: archiveSha256,
+				Position:      position,
+			}); err != nil {
+				return fmt.Errorf("restoring content hash at position %d: %w", position, err)
+			}
+		}
+
+		if err := qtx.RefreshArchiveInventoryScanned(ctx, archiveSha256); err != nil {
+			return fmt.Errorf("refreshing scanned timestamp: %w", err)
+		}
+	} else if err := qtx.MarkArchiveInventoryScanned(ctx, archiveSha256); err != nil {
 		return fmt.Errorf("marking archive as scanned: %w", err)
 	}
 

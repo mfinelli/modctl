@@ -93,6 +93,16 @@ func Apply(rules []dbq.RemapRule, rawPath string) (Result, error) {
 			prefix := path.Clean(rule.TextValue.String)
 			current = prefix + "/" + current
 
+		case "strip_whitespace":
+			stripped, bad, ok := stripWhitespace(current)
+			if !ok {
+				return Result{
+					Skip:       true,
+					SkipReason: fmt.Sprintf("excluded by strip_whitespace (path segment %q is only whitespace)", bad),
+				}, nil
+			}
+			current = stripped
+
 		case "include_glob":
 			pattern := rule.TextValue.String
 			matched, err := path.Match(pattern, current)
@@ -137,6 +147,24 @@ func stripComponents(p string, n int) string {
 		return ""
 	}
 	return strings.Join(parts[n:], "/")
+}
+
+// stripWhitespace removes leading and trailing whitespace from every segment
+// of p (directories and the filename alike). Empty segments that were already
+// present (a trailing slash on a directory entry, a doubled slash) are left
+// alone. If a non-empty segment consists only of whitespace, ok is false and
+// bad holds that segment: dropping it would silently change the directory
+// structure, so the caller skips the entry instead.
+func stripWhitespace(p string) (stripped, bad string, ok bool) {
+	parts := strings.Split(p, "/")
+	for i, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" && part != "" {
+			return "", part, false
+		}
+		parts[i] = trimmed
+	}
+	return strings.Join(parts, "/"), "", true
 }
 
 // InvalidGlobError is returned when a glob pattern in a remap rule is malformed.
