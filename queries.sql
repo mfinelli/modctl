@@ -2319,6 +2319,18 @@ JOIN mod_pages mp ON mp.id = mf.mod_page_id
 WHERE mp.game_install_id = ?1
   AND mfv.nexus_file_id IS NOT NULL;
 
+-- name: SetModPageNotes :exec
+UPDATE mod_pages
+SET notes = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE id = ?
+  AND game_install_id = ?;
+
+-- name: ClearModPageNotes :exec
+UPDATE mod_pages
+SET notes = NULL, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE id = ?
+  AND game_install_id = ?;
+
 -- name: SetGameInstallNotes :exec
 UPDATE game_installs
 SET notes = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')

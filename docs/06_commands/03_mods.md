@@ -71,6 +71,30 @@ check-updates` to refresh it.
 |--------------------|------------------------|
 | `--show-inventory` | List mod file contents |
 
+## Notes
+
+### mods notes set
+
+Set freeform notes on a mod page, replacing any existing notes. The text is
+stored exactly as given and can span multiple lines. It is shown by
+`mods info`. This is a good place to record where a mod came from, such as the
+download URL for a mod that isn't on Nexus.
+```bash
+modctl mods notes set "Appearance Menu Mod" "https://example.com/mods/ami"
+```
+
+Pass `-` as the text to read it from stdin:
+```bash
+cat notes.txt | modctl mods notes set "Appearance Menu Mod" -
+```
+
+### mods notes clear
+
+Remove the notes from a mod page.
+```bash
+modctl mods notes clear "Appearance Menu Mod"
+```
+
 ## Deleting mods
 
 ### mods remove

@@ -18,6 +18,8 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
   match their base file after the rescan.
 - Add `mods scan-inventory --rescan` to re-read every archive and replace its
   recorded inventory.
+- Add `mods notes set|clear` to attach freeform notes to a mod page. Notes are
+  shown by `mods info`.
 
 ## v0.7.1 - 2026-10-03
 

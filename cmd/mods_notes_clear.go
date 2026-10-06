@@ -19,11 +19,8 @@
 package cmd
 
 import (
-	"database/sql"
 	"fmt"
-	"os"
 	"strconv"
-	"strings"
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
@@ -33,18 +30,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var gamesNotesSetGame string
+var modsNotesClearGame string
 
-var gamesNotesSetCmd = &cobra.Command{
-	Use:   "set <text|-]>",
-	Short: "Set notes for the active game install",
-	Long: `Set freeform notes on the active game install.
-
-Pass - as the argument to read note text from stdin:
-
-  modctl games notes set "remember to run protontricks"
-  echo "remember to run protontricks" | modctl games notes set -`,
-	Args:         cobra.ExactArgs(1),
+var modsNotesClearCmd = &cobra.Command{
+	Use:   "clear <mod>",
+	Short: "Clear the notes on a mod page",
+	Args:  cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return completion.ModPageIDs(cmd, toComplete)
+	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
@@ -65,7 +62,7 @@ Pass - as the argument to read note text from stdin:
 
 		q := dbq.New(db)
 
-		if gamesNotesSetGame == "" {
+		if modsNotesClearGame == "" {
 			active, err := state.LoadActive()
 			if err != nil {
 				return fmt.Errorf("load active selection: %w", err)
@@ -73,36 +70,32 @@ Pass - as the argument to read note text from stdin:
 			if active.ActiveGameInstallID == 0 {
 				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
 			}
-			gamesNotesSetGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
+			modsNotesClearGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, gamesNotesSetGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, modsNotesClearGame)
 		if err != nil {
 			return err
 		}
 
-		text, err := internal.NotesTextFromArg(args[0], os.Stdin)
+		mp, err := internal.ResolveModPageArg(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}
 
-		if strings.TrimSpace(text) == "" {
-			return fmt.Errorf("notes text cannot be empty; use 'games notes clear' to remove notes")
-		}
-
-		return q.SetGameInstallNotes(ctx, dbq.SetGameInstallNotesParams{
-			Notes: sql.NullString{String: text, Valid: true},
-			ID:    gi.ID,
+		return q.ClearModPageNotes(ctx, dbq.ClearModPageNotesParams{
+			ID:            mp.ID,
+			GameInstallID: gi.ID,
 		})
 	},
 }
 
 func init() {
-	gamesNotesCmd.AddCommand(gamesNotesSetCmd)
+	modsNotesCmd.AddCommand(modsNotesClearCmd)
 
-	gamesNotesSetCmd.Flags().StringVarP(&gamesNotesSetGame, "game", "g", "",
+	modsNotesClearCmd.Flags().StringVarP(&modsNotesClearGame, "game", "g", "",
 		"Override the currently active game")
-	gamesNotesSetCmd.RegisterFlagCompletionFunc("game",
+	modsNotesClearCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return completion.GameInstallSelectors(cmd, toComplete)
 		})

@@ -1185,6 +1185,7 @@ This preserves a clean v1 while allowing richer v2.
 - `games notes set|clear`
 - `mods import|list|info|remove`
 - `mods scan-inventory`
+- `mods notes set|clear`
 - `mods incompatible add|remove|list`
 - `nexus link|check-updates` (attach mod_id/file_id metadata)
 - `profiles
