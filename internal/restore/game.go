@@ -81,7 +81,7 @@ func Game(
 	}
 	if bundle.Manifest.SchemaVersion > currentSchema {
 		return res, fmt.Errorf(
-			"bundle schema version %d is newer than current schema version %d; run migrations first",
+			"bundle schema version %d is newer than current schema version %d; upgrade modctl to import this bundle",
 			bundle.Manifest.SchemaVersion, currentSchema,
 		)
 	}

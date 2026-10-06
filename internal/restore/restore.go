@@ -146,8 +146,9 @@ func OpenAndValidate(ctx context.Context, bundlePath string) (*Bundle, error) {
 		}
 	}
 
-	// Open bundle DB
-	bundleDB, err := sql.Open("sqlite3", dbPath+internal.DB_PRAGMAS+"&mode=ro")
+	// Open bundle DB, migrating it to the current schema first if the bundle
+	// was exported by an older version (this only touches the extracted copy)
+	bundleDB, err := openBundleDB(ctx, dbPath, internal.GooseProvider)
 	if err != nil {
 		os.RemoveAll(tmpDir)
 		return nil, fmt.Errorf("open bundle database: %w", err)

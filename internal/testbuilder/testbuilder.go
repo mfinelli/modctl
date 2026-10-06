@@ -43,8 +43,20 @@ func SetupDB(t *testing.T) *sql.DB {
 	require.NoError(t, err, "open in-memory sqlite")
 	t.Cleanup(func() { db.Close() })
 
-	migrationsDir := findMigrationsDir(t)
-	fsys := os.DirFS(migrationsDir)
+	p := NewProvider(t, db)
+
+	_, err = p.Up(context.Background())
+	require.NoError(t, err, "run migrations")
+
+	return db
+}
+
+// NewProvider returns a goose provider for db that reads migrations from the
+// filesystem, for tests that need to control how far a database is migrated.
+func NewProvider(t *testing.T, db *sql.DB) *goose.Provider {
+	t.Helper()
+
+	fsys := os.DirFS(findMigrationsDir(t))
 
 	base, err := database.NewStore(database.DialectSQLite3, "schema_migrations")
 	require.NoError(t, err, "create goose store")
@@ -54,10 +66,7 @@ func SetupDB(t *testing.T) *sql.DB {
 	)
 	require.NoError(t, err, "create goose provider")
 
-	_, err = p.Up(context.Background())
-	require.NoError(t, err, "run migrations")
-
-	return db
+	return p
 }
 
 func findMigrationsDir(t *testing.T) string {

@@ -1769,6 +1769,20 @@ Import validates the bundle before touching the destination database:
 3. Warns if `modctl_version` in the bundle is newer than the running binary
 4. Refuses if `schema_version` is newer than the current binary's schema
 
+Bundles exported by an older version are supported. After the integrity check
+the extracted `modctl.db` is migrated to the current schema (goose `Up`)
+before anything reads it, so that the current generated queries work against
+it. This happens on the temporary extracted copy only: the bundle file is
+opened read-only and streamed into a temp directory, so the original export is
+never modified. Every consumer of the bundle database (full and game-scoped
+import, `verify`, `extract`) goes through the same open path
+(`restore.OpenAndValidate`). A bundle database is just a smaller database
+built with the same migration chain, so this is the same code path as a
+normal upgrade. The database's own schema version is what decides whether to
+migrate (current: leave alone, older: migrate, newer: leave as it is), so the
+check does not rely on the manifest. A newer database is not touched here:
+import refuses it as described above, while `verify` only warns.
+
 Blob files are verified by hashing their content against their filename
 (which is their sha256) before ingestion. A mismatch causes import to abort.
 
