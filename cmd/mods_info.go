@@ -370,7 +370,7 @@ func renderModInfo(
 		headerContent += "\n" + subtleStyle.Render(fmt.Sprintf("ref: %s", mp.SourceRef.String))
 	}
 	if mp.Notes.Valid && strings.TrimSpace(mp.Notes.String) != "" {
-		headerContent += "\n" + subtleStyle.Render(mp.Notes.String)
+		headerContent += "\n" + subtleStyle.Render(internal.FormatNotesLines(mp.Notes.String))
 	}
 	headerContent += "\n" + subtleStyle.Render(fmt.Sprintf(
 		"added: %s", formatAge(mustParseTime(mp.CreatedAt)),

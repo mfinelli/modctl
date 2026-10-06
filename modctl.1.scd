@@ -187,6 +187,13 @@ Set the active game:
 	Nexus link state, and profile membership. Pass --show-inventory to list the
 	mod contents.
 
+*modctl mods notes set* <mod> <text|->
+	Set freeform notes on a mod page, replacing any existing notes. Pass - as
+	the text to read it from stdin. Notes are shown by *modctl mods info*.
+
+*modctl mods notes clear* <mod>
+	Clear the notes on a mod page.
+
 *modctl mods remove* [--file-version <id>] [--force] <mod-page>
 	Remove a mod page and all files and versions under it. With
 	\--file-version, removes only that specific version; empty parent
