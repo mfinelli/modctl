@@ -1270,8 +1270,8 @@ INSERT INTO game_installs (
 );
 
 -- name: ExportInsertTarget :exec
-INSERT INTO targets (id, game_install_id, name, root_path, origin, metadata, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO targets (id, game_install_id, name, root_path, origin, metadata, created_at, updated_at, enabled)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: ExportInsertBlob :exec
 INSERT INTO blobs (sha256, kind, size_bytes, original_name, verified_at, created_at)
@@ -1377,8 +1377,8 @@ INSERT INTO game_installs (
 ) RETURNING id;
 
 -- name: ImportInsertTarget :one
-INSERT INTO targets (game_install_id, name, root_path, origin, metadata, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?)
+INSERT INTO targets (game_install_id, name, root_path, origin, metadata, created_at, updated_at, enabled)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 RETURNING id;
 
 -- name: ImportInsertModPage :one
@@ -2166,6 +2166,17 @@ WHERE id = ?;
 -- name: CountInstalledFilesForTarget :one
 SELECT CAST(COUNT(*) AS INTEGER) AS count
 FROM installed_files
+WHERE target_id = ?;
+
+-- name: SetTargetEnabled :exec
+UPDATE targets
+SET enabled = ?,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE id = ?;
+
+-- name: CountOverridesForTarget :one
+SELECT CAST(COUNT(*) AS INTEGER) AS count
+FROM overrides
 WHERE target_id = ?;
 
 -- name: CountProfileItemsForTarget :one

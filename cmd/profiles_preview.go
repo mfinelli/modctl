@@ -115,17 +115,13 @@ Binary files are detected automatically and refused unless --force is passed.`,
 			return err
 		}
 
-		targetName := profilesPreviewTarget
-		if targetName == "" {
-			targetName = "game_dir"
-		}
-
-		target, err := q.GetTargetByName(ctx, dbq.GetTargetByNameParams{
-			GameInstallID: gi.ID,
-			Name:          targetName,
-		})
+		targets, err := q.ListTargetsForGameInstall(ctx, gi.ID)
 		if err != nil {
-			return fmt.Errorf("resolve target %q: %w", targetName, err)
+			return fmt.Errorf("list targets: %w", err)
+		}
+		target, err := internal.ResolveTarget(targets, profilesPreviewTarget)
+		if err != nil {
+			return err
 		}
 
 		// Build apply plan to find the winner for this path

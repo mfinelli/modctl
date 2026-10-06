@@ -115,6 +115,9 @@ archives.`,
 		if err != nil {
 			return fmt.Errorf("resolve game_dir target: %w", err)
 		}
+		if err := internal.EnsureTargetEnabled(target); err != nil {
+			return err
+		}
 
 		bs := blobstore.Store{
 			ArchivesDir:  viper.GetString("archives_dir"),

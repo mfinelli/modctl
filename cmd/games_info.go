@@ -201,6 +201,9 @@ func renderGameInfo(gi dbq.GameInstall, targets []dbq.Target, profiles []dbq.Pro
 			b.WriteString("  • " + t.Name + "\n")
 			writeKVIndented(&b, "path:", t.RootPath)
 			writeKVIndented(&b, "origin:", t.Origin)
+			if !internal.TargetEnabled(t) {
+				writeKVIndented(&b, "state:", "disabled")
+			}
 		}
 	}
 

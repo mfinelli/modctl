@@ -56,7 +56,8 @@ profile. Higher priority wins conflicts.
 
 Use --target to specify which install target the mod should be deployed to
 (e.g. "game_dir", "proton_prefix", or a custom target name). Defaults to
-"game_dir".`,
+"game_dir", or to the only enabled target if "game_dir" is disabled. Disabled
+targets cannot be used.`,
 	Args: cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) != 0 {
@@ -113,21 +114,15 @@ Use --target to specify which install target the mod should be deployed to
 			return err
 		}
 
-		// Resolve target: default to game_dir.
-		targetName := profilesAddTarget
-		if targetName == "" {
-			targetName = "game_dir"
-		}
-
-		target, err := q.GetTargetByGameInstallAndName(ctx, dbq.GetTargetByGameInstallAndNameParams{
-			GameInstallID: gi.ID,
-			Name:          targetName,
-		})
+		// Resolve target: game_dir unless it is disabled, in which case the
+		// only enabled target
+		targets, err := q.ListTargetsForGameInstall(ctx, gi.ID)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("target %q not found for game %q; run `modctl games targets list` to see available targets", targetName, gi.DisplayName)
-			}
-			return fmt.Errorf("resolve target %q: %w", targetName, err)
+			return fmt.Errorf("list targets: %w", err)
+		}
+		target, err := internal.ResolveTarget(targets, profilesAddTarget)
+		if err != nil {
+			return fmt.Errorf("game %q: %w", gi.DisplayName, err)
 		}
 
 		tx, err := db.BeginTx(ctx, nil)
@@ -233,7 +228,7 @@ func init() {
 		})
 
 	profilesAddCmd.Flags().StringVarP(&profilesAddTarget, "target", "t", "",
-		`Install target to deploy this mod to (default "game_dir")`)
+		`Install target to deploy this mod to (default "game_dir", or the only enabled target)`)
 	profilesAddCmd.RegisterFlagCompletionFunc("target",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return completion.TargetNames(cmd, toComplete)

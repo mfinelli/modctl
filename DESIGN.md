@@ -109,6 +109,26 @@ Targets with active installed files cannot be removed; the profile must be
 unapplied first. Removing a target cascades to any profile items that
 reference it (since nothing is on disk after unapply, this is safe).
 
+Targets can be disabled (`targets.enabled = 0`), which is how a game that only
+uses one of `game_dir`/`proton_prefix` avoids planning for the other. Disabling
+is allowed for discovered targets as well and survives refresh (the discovery
+upsert only touches the path). A target can only be disabled when it is safe
+to stop managing it:
+- no `installed_files` rows reference it (the authoritative record of what is
+  on disk), checked while holding the per-game lock so an apply cannot record
+  files in between;
+- no profile items or overrides reference it, since they would never deploy;
+- it is not the only enabled target.
+
+Apply and `profiles preview` only consider enabled targets; `unapply` always
+walks every target, because it undoes recorded state and must never skip rows
+that exist. Commands that choose a target (`profiles add`, `profiles preview`,
+and the commands that create overrides) refuse a disabled one. With no
+explicit target, `game_dir` is used when enabled, otherwise the sole enabled
+target; several enabled targets with `game_dir` disabled is an error that asks
+for `--target`. Plans carry the target name so apply/unapply output can say
+which target each section belongs to.
+
 ### Mods model
 
 #### "Mod Page" vs "Mod File" vs "Mod File Version"
@@ -1194,8 +1214,9 @@ This preserves a clean v1 while allowing richer v2.
     but the CLI overrides this at insert time. Use `--disabled` to explicitly add
     an item without enabling it.
   - `profiles add` - add a mod file version to a profile. Use `--target <name>`
-  to specify which install target the mod deploys to (default: `game_dir`).
-  The target must exist for the current game install.
+  to specify which install target the mod deploys to (default: `game_dir`, or
+  the only enabled target when `game_dir` is disabled). The target must exist
+  for the current game install and be enabled.
 - `profiles order compact|move|set|swap`
 - `profiles remap add|remove|list|clear|copy|preview` - manage remap rules for
   a mod version within a profile. Rules are appended by default; use
@@ -1296,7 +1317,7 @@ This preserves a clean v1 while allowing richer v2.
 - `operations list|show` - show specific actions that we took during
   apply/unapply
 - `games targets list` - list all install targets for the active (or specified)
-  game install, showing name, root path, and origin
+  game install, showing name, root path, origin, and whether it is enabled
 - `games targets add <name> <path> [--relative-to <target-name>]` - add a
   user-defined install target. The path must be absolute unless
   `--relative-to` is specified, in which case it is resolved relative to the
@@ -1304,6 +1325,9 @@ This preserves a clean v1 while allowing richer v2.
 - `games targets remove <name>` - remove a user-defined target. Refuses if
   any installed files reference the target (unapply first). Cascades to
   profile items referencing the target. Cannot remove auto-discovered targets.
+- `games targets disable|enable <name>` - turn a target off or on for
+  planning. Disabling refuses if installed files, profile items or overrides
+  reference the target, or if it is the only enabled target.
 - `games backups list` - list all backed-up files for the current game,
   optionally filtered by target
 - `games backups view <path>` - print the content of a backed-up file to

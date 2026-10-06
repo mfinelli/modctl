@@ -68,7 +68,11 @@ func TargetNames(cmd *cobra.Command, toComplete string) ([]string, cobra.ShellCo
 	out := make([]string, 0, len(rows))
 	for _, t := range rows {
 		if strings.HasPrefix(strings.ToLower(t.Name), needle) {
-			out = append(out, fmt.Sprintf("%s\t%s", t.Name, t.RootPath))
+			desc := t.RootPath
+			if t.Enabled == 0 {
+				desc += " (disabled)"
+			}
+			out = append(out, fmt.Sprintf("%s\t%s", t.Name, desc))
 		}
 	}
 	return out, cobra.ShellCompDirectiveNoFileComp

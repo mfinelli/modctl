@@ -110,6 +110,9 @@ Examples:
 		if err != nil {
 			return fmt.Errorf("resolve game_dir target: %w", err)
 		}
+		if err := internal.EnsureTargetEnabled(target); err != nil {
+			return err
+		}
 
 		// check for existing override
 		existing, existingErr := q.GetOverride(ctx, dbq.GetOverrideParams{

@@ -115,10 +115,15 @@ mod manager folder deep inside the Proton prefix), define a named custom
 target once and all mods that belong there can reference it by name without
 remap rules.
 
+Apply and unapply work through each enabled target in turn, and their output
+says which target is being processed. If a game only uses one of its targets,
+disable the others (see `games targets disable`) to keep the output focused.
+
 ### games targets list
 
 List all install targets for the current game, showing the name, root path,
-and whether each target was auto-discovered or user-defined.
+whether each target was auto-discovered or user-defined, and whether it is
+enabled.
 ```bash
 modctl games targets list
 ```
@@ -152,6 +157,32 @@ installed to that target (unapply the profile first). Auto-discovered
 targets (`game_dir`, `proton_prefix`) cannot be removed.
 ```bash
 modctl games targets remove saves
+```
+
+### games targets disable
+
+Disable an install target. Apply skips disabled targets, and `profiles add`
+and `profiles overrides` refuse to use them. This works for auto-discovered
+targets too, and a disabled target stays disabled when games are refreshed.
+```bash
+modctl games targets disable game_dir
+```
+
+A target cannot be disabled while:
+
+- any files are currently installed to it (unapply the profile first),
+- any profile items or overrides still use it, or
+- it is the only enabled target.
+
+When `game_dir` is disabled and exactly one other target is enabled,
+`profiles add` and `profiles preview` use that target by default instead of
+`game_dir`. If several targets are enabled, pass `--target`.
+
+### games targets enable
+
+Enable a target that was previously disabled.
+```bash
+modctl games targets enable game_dir
 ```
 
 ## Backups
