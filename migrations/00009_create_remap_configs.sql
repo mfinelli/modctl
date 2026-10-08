@@ -12,5 +12,5 @@ CREATE TABLE remap_configs
 
 -- +goose Down
 -- +goose StatementBegin
-DROP_TABLE remap_configs;
+DROP TABLE remap_configs;
 -- +goose StatementEnd

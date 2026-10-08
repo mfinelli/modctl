@@ -92,7 +92,7 @@ func buildUserAgent(version string) string {
 func openCacheDB(ctx context.Context) (*sql.DB, error) {
 	path := filepath.Join(viper.GetString("cache_dir"), "nexus_cache.db")
 
-	db, err := sql.Open("sqlite3", fmt.Sprintf("%s%s", path, internal.DB_PRAGMAS))
+	db, err := sql.Open("sqlite3", internal.DSN(path, false))
 	if err != nil {
 		return nil, fmt.Errorf("opening cache db: %w", err)
 	}

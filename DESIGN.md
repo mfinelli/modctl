@@ -36,6 +36,7 @@ stores.
 
 A source of game installations (e.g., Steam, Heroic, Lutris, future GOG). A
 store integration is responsible for:
+
 - discovering installed games
 - providing store-specific identifiers
 - resolving install roots/targets
@@ -45,6 +46,7 @@ Stores are **first-class** even if only Steam is implemented in v1.
 ### Game
 
 Represents a Steam game installation:
+
 - Steam appid
 - name
 - install directory
@@ -54,23 +56,26 @@ Represents a Steam game installation:
 #### Game vs. Game Install
 
 Separate the idea of a "game identity" from an "install instance":
+
 - **Game**: logical entry (name, maybe canonical ids)
 - **GameInstall** : a concrete installation associated with a store, e.g.
   - Steam appid 1091500 installed in library X
   - Heroic game "cyberpunk2077" installed under some prefix
 
 This allows:
+
 - multiple stores
 - multiple installs of same game (rare, but possible)
 
 #### Discovery State
 
 `GameInstall` tracks soft-delete/staleness state from store refresh:
-  - `is_present` - set to `FALSE` when a game is not found during refresh;
-    the install is never deleted so that profile and mod data is preserved
-  - `last_seen_at` - timestamp of the last refresh that observed this install
-  - `display_name` - human-facing name as reported by the store; stored on
-    `GameInstall` rather than derived at query time
+
+- `is_present` - set to `FALSE` when a game is not found during refresh;
+  the install is never deleted so that profile and mod data is preserved
+- `last_seen_at` - timestamp of the last refresh that observed this install
+- `display_name` - human-facing name as reported by the store; stored on
+  `GameInstall` rather than derived at query time
 
 The decision not to hard-delete missing installs is intentional: a game
 temporarily moved to a different drive or library should not lose its profiles
@@ -83,6 +88,7 @@ A named install root within a `GameInstall`. Two tiers are supported:
 **Auto-discovered targets** are created and maintained by modctl during store
 refresh. They cannot be removed manually and are recreated on the next refresh
 if missing:
+
 - `game_dir`: the game's install directory. Created for every game install.
 - `proton_prefix`: the Wine C: drive root (`compatdata/<appid>/pfx/drive_c`).
   Created automatically for any Steam game that has a Proton compatdata
@@ -114,6 +120,7 @@ uses one of `game_dir`/`proton_prefix` avoids planning for the other. Disabling
 is allowed for discovered targets as well and survives refresh (the discovery
 upsert only touches the path). A target can only be disabled when it is safe
 to stop managing it:
+
 - no `installed_files` rows reference it (the authoritative record of what is
   on disk), checked while holding the per-game lock so an apply cannot record
   files in between;
@@ -141,6 +148,7 @@ markdown
 #### "Mod Page" vs "Mod File" vs "Mod File Version"
 
 Model it like Nexus does:
+
 - **ModPage** (a mod "project")
   - Source: local/manual or Nexus
   - If Nexus: `nexus.mod_id`, maybe `nexus.game_domain`/slug
@@ -162,6 +170,7 @@ Model it like Nexus does:
 
 Profiles should enable **ModFile** (with a chosen version policy) or directly
 pin a **ModFileVersion**:
+
 - v1 simplest: pin a ModFileVersion
 - later: allow "track latest" policies if user provides API key
 
@@ -190,6 +199,7 @@ recently ran a successful apply.
 ### Profile
 
 A named set of enabled mod versions for a `GameInstall`, with:
+
 - set of enabled/disabled mod file versions (or mod files with pinned version
 - per-profile priority order (higher priority wins conflicts)
 - remap rules per mod (possibly per version)
@@ -200,6 +210,7 @@ Exactly one profile can be active/applied at a time per `GameInstall`.
 ### Applied State
 
 `GameInstall` tracks the currently-applied profile as denormalized state:
+
 - `applied_profile_id` - the profile whose file set is currently on disk
 - `applied_at` - timestamp of the last successful apply
 - `applied_operation_id` - the operation that produced the current on-disk state
@@ -222,6 +233,7 @@ A computed desired state: the union of enabled mods in a profile with conflicts
 resolved by priority.
 
 Outputs:
+
 - winner for each destination path
 - list of file ops: write/overwrite/remove
 - list of required backups
@@ -229,6 +241,7 @@ Outputs:
 ### Operation
 
 A logged apply/switch/unapply run:
+
 - used for auditing, crash recovery, and debugging.
 
 ## 3. Storage model
@@ -236,6 +249,7 @@ A logged apply/switch/unapply run:
 ### Metadata: SQLite
 
 SQLite stores:
+
 - stores, game installs, targets
 - mode pages, mode files, mod file versions
 - profiles and their enabled mod file versions + priority
@@ -254,10 +268,29 @@ SQLite stores:
 
 Version schema from day 1.
 
+#### Connections
+
+Every database is opened through `internal.DSN(path, readOnly)`, which builds
+a `file:` URI with an escaped path. A plain path would make the driver drop the
+query string before SQLite sees it (silently losing `mode=ro`, and cutting a
+path containing `?` short).
+
+- Read-write connections run with foreign keys on, WAL journaling and
+  `synchronous = NORMAL`. The driver executes these as pragmas each time a
+  connection is opened, so they do not depend on how the file was created.
+  Foreign keys and synchronous are per-connection settings and are not
+  recorded in the file; the journal mode is, so a database that modctl has
+  opened read-write stays in WAL mode.
+- Read-only connections run with foreign keys on and no journal mode. They
+  cannot change the journal mode, and the databases inside an export are stored
+  without WAL (`VACUUM INTO` writes them in rollback-journal mode), so asking
+  for WAL there would fail.
+
 ### Nexus cache: separate SQLite in XDG cache
 
 A separate SQLite database at `$XDG_CACHE_HOME/modctl/nexus_cache.db` stores
 cached Nexus API responses. This is intentionally separate from the main DB:
+
 - It is safe to delete (will be repopulated on next `mods nexus check-updates`)
 - It uses a simple internal version number; if the schema version does not
   match the expected version the cache is blown away and recreated
@@ -265,6 +298,7 @@ cached Nexus API responses. This is intentionally separate from the main DB:
 ### Blob stores: on-disk, content-addressed
 
 Two separate stores:
+
 - `archives/` for imported mod archives
 - `backups/` for backed-up pre-existing files
 
@@ -272,6 +306,7 @@ No per-game partitioning; per-game accounting derived from references. Blobs
 are keyed by sha256 and immutable.
 
 Layout with directory fanout:
+
 - `archives/<fan2>/<fullhash>`
 - `backups/<fan2>/<fullhash>`
 
@@ -283,6 +318,7 @@ The blob store directories are purely blob content. Files placed there
 manually are unsupported and may be silently removed by `gc`.
 
 Rationale:
+
 - simplicity (one storage mode)
 - dedupe
 - filesystem-friendly backups
@@ -291,6 +327,7 @@ Rationale:
 ### Export/import bundle
 
 A single file (tar + zstd) containing:
+
 - `manifest.json` - bundle metadata (see below)
 - `modctl.db` - database snapshot
 - `nexus_cache.db` - nexus cache database snapshot
@@ -304,6 +341,7 @@ Import verifies integrity and schema compatibility.
 #### Manifest
 
 `manifest.json` contains:
+
 - `export_format_version`: integer, currently `1`. Used by import to handle
   future format changes.
 - `export_kind`: `"full"` or `"game"`
@@ -325,6 +363,7 @@ of all kinds. Suitable for full machine migration or complete backup.
 #### Game-scoped export
 
 Includes only data relevant to a single game install:
+
 - The store row for that game's store
 - The game install, targets, profiles, mod pages, mod files, mod file
   versions, remap configs and rules, profile items, profile path policies,
@@ -358,6 +397,7 @@ before any remap rules are applied.
 ### Storage
 
 `archive_inventory_entries` stores one row per entry in an archive:
+
 - Keyed on `(archive_sha256, position)` - position is the zero-based index
   of the entry in the `bsdtar -tvvf` listing and is the canonical key since
   archives may contain duplicate paths (last entry wins during extraction,
@@ -392,6 +432,7 @@ entries including dangerous paths (traversal, absolute paths, symlinks) -
 rejection of unsafe entries is deferred to the planner.
 
 The `archivescanner` package provides two functions:
+
 - `ScanOne` - scans a single archive by sha256; no-op if already scanned.
   Used by `mods import` to scan the just-imported archive only, avoiding
   the surprising behavior of scanning unrelated archives as a side effect.
@@ -413,6 +454,7 @@ with `--skip-inventory` can be backfilled with `mods scan-inventory`.
     <perms> <links> <uid> <gid> <size> <month> <day> <time|year> <path>
 
 Field notes:
+
 - uid/gid may be numeric or named depending on archive type and platform
 - A summary trailer is always printed as the final line:
   `Archive Format: <format>,  Compression: <compression>`
@@ -435,6 +477,7 @@ placeholder file at that path using the overrides system.
 ### In-process extraction (unlikely future)
 
 Possible future backends:
+
 - pure-Go zip/tar
 - libarchive via CGO
 - fallback to bsdtar/7z
@@ -444,6 +487,7 @@ To keep this option open, extraction is an interface with multiple backends.
 ### Staging directory
 
 All extraction uses a per-archive subdirectory under the configured `tmp_dir`:
+
 ```
 <tmp_dir>/staging/<archive_sha256>/
 ```
@@ -468,6 +512,7 @@ future version behind an explicit opt-in flag.
 ### Staging + safe move
 
 All extraction goes to staging, then the tool:
+
 - validates destination paths
 - rejects traversal and absolute paths
 - enforces "within target root"
@@ -494,12 +539,14 @@ not detecting external modifications.
 ### Symlinks and special files
 
 Default v1 policy:
+
 - reject symlinks/hardlinks/special device files
 - require explicit override flags in future if supported
 
 ### Limits
 
 Configurable safety limits:
+
 - max number of files per operation
 - max total extracted size
 - max path length / nesting depth
@@ -514,6 +561,7 @@ before deletion (to detect external modifications) is not performed by
 default - use `apply --recheck` to detect drift before applying.
 
 Never blindly delete:
+
 - Only delete a file if its hash matches what the tool installed (unless
   `--force`).
 - If changed externally, mark "drifted" and require explicit action.
@@ -523,11 +571,13 @@ Never blindly delete:
 ### Winner selection
 
 For each destination path:
+
 - winner = enabled mod with highest priority that provides that path
 
 ### Apply semantics
 
 Apply reconciles filesystem to profile state:
+
 - write/overwrite winners (extracting from staging)
 - remove files that are no longer winners and are tool-owned
 - restore backups when a previously overwritten non-tool-owned file has no
@@ -540,6 +590,7 @@ up to the backup blob store before being replaced. Backups are restored
 automatically during unapply or when no mod claims the path.
 
 Apply detects four filesystem states for each planned path:
+
 1. Tool-owned and present on disk -> overwrite, no backup needed
 2. Tool-owned but missing from disk -> drift warning, treat as fresh write
 3. Not tool-owned but present on disk -> back up then write
@@ -548,6 +599,7 @@ Apply detects four filesystem states for each planned path:
 ### Future conflict resolution types
 
 For each destination path (or pattern), allow policy:
+
 - `priority` (default)
 - `merge_text` (v2+)
 - `manual (v2+)` – user chooses winner
@@ -555,6 +607,7 @@ For each destination path (or pattern), allow policy:
 
 The planner should produce a plan consisting of "desired final content per
 path", where the "content source" can eventually be:
+
 - a file from a mod version (normal)
 - a merged result (future)
 - an overridden result (user edit)
@@ -584,6 +637,7 @@ profile-scoped by default. There is currently no mechanism for version-level
 remaps that apply across profiles; this is a future extension point.
 
 v1 remap capabilities (stored as structured data):
+
 - strip-components (remove N leading path segments)
 - select-subdir (only install entries under a subpath)
 - destination-prefix (install everything under a subfolder in target)
@@ -660,6 +714,7 @@ Both rules can be applied to the same path. The resulting behavior is:
 - Unapply: delete (no backup to restore).
 
 ### Commands
+
 ```
 profiles deploys skip-backup add|remove|list|copy <mod_file_version_id> <pattern>
 profiles deploys write-once add|remove|list|copy <mod_file_version_id> <pattern>
@@ -814,6 +869,7 @@ Overrides are stored in the `overrides` table:
   the row (and the old blob becomes eligible for garbage collection)
 
 A CHECK constraint enforces blob/type consistency:
+
 ```sql
 CHECK (
   (override_type = 'full_file' AND blob_sha256 IS NOT NULL)
@@ -834,6 +890,7 @@ operations have a value and unset/clear operations do not, and that
 
 All override commands are under `profiles` since overrides are profile-scoped,
 consistent with `profiles remap`.
+
 ```
 profiles overrides set <path> <file>
 profiles overrides edit <path> [--reset]
@@ -1091,9 +1148,11 @@ scope results.
 ### When to back up
 
 Before overwriting a destination path:
+
 - if destination is NOT currently tool-owned, back it up
 
 ### How to back up
+
 - hash file content
 - store blob in backups store
 - record mapping in DB: (game, target, relpath) -> backup_hash
@@ -1102,6 +1161,7 @@ Before overwriting a destination path:
 ### Restore
 
 On unapply/rollback:
+
 - restore backups where they exist (and where it is safe to do so)
 - if user changed file since backup, require explicit choice (or use hash
   checks)
@@ -1111,6 +1171,7 @@ On unapply/rollback:
 ### Store integration responsibilities
 
 A store integration must provide:
+
 - discovery of installed games (list of `GameInstall`)
 - for each install: resolved Targets (at least `game_dir`)
 - stable store IDs (e.g., `steam:1091500`, `heroic:<slug>`)
@@ -1124,6 +1185,7 @@ not on Steam-specific paths.
 ### Steam discovery
 
 Requirements
+
 - detect Steam installation root
 - parse library folder config
 - locate game install dirs from app manifests
@@ -1163,6 +1225,7 @@ Store `game.integration` (default generic).
 ### Hook points
 
 Design apply as pipeline:
+
 1. discover context (paths, targets)
 2. plan
 3. execute (file operations)
@@ -1170,6 +1233,7 @@ Design apply as pipeline:
    run tools)
 
 Game-specific integrations add/override:
+
 - target definitions
 - planner transformations
 - post steps
@@ -1209,14 +1273,14 @@ This preserves a clean v1 while allowing richer v2.
 - `mods incompatible add|remove|list`
 - `nexus link|check-updates` (attach mod_id/file_id metadata)
 - `profiles
-  create|list|rename|delete|set-active|apply|diff|add|remove|enable|disable|order|status`
+create|list|rename|delete|set-active|apply|diff|add|remove|enable|disable|order|status`
   - Items are added to a profile enabled by default. The schema default is `FALSE`
     but the CLI overrides this at insert time. Use `--disabled` to explicitly add
     an item without enabling it.
   - `profiles add` - add a mod file version to a profile. Use `--target <name>`
-  to specify which install target the mod deploys to (default: `game_dir`, or
-  the only enabled target when `game_dir` is disabled). The target must exist
-  for the current game install and be enabled.
+    to specify which install target the mod deploys to (default: `game_dir`, or
+    the only enabled target when `game_dir` is disabled). The target must exist
+    for the current game install and be enabled.
 - `profiles order compact|move|set|swap`
 - `profiles remap add|remove|list|clear|copy|preview` - manage remap rules for
   a mod version within a profile. Rules are appended by default; use
@@ -1341,6 +1405,7 @@ This preserves a clean v1 while allowing richer v2.
   and the current on-disk file
 
 Key behavior:
+
 - "intent changes" (enable/disable/order) are cheap
 - apply performs reconciliation
 - always support --dry-run where destructive
@@ -1440,6 +1505,7 @@ detect priority reordering between mods that conflict on the same path. Run
 ### Adversarial test archives
 
 Include in `testdata/`:
+
 - `../` traversal
 - absolute paths
 - symlink entries
@@ -1489,17 +1555,17 @@ file is optional: if it does not exist, all built-in defaults are used.
 
 ### Keys and defaults
 
-| Key            | Default                                  | Description                              |
-|----------------|------------------------------------------|------------------------------------------|
-| `bsdtar`       | `bsdtar`                                 | bsdtar binary name or path               |
-| `database`     | `$XDG_DATA_HOME/modctl/modctl.db`        | Path to the SQLite database              |
-| `archives_dir` | `$XDG_DATA_HOME/modctl/archives`         | Blob store for mod archives              |
-| `backups_dir`  | `$XDG_DATA_HOME/modctl/backups`          | Blob store for pre-existing file backups |
-| `cache_dir`    | `$XDG_CACHE_HOME/modctl`                 | Local caches (e.g., nexus api responses) |
-| `overrides_dir`| `$XDG_DATA_HOME/modctl/overrides`        | Blob store for user overrides            |
-| `locks_dir`    | `$XDG_STATE_HOME/modctl/locks`           | Per-game lockfiles                       |
-| `tmp_dir`      | `$XDG_RUNTIME_DIR/modctl`                | Staging directory for extraction         |
-| `nexus.apikey` | (none)                                   | Nexus Mods API key                       |
+| Key             | Default                           | Description                              |
+| --------------- | --------------------------------- | ---------------------------------------- |
+| `bsdtar`        | `bsdtar`                          | bsdtar binary name or path               |
+| `database`      | `$XDG_DATA_HOME/modctl/modctl.db` | Path to the SQLite database              |
+| `archives_dir`  | `$XDG_DATA_HOME/modctl/archives`  | Blob store for mod archives              |
+| `backups_dir`   | `$XDG_DATA_HOME/modctl/backups`   | Blob store for pre-existing file backups |
+| `cache_dir`     | `$XDG_CACHE_HOME/modctl`          | Local caches (e.g., nexus api responses) |
+| `overrides_dir` | `$XDG_DATA_HOME/modctl/overrides` | Blob store for user overrides            |
+| `locks_dir`     | `$XDG_STATE_HOME/modctl/locks`    | Per-game lockfiles                       |
+| `tmp_dir`       | `$XDG_RUNTIME_DIR/modctl`         | Staging directory for extraction         |
+| `nexus.apikey`  | (none)                            | Nexus Mods API key                       |
 
 Only `nexus.apikey` has no default. All other keys have sane defaults and
 most users will never need to change them. See section 5 for the rationale
@@ -1590,6 +1656,7 @@ with the layout `"2006-01-02 15:04:05 -0700"`.
 
 API responses are cached in a separate SQLite database at
 `$XDG_CACHE_HOME/modctl/nexus_cache.db`. The cache stores:
+
 - `nexus_mod_info`: mod page metadata (name, author, summary). TTL: 7 days.
 - `nexus_file_info`: per-file metadata (version, size, filename, category).
   TTL: 24 hours.
@@ -1634,10 +1701,11 @@ versions are shown as "old version" without an update indicator.
 ### Client architecture
 
 The `internal/nexusclient` package provides:
+
 - `Client`: full client with API key, HTTP client, rate limiter, and cache DB.
   Used for commands that make API calls.
 - `CacheReader`: lightweight read-only cache accessor. Used by `profiles
-  status` and `mods info` which need cached data but should not make API calls.
+status` and `mods info` which need cached data but should not make API calls.
   `Client` embeds `CacheReader`.
 
 The API key is read from config (`nexus.apikey`). If not configured, Nexus
@@ -1655,6 +1723,7 @@ by other commands.
 ### Eligibility
 
 A blob is eligible for collection when no live database row references it:
+
 - **Archives**: not referenced by any `mod_file_versions.archive_sha256`
 - **Backups**: not referenced by any `backups.backup_blob_sha256`
 
@@ -1693,6 +1762,7 @@ non-empty the removal is silently skipped.
 `gc [--dry-run] [--no-archives] [--no-backups] [--min-age <duration>] [--clean-missing] [--skip-orphans]`
 
 Flags:
+
 - `--dry-run`: preview what would be removed without making any changes
 - `--no-archives`: skip archive blob collection
 - `--no-backups`: skip backup blob collection
@@ -1764,10 +1834,26 @@ file is deleted automatically.
 ### Import
 
 Import validates the bundle before touching the destination database:
+
 1. Verifies `export_format_version` is supported (refuses if newer)
 2. Extracts and verifies `modctl.db` against `db_sha256` in the manifest
 3. Warns if `modctl_version` in the bundle is newer than the running binary
 4. Refuses if `schema_version` is newer than the current binary's schema
+
+Bundles exported by an older version are supported. After the integrity check
+the extracted `modctl.db` is migrated to the current schema (goose `Up`)
+before anything reads it, so that the current generated queries work against
+it. This happens on the temporary extracted copy only: the bundle file is
+opened read-only and streamed into a temp directory, so the original export is
+never modified. Once migrated, the bundle database is opened with a read-only
+connection, since nothing that reads a bundle writes to it. Every consumer of the bundle database (full and game-scoped
+import, `verify`, `extract`) goes through the same open path
+(`restore.OpenAndValidate`). A bundle database is just a smaller database
+built with the same migration chain, so this is the same code path as a
+normal upgrade. The database's own schema version is what decides whether to
+migrate (current: leave alone, older: migrate, newer: leave as it is), so the
+check does not rely on the manifest. A newer database is not touched here:
+import refuses it as described above, while `verify` only warns.
 
 Blob files are verified by hashing their content against their filename
 (which is their sha256) before ingestion. A mismatch causes import to abort.
@@ -1780,6 +1866,7 @@ wiped first.
 
 By default a full import clears all on-disk state after restoring the
 database, so the destination machine starts clean:
+
 - `installed_files` is truncated
 - `backups` is truncated
 - `operations` and `operation_changes` are truncated (via cascade)
@@ -1818,6 +1905,7 @@ the flag is ignored. If `--game` does not match the bundle's game, the
 command errors.
 
 **Inventory scanning** is handled as follows:
+
 - If the bundle contains inventory entries (i.e. `inventory_scanned_at` is
   non-null on the mod file version), they are imported directly
 - If the bundle does not contain inventory entries and `--skip-inventory` is
@@ -1841,6 +1929,7 @@ importing it. It is useful for validating a bundle before importing, or for
 checking a stored backup for corruption.
 
 Checks performed:
+
 - `db_sha256` in the manifest matches the actual sha256 of `modctl.db`
 - `export_format_version` is supported (hard error if newer)
 - `PRAGMA quick_check` on the bundle database

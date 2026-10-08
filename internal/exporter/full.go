@@ -251,7 +251,7 @@ func snapshotCacheDB(ctx context.Context, cacheDBPath string) (path string, sha2
 	tmpPath := tmp.Name()
 	tmp.Close()
 
-	cacheDB, err := sql.Open("sqlite3", cacheDBPath+internal.DB_PRAGMAS)
+	cacheDB, err := sql.Open("sqlite3", internal.DSN(cacheDBPath, false))
 	if err != nil {
 		os.Remove(tmpPath)
 		return "", "", fmt.Errorf("open cache db: %w", err)

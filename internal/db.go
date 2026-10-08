@@ -33,18 +33,42 @@ import (
 	"github.com/spf13/viper"
 )
 
+// DB_PRAGMAS are the connection parameters for a read-write database:
+// foreign keys enforced, write-ahead logging and synchronous NORMAL. The
+// driver runs each of them as a PRAGMA when a connection is opened.
 const DB_PRAGMAS = "?_foreign_keys=ON&_journal_mode=WAL&_synchronous=NORMAL"
+
+// DB_PRAGMAS_READONLY are the connection parameters for a read-only database.
+// There is deliberately no journal mode: a read-only connection can't change
+// it, and asking for WAL on a database that is stored in rollback-journal
+// mode fails with "attempt to write a readonly database". That is exactly how
+// the databases inside an export are stored, since VACUUM INTO writes them
+// that way.
+const DB_PRAGMAS_READONLY = "?_foreign_keys=ON&mode=ro"
 
 var Migrations embed.FS
 
+// DSN returns the connection string for the SQLite database at path, which
+// every database open in modctl should use rather than building its own.
+//
+// It is a file: URI with an escaped path. With a plain path the driver cuts
+// the query string off before SQLite sees it, which silently drops mode=ro
+// (the connection stays writable), and a path that contains a '?' is cut
+// short at it. The read-only variant is described at DB_PRAGMAS_READONLY.
+func DSN(path string, readOnly bool) string {
+	pragmas := DB_PRAGMAS
+	if readOnly {
+		pragmas = DB_PRAGMAS_READONLY
+	}
+	return fmt.Sprintf("file:%s%s", url.PathEscape(path), pragmas)
+}
+
 func SetupDB() (*sql.DB, error) {
-	return sql.Open("sqlite3", fmt.Sprintf("file:%s%s",
-		url.PathEscape(viper.GetString("database")), DB_PRAGMAS))
+	return sql.Open("sqlite3", DSN(viper.GetString("database"), false))
 }
 
 func SetupDBReadOnly() (*sql.DB, error) {
-	return sql.Open("sqlite3", fmt.Sprintf("file:%s%s&mode=ro",
-		url.PathEscape(viper.GetString("database")), DB_PRAGMAS))
+	return sql.Open("sqlite3", DSN(viper.GetString("database"), true))
 }
 
 func GooseProvider(db *sql.DB) (*goose.Provider, error) {

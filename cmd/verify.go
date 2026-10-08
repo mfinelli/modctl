@@ -373,7 +373,7 @@ func checkBundleBlobs(ctx context.Context, bundle *restore.Bundle, bq *dbq.Queri
 
 // checkBundleCacheDB runs quick_check on the nexus cache database.
 func checkBundleCacheDB(ctx context.Context, cachePath string) []string {
-	cacheDB, err := sql.Open("sqlite3", cachePath+internal.DB_PRAGMAS+"&mode=ro")
+	cacheDB, err := sql.Open("sqlite3", internal.DSN(cachePath, true))
 	if err != nil {
 		return []string{"open nexus cache db: " + err.Error()}
 	}
