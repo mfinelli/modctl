@@ -48,7 +48,7 @@ func newBundleDBFile(t *testing.T, behind int64) (string, int64) {
 	ctx := context.Background()
 
 	path := filepath.Join(t.TempDir(), "modctl.db")
-	db, err := sql.Open("sqlite3", path+internal.DB_PRAGMAS)
+	db, err := sql.Open("sqlite3", internal.DSN(path, false))
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -104,7 +104,7 @@ func TestOpenBundleDB(t *testing.T) {
 				path, latest := newBundleDBFile(t, behind)
 
 				// before: really is behind
-				raw, err := sql.Open("sqlite3", path+internal.DB_PRAGMAS)
+				raw, err := sql.Open("sqlite3", internal.DSN(path, false))
 				require.NoError(t, err)
 				assert.Equal(t, latest-behind, schemaVersion(t, raw))
 				raw.Close()
@@ -137,7 +137,7 @@ func TestOpenBundleDB(t *testing.T) {
 
 		path, latest := newBundleDBFile(t, 0)
 
-		raw, err := sql.Open("sqlite3", path+internal.DB_PRAGMAS)
+		raw, err := sql.Open("sqlite3", internal.DSN(path, false))
 		require.NoError(t, err)
 		_, err = raw.Exec(`INSERT INTO schema_migrations (version_id, is_applied) VALUES (?, TRUE)`, latest+1)
 		require.NoError(t, err)
@@ -176,9 +176,8 @@ func TestOpenBundleDB(t *testing.T) {
 	t.Run("a database in rollback-journal mode can still be opened read-only", func(t *testing.T) {
 		t.Parallel()
 
-		// e.g. a bundle whose database was written without WAL; opening it
-		// read-only can't switch it to WAL itself, so the migration step has
-		// to have done that first
+		// e.g. the database of an exported bundle, which VACUUM INTO writes
+		// without WAL
 		path := filepath.Join(t.TempDir(), "modctl.db")
 		raw, err := sql.Open("sqlite3", path+"?_foreign_keys=ON&_journal_mode=DELETE")
 		require.NoError(t, err)

@@ -268,6 +268,24 @@ SQLite stores:
 
 Version schema from day 1.
 
+#### Connections
+
+Every database is opened through `internal.DSN(path, readOnly)`, which builds
+a `file:` URI with an escaped path. A plain path would make the driver drop the
+query string before SQLite sees it (silently losing `mode=ro`, and cutting a
+path containing `?` short).
+
+- Read-write connections run with foreign keys on, WAL journaling and
+  `synchronous = NORMAL`. The driver executes these as pragmas each time a
+  connection is opened, so they do not depend on how the file was created.
+  Foreign keys and synchronous are per-connection settings and are not
+  recorded in the file; the journal mode is, so a database that modctl has
+  opened read-write stays in WAL mode.
+- Read-only connections run with foreign keys on and no journal mode. They
+  cannot change the journal mode, and the databases inside an export are stored
+  without WAL (`VACUUM INTO` writes them in rollback-journal mode), so asking
+  for WAL there would fail.
+
 ### Nexus cache: separate SQLite in XDG cache
 
 A separate SQLite database at `$XDG_CACHE_HOME/modctl/nexus_cache.db` stores

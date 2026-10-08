@@ -219,7 +219,7 @@ func buildGameScopedDB(
 	tmpPath := tmp.Name()
 	tmp.Close()
 
-	scopedDB, err := sql.Open("sqlite3", tmpPath+internal.DB_PRAGMAS)
+	scopedDB, err := sql.Open("sqlite3", internal.DSN(tmpPath, false))
 	if err != nil {
 		os.Remove(tmpPath)
 		return "", "", 0, 0, 0, fmt.Errorf("open scoped db: %w", err)
@@ -624,7 +624,7 @@ func buildGameScopedCacheDB(
 	}
 
 	// Open source cache DB
-	srcCacheDB, err := sql.Open("sqlite3", cacheDBPath+internal.DB_PRAGMAS)
+	srcCacheDB, err := sql.Open("sqlite3", internal.DSN(cacheDBPath, false))
 	if err != nil {
 		return "", "", fmt.Errorf("open cache db: %w", err)
 	}
@@ -638,7 +638,7 @@ func buildGameScopedCacheDB(
 	tmpPath := tmp.Name()
 	tmp.Close()
 
-	dstCacheDB, err := sql.Open("sqlite3", tmpPath+internal.DB_PRAGMAS)
+	dstCacheDB, err := sql.Open("sqlite3", internal.DSN(tmpPath, false))
 	if err != nil {
 		os.Remove(tmpPath)
 		return "", "", fmt.Errorf("open scoped cache db: %w", err)
