@@ -1774,7 +1774,8 @@ the extracted `modctl.db` is migrated to the current schema (goose `Up`)
 before anything reads it, so that the current generated queries work against
 it. This happens on the temporary extracted copy only: the bundle file is
 opened read-only and streamed into a temp directory, so the original export is
-never modified. Every consumer of the bundle database (full and game-scoped
+never modified. Once migrated, the bundle database is opened with a read-only
+connection, since nothing that reads a bundle writes to it. Every consumer of the bundle database (full and game-scoped
 import, `verify`, `extract`) goes through the same open path
 (`restore.OpenAndValidate`). A bundle database is just a smaller database
 built with the same migration chain, so this is the same code path as a

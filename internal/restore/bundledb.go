@@ -22,6 +22,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
 
 	"github.com/mfinelli/modctl/internal"
 	"github.com/pressly/goose/v3"
@@ -33,16 +34,20 @@ import (
 // only populated in the real binary.
 type providerFunc func(*sql.DB) (*goose.Provider, error)
 
-// openBundleDB opens the extracted bundle database. If the bundle was
-// exported by an older version of modctl its schema is migrated to the
+// openBundleDB opens the extracted bundle database read-only. If the bundle
+// was exported by an older version of modctl its schema is migrated to the
 // current one first, so that the current queries can read it. This only ever
 // touches the temporary extracted copy: the original bundle file is opened
 // read-only and streamed into the temp directory, and never written to.
+//
+// The read-only connection must be opened as a file: URI. With a plain path
+// the driver silently discards the query string, mode=ro included, and the
+// connection ends up writable.
 func openBundleDB(ctx context.Context, dbPath string, newProvider providerFunc) (*sql.DB, error) {
 	if err := migrateBundleDB(ctx, dbPath, newProvider); err != nil {
 		return nil, err
 	}
-	return sql.Open("sqlite3", dbPath+internal.DB_PRAGMAS+"&mode=ro")
+	return sql.Open("sqlite3", fmt.Sprintf("file:%s%s&mode=ro", url.PathEscape(dbPath), internal.DB_PRAGMAS))
 }
 
 // migrateBundleDB brings the bundle database at dbPath up to the latest

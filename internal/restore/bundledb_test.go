@@ -152,6 +152,55 @@ func TestOpenBundleDB(t *testing.T) {
 		assert.EqualValues(t, 1, blobCount(t, db))
 	})
 
+	t.Run("the bundle database is read-only", func(t *testing.T) {
+		t.Parallel()
+
+		path, _ := newBundleDBFile(t, 0)
+
+		db, err := openBundleDB(ctx, path, testProvider(t))
+		require.NoError(t, err)
+		defer db.Close()
+
+		// reads work
+		assert.EqualValues(t, 1, blobCount(t, db))
+
+		// writes do not
+		_, err = db.Exec(`DELETE FROM blobs`)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "readonly")
+		_, err = db.Exec(`CREATE TABLE not_allowed (a)`)
+		require.Error(t, err)
+		assert.EqualValues(t, 1, blobCount(t, db))
+	})
+
+	t.Run("a database in rollback-journal mode can still be opened read-only", func(t *testing.T) {
+		t.Parallel()
+
+		// e.g. a bundle whose database was written without WAL; opening it
+		// read-only can't switch it to WAL itself, so the migration step has
+		// to have done that first
+		path := filepath.Join(t.TempDir(), "modctl.db")
+		raw, err := sql.Open("sqlite3", path+"?_foreign_keys=ON&_journal_mode=DELETE")
+		require.NoError(t, err)
+		p := testbuilder.NewProvider(t, raw)
+		_, err = p.Up(ctx)
+		require.NoError(t, err)
+		_, err = raw.Exec(
+			`INSERT INTO blobs (sha256, kind, size_bytes, original_name) VALUES (?, 'archive', 10, 'x.zip')`,
+			testBlobSha,
+		)
+		require.NoError(t, err)
+		raw.Close()
+
+		db, err := openBundleDB(ctx, path, testProvider(t))
+		require.NoError(t, err)
+		defer db.Close()
+
+		assert.EqualValues(t, 1, blobCount(t, db))
+		_, err = db.Exec(`DELETE FROM blobs`)
+		require.Error(t, err)
+	})
+
 	t.Run("missing database is an error", func(t *testing.T) {
 		t.Parallel()
 
