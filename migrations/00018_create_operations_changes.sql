@@ -149,7 +149,7 @@ DROP INDEX idx_operation_changes_action;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
-DROP INDEX idx_operaiont_changes_backup_blob;
+DROP INDEX idx_operation_changes_backup_blob;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
