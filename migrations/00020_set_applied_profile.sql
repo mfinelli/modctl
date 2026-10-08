@@ -61,5 +61,14 @@ DROP TRIGGER trg_game_installs_applied_profile_matches_game_upd;
 DROP TRIGGER trg_game_installs_applied_profile_matches_game_ins;
 -- +goose StatementEnd
 
--- TODO: rebuild the game_installs table without the columns we added
--- https://stackoverflow.com/a/66399224
+-- +goose StatementBegin
+ALTER TABLE game_installs DROP COLUMN applied_operation_id;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+ALTER TABLE game_installs DROP COLUMN applied_at;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+ALTER TABLE game_installs DROP COLUMN applied_profile_id;
+-- +goose StatementEnd

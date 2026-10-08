@@ -93,4 +93,76 @@ CREATE INDEX idx_profile_items_target ON profile_items(target_id);
 -- +goose StatementEnd
 
 -- +goose Down
-SELECT 'TODO: do the rebuild in reverse...';
+-- Reverse the rebuild: profile_items goes back to its pre-00023 shape, without
+-- target_id. Which target each item deployed to is lost, and applying 00023
+-- again points every item at game_dir.
+-- +goose StatementBegin
+CREATE TABLE profile_items_old
+(
+  id INTEGER PRIMARY KEY,
+  profile_id INTEGER NOT NULL REFERENCES profiles(id) ON UPDATE CASCADE ON DELETE CASCADE,
+
+  -- we might use this in the future for now just always set it to 'pinned'
+  policy TEXT NOT NULL DEFAULT 'pinned' CHECK (policy IN ('pinned')),
+
+  -- pinned version
+  mod_file_version_id INTEGER NOT NULL REFERENCES mod_file_versions(id) ON UPDATE CASCADE ON DELETE RESTRICT,
+
+  enabled INTEGER NOT NULL DEFAULT FALSE CHECK (enabled IN (TRUE, FALSE)),
+
+  -- larger numbers = higher priority (wins conflicts)
+  priority INTEGER NOT NULL DEFAULT 0,
+
+  -- remap rules/configuration for this item
+  remap_config_id INTEGER REFERENCES remap_configs(id) ON UPDATE CASCADE ON DELETE CASCADE,
+
+  -- optional notes per item
+  notes TEXT,
+
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+
+  -- prevent duplicates: same version shouldn't appear multiple times in the same profile
+  UNIQUE(profile_id, mod_file_version_id)
+) STRICT;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+INSERT INTO profile_items_old (
+  id, profile_id, policy, mod_file_version_id,
+  enabled, priority, remap_config_id, notes, created_at, updated_at
+)
+SELECT
+  id, profile_id, policy, mod_file_version_id,
+  enabled, priority, remap_config_id, notes, created_at, updated_at
+FROM profile_items;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+DROP TABLE profile_items;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+ALTER TABLE profile_items_old RENAME TO profile_items;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE INDEX idx_profile_items_profile ON profile_items(profile_id);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE INDEX idx_profile_items_remap_config ON profile_items(remap_config_id);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE INDEX idx_profile_items_profile_priority ON profile_items(profile_id, enabled, priority DESC);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE INDEX idx_profile_items_mfv ON profile_items(mod_file_version_id);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE UNIQUE INDEX uq_profile_items_priority_per_profile
+ON profile_items(profile_id, priority);
+-- +goose StatementEnd
