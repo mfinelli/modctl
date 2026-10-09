@@ -114,7 +114,16 @@ versions are ignored when computing the applied mod set.`,
 			return err
 		}
 
-		return internal.SetProfileItemEnabled(ctx, &p, q, mfvID, false)
+		changed, err := internal.SetProfileItemEnabled(ctx, &p, q, mfvID, false)
+		if err != nil {
+			return err
+		}
+		if !changed {
+			fmt.Printf("Version %d is already disabled in profile %q\n", mfvID, p.Name)
+			return nil
+		}
+		fmt.Printf("Disabled version %d in profile %q\n", mfvID, p.Name)
+		return nil
 	},
 }
 

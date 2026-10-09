@@ -111,7 +111,17 @@ the write-once configuration from the old version.`,
 			return fmt.Errorf("destination: %w", err)
 		}
 
-		return internal.CopyWriteOncePatterns(ctx, db, q, srcItemID, dstItemID, mfvSrc.ID, mfvDst.ID, p.Name)
+		copied, err := internal.CopyWriteOncePatterns(ctx, db, q, srcItemID, dstItemID)
+		if err != nil {
+			return err
+		}
+		if copied == 0 {
+			fmt.Printf("Version %d in profile %q has no write-once patterns to copy\n", mfvSrc.ID, p.Name)
+			return nil
+		}
+		fmt.Printf("Copied %d write-once pattern(s) from version %d to version %d in profile %q\n",
+			copied, mfvSrc.ID, mfvDst.ID, p.Name)
+		return nil
 	},
 }
 

@@ -1436,6 +1436,15 @@ aligned label/value lines (one `KV` per group of lines, sized to the longest
 label), `Table` for tables, and `Bytes`, `Age`, `Duration` and `ShortSha` for
 sizes, times and hashes.
 
+Code under `internal/` does not print. Anything that is shown to the user is
+rendered by the command in `cmd/`, using `internal/style`. Functions that do
+work return what happened (a changed flag, a count, a list of changes) and the
+command decides how to say it; long-running work reports how it is going through
+a callback (see `exporter.Options.Progress`) rather than writing to the
+terminal. The one exception is code that is handed an `io.Writer` to write to,
+such as the Nexus SSO flow. This keeps that code testable, and means it can drive
+something other than a line-oriented terminal, such as a TUI.
+
 ### command-specifc information
 
 #### `profiles delete`

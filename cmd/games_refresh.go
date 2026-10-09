@@ -61,8 +61,17 @@ It is safe to run multiple times.`,
 		fmt.Println()
 
 		result, err := internal.ScanStores(ctx, db)
+
+		// warnings are worth showing even if the scan then failed
+		for _, w := range result.Warnings {
+			fmt.Println(style.Warning.Render(fmt.Sprintf("  ⚠ %s", w)))
+		}
 		if err != nil {
 			return err
+		}
+
+		for _, c := range result.Changes {
+			fmt.Println(refreshChangeLine(c))
 		}
 
 		// Summary
@@ -86,6 +95,23 @@ It is safe to run multiple times.`,
 
 		return nil
 	},
+}
+
+// refreshChangeLine renders what a refresh found out about one install.
+func refreshChangeLine(c internal.RefreshChange) string {
+	switch c.Kind {
+	case internal.RefreshMissing:
+		return style.Removed.Render(fmt.Sprintf("  - %s", c.Name)) +
+			style.Subtle.Render("  (no longer present)")
+	case internal.RefreshNew:
+		return style.Added.Render(fmt.Sprintf("  + %s", c.Name)) +
+			style.Subtle.Render("  (new)")
+	case internal.RefreshReturned:
+		return style.Restored.Render(fmt.Sprintf("  ↩ %s", c.Name)) +
+			style.Subtle.Render("  (returned)")
+	default:
+		return style.Subtle.Render(fmt.Sprintf("  = %s", c.Name))
+	}
 }
 
 func init() {

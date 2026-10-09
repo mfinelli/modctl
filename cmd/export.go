@@ -90,6 +90,7 @@ Examples:
 			SkipInventory: exportSkipInventory,
 			NoVerify:      exportNoVerify,
 			CacheDBPath:   filepath.Join(viper.GetString("cache_dir"), "nexus_cache.db"),
+			Progress:      printExportProgress,
 		}
 
 		date := time.Now().Format("20060102")
@@ -106,9 +107,11 @@ Examples:
 			fmt.Println()
 
 			start := time.Now()
-			if err := exporter.Full(ctx, db, q, bs, opts); err != nil {
+			result, err := exporter.Full(ctx, db, q, bs, opts)
+			if err != nil {
 				return fmt.Errorf("export: %w", err)
 			}
+			warnSkippedBlobs(result)
 
 			st, _ := os.Stat(exportOutput)
 			fmt.Println(style.Success.Render(fmt.Sprintf("  ✓ export complete in %.1fs", time.Since(start).Seconds())))
@@ -137,9 +140,11 @@ Examples:
 		fmt.Println()
 
 		start := time.Now()
-		if err := exporter.Game(ctx, db, q, bs, gi, opts); err != nil {
+		result, err := exporter.Game(ctx, db, q, bs, gi, opts)
+		if err != nil {
 			return fmt.Errorf("export: %w", err)
 		}
+		warnSkippedBlobs(result)
 
 		st, _ := os.Stat(exportOutput)
 		fmt.Println(style.Success.Render(fmt.Sprintf("  ✓ export complete in %.1fs", time.Since(start).Seconds())))
@@ -149,6 +154,30 @@ Examples:
 
 		return nil
 	},
+}
+
+// printExportProgress shows blob verification as a single updating line.
+func printExportProgress(p exporter.Progress) {
+	switch p.Kind {
+	case exporter.VerifyStarted:
+		fmt.Printf("  verifying blobs (0/%d)", p.Total)
+	case exporter.VerifyBlob:
+		fmt.Printf("\r  verifying blobs (%d/%d)", p.Done, p.Total)
+	case exporter.VerifyFinished:
+		fmt.Printf("\r%-60s\r", "")
+		fmt.Printf("  verified %d blob(s)\n", p.Total)
+	case exporter.VerifyFailed:
+		// end the progress line so the error starts on a line of its own
+		fmt.Print("\n")
+	}
+}
+
+// warnSkippedBlobs tells the user about blobs that were left out of an export
+// because they were missing from disk.
+func warnSkippedBlobs(r exporter.Result) {
+	for _, sha := range r.SkippedBlobs {
+		fmt.Fprintf(os.Stderr, "warning: blob %s missing from disk, skipped in export\n", style.ShortSha(sha))
+	}
 }
 
 func init() {

@@ -113,7 +113,17 @@ version to the new version before removing the old version from the profile.`,
 			return fmt.Errorf("destination: %w", err)
 		}
 
-		return internal.CopyRemapConfig(ctx, db, q, srcItemID, dstItemID, mfvSrc.ID, mfvDst.ID, p.Name)
+		copied, err := internal.CopyRemapConfig(ctx, db, q, srcItemID, dstItemID)
+		if err != nil {
+			return err
+		}
+		if copied == 0 {
+			fmt.Printf("Version %d in profile %q has no remap rules to copy\n", mfvSrc.ID, p.Name)
+			return nil
+		}
+		fmt.Printf("Copied %d remap rule(s) from version %d to version %d in profile %q\n",
+			copied, mfvSrc.ID, mfvDst.ID, p.Name)
+		return nil
 	},
 }
 

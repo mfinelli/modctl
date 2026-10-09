@@ -114,7 +114,16 @@ priority or position in the load order.`,
 			return err
 		}
 
-		return internal.SetProfileItemEnabled(ctx, &p, q, mfv.ID, true)
+		changed, err := internal.SetProfileItemEnabled(ctx, &p, q, mfv.ID, true)
+		if err != nil {
+			return err
+		}
+		if !changed {
+			fmt.Printf("Version %d is already enabled in profile %q\n", mfv.ID, p.Name)
+			return nil
+		}
+		fmt.Printf("Enabled version %d in profile %q\n", mfv.ID, p.Name)
+		return nil
 	},
 }
 
