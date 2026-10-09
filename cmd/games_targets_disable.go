@@ -29,6 +29,7 @@ import (
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/lock"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -117,7 +118,7 @@ the only enabled target.`,
 		}
 
 		if !internal.TargetEnabled(target) {
-			fmt.Printf("Target %q is already disabled.\n", name)
+			style.Printf("Target %q is already disabled.\n", name)
 			return nil
 		}
 
@@ -150,7 +151,7 @@ the only enabled target.`,
 			return fmt.Errorf("disable target: %w", err)
 		}
 
-		fmt.Printf("Disabled target %q.\n", name)
+		style.Printf("Disabled target %q.\n", name)
 		return nil
 	},
 }

@@ -27,6 +27,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -119,7 +120,7 @@ Use 'remap list' to see current rules and their positions.`,
 			return fmt.Errorf("delete remap rule: %w", err)
 		}
 
-		fmt.Printf("Removed remap rule at position %d for version %d in profile %q\n",
+		style.Printf("Removed remap rule at position %d for version %d in profile %q\n",
 			position, mfv.ID, p.Name)
 
 		return nil

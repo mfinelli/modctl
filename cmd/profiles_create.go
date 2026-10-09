@@ -30,6 +30,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
 )
@@ -109,7 +110,7 @@ Note: modctl automatically creates a "default" profile during game refresh.`,
 			return fmt.Errorf("create profile: %w", err)
 		}
 
-		fmt.Printf("Created profile %q (id=%d)\n", name, id)
+		style.Printf("Created profile %q (id=%d)\n", name, id)
 
 		return nil
 	},

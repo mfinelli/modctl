@@ -29,6 +29,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -235,7 +236,7 @@ removing the node entirely.`,
 			}); err != nil {
 				return fmt.Errorf("insert unset patch entry: %w", err)
 			}
-			fmt.Printf("marked key %q for removal in override for %q in profile %q\n",
+			style.Printf("marked key %q for removal in override for %q in profile %q\n",
 				entryKey, relpath, p.Name)
 		} else {
 			// existing entry: update type to unset and clear value
@@ -246,7 +247,7 @@ removing the node entirely.`,
 			}); err != nil {
 				return fmt.Errorf("update patch entry: %w", err)
 			}
-			fmt.Printf("converted patch entry %q to unset in override for %q in profile %q\n",
+			style.Printf("converted patch entry %q to unset in override for %q in profile %q\n",
 				entryKey, relpath, p.Name)
 		}
 

@@ -101,7 +101,7 @@ not immediately removed from disk; run 'modctl gc' to reclaim space.`,
 			return fmt.Errorf("resolve target %q: %w", targetName, err)
 		}
 
-		fmt.Println(style.Warning.Render(fmt.Sprintf(
+		style.Println(style.Warning.Render(fmt.Sprintf(
 			"  warning: deleting this backup means modctl cannot restore the original file at %q on unapply",
 			relpath,
 		)))
@@ -118,7 +118,7 @@ not immediately removed from disk; run 'modctl gc' to reclaim space.`,
 			return fmt.Errorf("no backup found for %q in target %q", relpath, targetName)
 		}
 
-		fmt.Printf("Deleted backup for %q (run 'modctl gc' to reclaim disk space)\n", relpath)
+		style.Printf("Deleted backup for %q (run 'modctl gc' to reclaim disk space)\n", relpath)
 		return nil
 	},
 }

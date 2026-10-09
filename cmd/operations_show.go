@@ -76,7 +76,7 @@ action taken, content hashes before and after, and backup references.`,
 			return fmt.Errorf("list operation changes: %w", err)
 		}
 
-		fmt.Println(renderOperationDetail(op, changes))
+		style.Println(renderOperationDetail(op, changes))
 		return nil
 	},
 }

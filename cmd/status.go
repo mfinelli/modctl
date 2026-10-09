@@ -68,7 +68,7 @@ For detailed profile information including mod list and conflicts, use
 		}
 
 		if len(installs) == 0 {
-			fmt.Println(style.Subtle.Render("  no game installs found - run 'modctl games refresh' to discover games"))
+			style.Println(style.Subtle.Render("  no game installs found - run 'modctl games refresh' to discover games"))
 			return nil
 		}
 
@@ -114,7 +114,7 @@ For detailed profile information including mod list and conflicts, use
 			summaries = append(summaries, s)
 		}
 
-		fmt.Println(renderSystemStatus(summaries))
+		style.Println(renderSystemStatus(summaries))
 
 		return nil
 	},

@@ -110,7 +110,7 @@ specific store. Or use --all to include games from all stores.
 			})
 		}
 
-		fmt.Println(style.Table([]string{" ID ", " Selector ", " Name ", " Path ", " Present ", " Last Seen "}, rows))
+		style.Println(style.Table([]string{" ID ", " Selector ", " Name ", " Path ", " Present ", " Last Seen "}, rows))
 
 		return nil
 	},

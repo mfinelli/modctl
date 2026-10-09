@@ -28,6 +28,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -151,7 +152,7 @@ Examples:
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Added %s rule at position %d\n", ruleType, position)
+		style.Printf("Added %s rule at position %d\n", ruleType, position)
 		return nil
 	},
 }

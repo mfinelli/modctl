@@ -50,23 +50,23 @@ you complete authorization.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if viper.GetString("nexus.apikey") != "" && !authNexusLoginForce {
-			fmt.Println(style.Failure.Render("  ✗ a Nexus Mods API key is already configured"))
-			fmt.Println(style.Subtle.Render("    run with --force to replace it"))
-			fmt.Println()
+			style.Println(style.Failure.Render("  ✗ a Nexus Mods API key is already configured"))
+			style.Println(style.Subtle.Render("    run with --force to replace it"))
+			style.Println()
 			return fmt.Errorf("nexus API key already set")
 		}
 
-		fmt.Println(style.Subtle.Render("  Connecting to Nexus Mods SSO..."))
+		style.Println(style.Subtle.Render("  Connecting to Nexus Mods SSO..."))
 
 		ctx, cancel := context.WithTimeout(cmd.Context(), nexusclient.DefaultSSOTimeout)
 		defer cancel()
 
 		apiKey, err := nexusclient.Login(ctx, os.Stderr)
 		if err != nil {
-			fmt.Println()
-			fmt.Println(style.Failure.Render("  ✗ authentication failed"))
-			fmt.Println(style.Subtle.Render("    " + err.Error()))
-			fmt.Println()
+			style.Println()
+			style.Println(style.Failure.Render("  ✗ authentication failed"))
+			style.Println(style.Subtle.Render("    " + err.Error()))
+			style.Println()
 			return fmt.Errorf("nexus SSO login: %w", err)
 		}
 
@@ -97,11 +97,11 @@ you complete authorization.`,
 			return fmt.Errorf("write config file: %w", err)
 		}
 
-		fmt.Println()
-		fmt.Println(style.Success.Render("  ✓ authenticated with Nexus Mods"))
-		fmt.Println(style.Subtle.Render("    API key saved to " + configPath))
-		fmt.Println(style.Subtle.Render("    Note: the key is stored in plain text (mode 0600)"))
-		fmt.Println()
+		style.Println()
+		style.Println(style.Success.Render("  ✓ authenticated with Nexus Mods"))
+		style.Println(style.Subtle.Render("    API key saved to " + configPath))
+		style.Println(style.Subtle.Render("    Note: the key is stored in plain text (mode 0600)"))
+		style.Println()
 
 		return nil
 	},

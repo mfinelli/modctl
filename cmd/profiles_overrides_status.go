@@ -110,19 +110,19 @@ Pass a path argument to show detail for a single override only.`,
 		}
 
 		if len(rows) == 0 {
-			fmt.Println(style.Subtle.Render(fmt.Sprintf(
+			style.Println(style.Subtle.Render(fmt.Sprintf(
 				"  no overrides for profile %q", p.Name,
 			)))
 			return nil
 		}
 
-		fmt.Println(style.Bold.Render(fmt.Sprintf(
+		style.Println(style.Bold.Render(fmt.Sprintf(
 			"Override status for profile %q:", p.Name,
 		)))
 
 		for _, r := range rows {
-			fmt.Println()
-			fmt.Printf("  %s\n", style.Bold.Render(r.Relpath))
+			style.Println()
+			style.Printf("  %s\n", style.Bold.Render(r.Relpath))
 
 			kvIndented.Print("type:", formatOverrideType(r.OverrideType))
 
@@ -166,7 +166,7 @@ Pass a path argument to show detail for a single override only.`,
 		}
 
 		// summary line
-		fmt.Println()
+		style.Println()
 		counts := map[string]int{}
 		for _, r := range rows {
 			counts[r.StalenessState]++
@@ -188,7 +188,7 @@ Pass a path argument to show detail for a single override only.`,
 			parts = append(parts, style.Warning.Render(fmt.Sprintf("%d anchor lost", n)))
 		}
 		if len(parts) > 0 {
-			fmt.Println(style.Subtle.Render("  " + strings.Join(parts, "  ·  ")))
+			style.Println(style.Subtle.Render("  " + strings.Join(parts, "  ·  ")))
 		}
 
 		return nil

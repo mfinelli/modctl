@@ -18,7 +18,12 @@
 
 package style
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"image/color"
+
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+)
 
 // Messages: a line that reports how something went. These use the plain
 // (non-bright) colors.
@@ -54,9 +59,9 @@ var (
 var (
 	Bold    = lipgloss.NewStyle().Bold(true)
 	Title   = Bold
-	Subtle  = fg("245") // secondary text
-	Dim     = Gray      // de-emphasized text
-	Label   = White     // field labels; use Label.Width(n) in aligned lists
+	Subtle  = lipgloss.NewStyle().Foreground(subtleColor(lipgloss.Writer.Profile)) // secondary text
+	Dim     = Gray                                                                 // de-emphasized text
+	Label   = White                                                                // field labels; use Label.Width(n) in aligned lists
 	Header  = Bold.Foreground(lipgloss.Color("63"))
 	Section = Bold.MarginTop(1)
 )
@@ -85,6 +90,18 @@ var (
 		BorderForeground(lipgloss.Color("11")).
 		Padding(0, 1)
 )
+
+// subtleColor is the color of secondary text for a terminal with the given
+// color profile: gray 245 wherever that can be shown. A terminal limited to 16
+// colors would be given white for it by the conversion lipgloss does, which
+// makes secondary text as prominent as the text around it, so there it is asked
+// for by name instead: bright black, which is the nearest gray it has.
+func subtleColor(p colorprofile.Profile) color.Color {
+	if p == colorprofile.ANSI {
+		return lipgloss.BrightBlack
+	}
+	return lipgloss.Color("245")
+}
 
 // ActiveDot and InactiveDot are the dots that mark an active or inactive item.
 // They are functions so that they render when called, not when the program

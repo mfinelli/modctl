@@ -134,14 +134,14 @@ if needed.`,
 		if mfv.VersionString.Valid && mfv.VersionString.String != "" {
 			versionSuffix = fmt.Sprintf(" (%s)", mfv.VersionString.String)
 		}
-		fmt.Println(style.Bold.Render(fmt.Sprintf(
+		style.Println(style.Bold.Render(fmt.Sprintf(
 			"Remap preview for version %d in profile %q",
 			mfv.ID, p.Name,
 		)))
-		fmt.Println(style.Subtle.Render(fmt.Sprintf(
+		style.Println(style.Subtle.Render(fmt.Sprintf(
 			"%s / %s%s", label.ModPageName, label.FileLabel, versionSuffix,
 		)))
-		fmt.Println()
+		style.Println()
 
 		// Convert ListRemapRulesForProfileItemRow to dbq.RemapRule.
 		remapRules := make([]dbq.RemapRule, len(rules))
@@ -173,7 +173,7 @@ if needed.`,
 
 			result, err := remap.Apply(remapRules, entry.RawPath.String)
 			if err != nil {
-				fmt.Println(style.Warning.Render(fmt.Sprintf(
+				style.Println(style.Warning.Render(fmt.Sprintf(
 					"  ⚠  remap error for %q: %v", entry.RawPath.String, err,
 				)))
 				continue
@@ -194,28 +194,28 @@ if needed.`,
 
 		// Summary line
 		if len(rules) == 0 {
-			fmt.Println(style.Subtle.Render(fmt.Sprintf(
+			style.Println(style.Subtle.Render(fmt.Sprintf(
 				"no remap rules:  all %d files pass through as-is",
 				len(included),
 			)))
 		} else {
 			total := len(included) + len(excluded)
-			fmt.Println(style.Subtle.Render(fmt.Sprintf(
+			style.Println(style.Subtle.Render(fmt.Sprintf(
 				"%d rule(s), %d of %d entries included",
 				len(rules), len(included), total,
 			)))
 		}
-		fmt.Println()
+		style.Println()
 
 		// Included entries
 		if len(included) == 0 {
-			fmt.Println(style.Warning.Render("  ⚠  no entries pass the current remap rules"))
+			style.Println(style.Warning.Render("  ⚠  no entries pass the current remap rules"))
 		} else {
 			for _, e := range included {
 				if e.source == e.dest {
-					fmt.Printf("  %s\n", e.source)
+					style.Printf("  %s\n", e.source)
 				} else {
-					fmt.Printf("  %s → %s\n", e.source, e.dest)
+					style.Printf("  %s → %s\n", e.source, e.dest)
 				}
 			}
 		}
@@ -223,17 +223,17 @@ if needed.`,
 		// Excluded entries
 		if len(excluded) > 0 {
 			if profilesRemapPreviewShowFiltered {
-				fmt.Println()
-				fmt.Println(style.Subtle.Render(fmt.Sprintf("Excluded (%d):", len(excluded))))
+				style.Println()
+				style.Println(style.Subtle.Render(fmt.Sprintf("Excluded (%d):", len(excluded))))
 				for _, e := range excluded {
-					fmt.Printf("  %s  %s\n",
+					style.Printf("  %s  %s\n",
 						style.Bad.Render("✗ "+e.source),
 						style.Subtle.Render(e.skipReason),
 					)
 				}
 			} else {
-				fmt.Println()
-				fmt.Println(style.Subtle.Render(fmt.Sprintf(
+				style.Println()
+				style.Println(style.Subtle.Render(fmt.Sprintf(
 					"(%d entries excluded, pass --show-filtered to see them)",
 					len(excluded),
 				)))

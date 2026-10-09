@@ -38,6 +38,11 @@ func TestTable(t *testing.T) {
 	}
 	// a header row, a separator, then one line per row, all inside a border
 	assert.Equal(t, 6, len(strings.Split(out, "\n")))
+
+	// the border is rounded, not square
+	assert.Contains(t, out, "╭")
+	assert.Contains(t, out, "╯")
+	assert.NotContains(t, out, "┌")
 }
 
 func TestTableNoRows(t *testing.T) {

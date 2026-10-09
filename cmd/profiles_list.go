@@ -90,22 +90,22 @@ The current active game is used unless --game is provided.`,
 		}
 
 		if len(rows) == 0 {
-			fmt.Println(style.Subtle.Render("No profiles found"))
+			style.Println(style.Subtle.Render("No profiles found"))
 			return nil
 		}
 
-		fmt.Println(style.Header.Render("Profiles"))
-		fmt.Println()
+		style.Println(style.Header.Render("Profiles"))
+		style.Println()
 
 		for _, p := range rows {
 			prefix := "  "
 			if p.IsActive != 0 {
 				prefix = style.Success.Render("  * ")
 			}
-			fmt.Printf("%s%s\n", prefix, p.Name)
+			style.Printf("%s%s\n", prefix, p.Name)
 
 			if p.Description.Valid && p.Description.String != "" {
-				fmt.Println(style.Subtle.Render("    " + p.Description.String))
+				style.Println(style.Subtle.Render("    " + p.Description.String))
 			}
 		}
 

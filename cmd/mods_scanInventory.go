@@ -99,23 +99,23 @@ its existing inventory.`,
 
 		if result.Scanned == 0 && result.Failed == 0 {
 			if modsScanInventoryRescan {
-				fmt.Println(style.Subtle.Render("  no archives to rescan"))
+				style.Println(style.Subtle.Render("  no archives to rescan"))
 			} else {
-				fmt.Println(style.Subtle.Render("  all archives already inventoried, nothing to do"))
+				style.Println(style.Subtle.Render("  all archives already inventoried, nothing to do"))
 			}
 			return nil
 		}
 
 		if modsScanInventoryRescan {
-			fmt.Println(style.Bold.Render("Inventory rescan complete:"))
-			fmt.Printf("  rescanned: %d\n", result.Scanned)
+			style.Println(style.Bold.Render("Inventory rescan complete:"))
+			style.Printf("  rescanned: %d\n", result.Scanned)
 		} else {
-			fmt.Println(style.Bold.Render("Inventory scan complete:"))
-			fmt.Printf("  scanned: %d\n", result.Scanned)
+			style.Println(style.Bold.Render("Inventory scan complete:"))
+			style.Printf("  scanned: %d\n", result.Scanned)
 		}
 
 		if result.Failed > 0 {
-			fmt.Println(style.Warning.Render(fmt.Sprintf("  failed:  %d (see logs for details)", result.Failed)))
+			style.Println(style.Warning.Render(fmt.Sprintf("  failed:  %d (see logs for details)", result.Failed)))
 			return fmt.Errorf("%d archive(s) failed to scan", result.Failed)
 		}
 

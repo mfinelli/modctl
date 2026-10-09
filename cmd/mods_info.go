@@ -320,7 +320,7 @@ func runModsInfo(
 		}
 	}
 
-	fmt.Println(renderModInfo(mp, fileVersions, versionProfiles, nexusModInfo, nexusFileInfos, superseded, inventories, showInventory))
+	style.Println(renderModInfo(mp, fileVersions, versionProfiles, nexusModInfo, nexusFileInfos, superseded, inventories, showInventory))
 	return nil
 }
 

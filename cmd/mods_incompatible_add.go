@@ -150,11 +150,11 @@ known crashes, conflicting game mechanics, or anything else.`,
 			return fmt.Errorf("flagging incompatibility: %w", err)
 		}
 
-		fmt.Printf("Flagged as incompatible:\n")
-		fmt.Printf("  %s (id: %d)\n", pageA.Name, pageA.ID)
-		fmt.Printf("  %s (id: %d)\n", pageB.Name, pageB.ID)
+		style.Printf("Flagged as incompatible:\n")
+		style.Printf("  %s (id: %d)\n", pageA.Name, pageA.ID)
+		style.Printf("  %s (id: %d)\n", pageB.Name, pageB.ID)
 		if modsIncompatibleAddReason != "" {
-			fmt.Println(style.Subtle.Render(fmt.Sprintf("  reason: %s", modsIncompatibleAddReason)))
+			style.Println(style.Subtle.Render(fmt.Sprintf("  reason: %s", modsIncompatibleAddReason)))
 		}
 
 		return nil

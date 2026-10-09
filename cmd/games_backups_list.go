@@ -87,7 +87,7 @@ not install. They are restored automatically on unapply.`,
 		}
 
 		if len(backups) == 0 {
-			fmt.Println(style.Subtle.Render("  no backups found"))
+			style.Println(style.Subtle.Render("  no backups found"))
 			return nil
 		}
 
@@ -106,7 +106,7 @@ not install. They are restored automatically on unapply.`,
 			})
 		}
 
-		fmt.Println(style.Table([]string{" Target ", " Path ", " Size ", " Backed Up At ", " Operation "}, rows))
+		style.Println(style.Table([]string{" Target ", " Path ", " Size ", " Backed Up At ", " Operation "}, rows))
 		return nil
 	},
 }

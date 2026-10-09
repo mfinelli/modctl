@@ -18,13 +18,19 @@
 
 package style
 
-import "github.com/charmbracelet/lipgloss/table"
+import (
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/table"
+)
 
 // Table renders rows under a header as a table. Cells are rendered as they are
 // given, so pad them (for example with spaces on either side) if you want them
 // to have some room.
 func Table(headers []string, rows [][]string) string {
 	return table.New().
+		// lipgloss v2 draws a square border unless told otherwise; v1 and
+		// modctl have always had a rounded one
+		Border(lipgloss.RoundedBorder()).
 		Headers(headers...).
 		Rows(rows...).
 		String()

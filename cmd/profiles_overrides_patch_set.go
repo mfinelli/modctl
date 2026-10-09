@@ -30,6 +30,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -233,7 +234,7 @@ Examples:
 			}); err != nil {
 				return fmt.Errorf("insert patch entry: %w", err)
 			}
-			fmt.Printf("added patch entry %q to override for %q in profile %q\n",
+			style.Printf("added patch entry %q to override for %q in profile %q\n",
 				entryKey, relpath, p.Name)
 		} else {
 			// existing entry: update value in place
@@ -243,7 +244,7 @@ Examples:
 			}); err != nil {
 				return fmt.Errorf("update patch entry: %w", err)
 			}
-			fmt.Printf("updated patch entry %q in override for %q in profile %q\n",
+			style.Printf("updated patch entry %q in override for %q in profile %q\n",
 				entryKey, relpath, p.Name)
 		}
 

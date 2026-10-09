@@ -57,41 +57,41 @@ It is safe to run multiple times.`,
 			return fmt.Errorf("error migrating database: %w", err)
 		}
 
-		fmt.Println(style.Bold.Render("Scanning stores..."))
-		fmt.Println()
+		style.Println(style.Bold.Render("Scanning stores..."))
+		style.Println()
 
 		result, err := internal.ScanStores(ctx, db)
 
 		// warnings are worth showing even if the scan then failed
 		for _, w := range result.Warnings {
-			fmt.Println(style.Warning.Render(fmt.Sprintf("  ⚠ %s", w)))
+			style.Println(style.Warning.Render(fmt.Sprintf("  ⚠ %s", w)))
 		}
 		if err != nil {
 			return err
 		}
 
 		for _, c := range result.Changes {
-			fmt.Println(refreshChangeLine(c))
+			style.Println(refreshChangeLine(c))
 		}
 
 		// Summary
-		fmt.Println()
-		fmt.Println(style.Bold.Render("Done."))
+		style.Println()
+		style.Println(style.Bold.Render("Done."))
 		total := len(result.New) + len(result.Updated) + len(result.Returned)
-		fmt.Printf("  %d game(s) found", total)
+		style.Printf("  %d game(s) found", total)
 		if len(result.New) > 0 {
-			fmt.Printf(", %d new", len(result.New))
+			style.Printf(", %d new", len(result.New))
 		}
 		if len(result.Returned) > 0 {
-			fmt.Printf(", %d returned", len(result.Returned))
+			style.Printf(", %d returned", len(result.Returned))
 		}
 		if len(result.Missing) > 0 {
-			fmt.Printf(", %d missing", len(result.Missing))
+			style.Printf(", %d missing", len(result.Missing))
 		}
 		if len(result.Skipped) > 0 {
-			fmt.Printf(", %d skipped", len(result.Skipped))
+			style.Printf(", %d skipped", len(result.Skipped))
 		}
-		fmt.Println()
+		style.Println()
 
 		return nil
 	},

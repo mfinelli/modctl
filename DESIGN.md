@@ -1412,9 +1412,9 @@ Key behavior:
 
 ### Terminal output styling
 
-All terminal styling lives in `internal/style`; no command defines its own
-styles (a test fails if `lipgloss.NewStyle()` appears anywhere else). The
-package has two layers:
+All terminal styling lives in `internal/style` (which is the only package that
+imports lipgloss); no command defines its own styles. The package has two
+layers:
 
 - the **palette**: the ANSI colors modctl uses, with the bright variants named
   separately (`Green` and `BrightGreen`, and so on);
@@ -1435,6 +1435,20 @@ command does it the same way and it can be tested in one place: `KV` for
 aligned label/value lines (one `KV` per group of lines, sized to the longest
 label), `Table` for tables, and `Bytes`, `Age`, `Duration` and `ShortSha` for
 sizes, times and hashes.
+
+Printing goes through `style.Print`, `Printf` and `Println` (and `Fprint*` for
+anything other than standard output), never through `fmt`. Since lipgloss v2 a
+style always renders to a string with its full escape sequences, and it is the
+writer that decides what the output can show: when the destination is not a
+terminal, or `NO_COLOR` is set, the colors are removed, and a terminal with
+fewer colors gets the closest ones it has. Printing a styled string with `fmt`
+skips that and writes the raw sequences into pipes and files. `KV.Print` and
+the other helpers in `style` print this way too.
+
+Two things differ from what lipgloss does by default, to keep the output the
+same as it was with v1: `Table` draws a rounded border (v2 defaults to a square
+one), and `Subtle` asks a 16-color terminal for bright black by name, because
+converting its 256-color gray would give it white.
 
 Code under `internal/` does not print. Anything that is shown to the user is
 rendered by the command in `cmd/`, using `internal/style`. Functions that do

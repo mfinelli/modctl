@@ -27,6 +27,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -187,7 +188,7 @@ Exactly one of --before or --after is required.`,
 			}
 		}
 		if noop {
-			fmt.Printf("No change: version %d is already in the requested position in profile %q\n", mfv.ID, p.Name)
+			style.Printf("No change: version %d is already in the requested position in profile %q\n", mfv.ID, p.Name)
 			return nil
 		}
 
@@ -201,9 +202,9 @@ Exactly one of --before or --after is required.`,
 		}
 
 		if placeAfter {
-			fmt.Printf("Moved version %d after %d in profile %q\n", mfv.ID, anchorID, p.Name)
+			style.Printf("Moved version %d after %d in profile %q\n", mfv.ID, anchorID, p.Name)
 		} else {
-			fmt.Printf("Moved version %d before %d in profile %q\n", mfv.ID, anchorID, p.Name)
+			style.Printf("Moved version %d before %d in profile %q\n", mfv.ID, anchorID, p.Name)
 		}
 
 		return nil

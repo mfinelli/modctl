@@ -141,7 +141,7 @@ directional: profile A is the source and profile B is the target.`,
 			return fmt.Errorf("get profile b items: %w", err)
 		}
 
-		fmt.Println(renderProfileDiff(
+		style.Println(renderProfileDiff(
 			computeProfileDiff(itemsA, itemsB),
 			profileA.Name,
 			profileB.Name,

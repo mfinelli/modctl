@@ -151,7 +151,7 @@ items are removed automatically via cascade.`,
 
 			if len(profiles) > 0 {
 				for _, p := range profiles {
-					fmt.Println(style.Warning.Render(fmt.Sprintf(
+					style.Println(style.Warning.Render(fmt.Sprintf(
 						"  ⚠ removing from profile %q (priority %d)", p.ProfileName, p.Priority)))
 				}
 			}
@@ -160,7 +160,7 @@ items are removed automatically via cascade.`,
 			if err := q.DeleteModFileVersion(ctx, mfv.ID); err != nil {
 				return fmt.Errorf("delete mod file version: %w", err)
 			}
-			fmt.Println(style.Subtle.Render(fmt.Sprintf(
+			style.Println(style.Subtle.Render(fmt.Sprintf(
 				"  removed version %d (%s / %s)", mfv.ID, ver.ModPageName, ver.FileLabel)))
 
 			// Cascade up: remove empty parent file
@@ -172,7 +172,7 @@ items are removed automatically via cascade.`,
 				if err := q.DeleteModFile(ctx, ver.ModFileID); err != nil {
 					return fmt.Errorf("delete empty mod file: %w", err)
 				}
-				fmt.Println(style.Subtle.Render(fmt.Sprintf(
+				style.Println(style.Subtle.Render(fmt.Sprintf(
 					"  removed empty file %q", ver.FileLabel)))
 
 				// Cascade up: remove empty parent page
@@ -184,12 +184,12 @@ items are removed automatically via cascade.`,
 					if err := q.DeleteModPage(ctx, ver.ModPageID); err != nil {
 						return fmt.Errorf("delete empty mod page: %w", err)
 					}
-					fmt.Println(style.Subtle.Render(fmt.Sprintf(
+					style.Println(style.Subtle.Render(fmt.Sprintf(
 						"  removed empty mod page %q", ver.ModPageName)))
 				}
 			}
 
-			fmt.Println("Removed mod file version " + strconv.FormatInt(mfv.ID, 10) +
+			style.Println("Removed mod file version " + strconv.FormatInt(mfv.ID, 10) +
 				style.Subtle.Render("  (run 'modctl gc' to reclaim disk space)"))
 			return nil
 		}
@@ -212,7 +212,7 @@ items are removed automatically via cascade.`,
 
 		if len(profiles) > 0 {
 			for _, p := range profiles {
-				fmt.Println(style.Warning.Render(fmt.Sprintf(
+				style.Println(style.Warning.Render(fmt.Sprintf(
 					"  ⚠ removing mod from profile %q", p.ProfileName)))
 			}
 		}
@@ -222,8 +222,8 @@ items are removed automatically via cascade.`,
 			return fmt.Errorf("delete mod page: %w", err)
 		}
 
-		fmt.Printf("Removed mod page %q (id=%d)", page.Name, page.ID)
-		fmt.Println(style.Subtle.Render("  (run 'modctl gc' to reclaim disk space)"))
+		style.Printf("Removed mod page %q (id=%d)", page.Name, page.ID)
+		style.Println(style.Subtle.Render("  (run 'modctl gc' to reclaim disk space)"))
 
 		return nil
 	},

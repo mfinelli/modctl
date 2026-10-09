@@ -119,20 +119,20 @@ Entries are shown in the order they will be applied.`,
 		}
 
 		if len(entries) == 0 {
-			fmt.Println(style.Subtle.Render(fmt.Sprintf(
+			style.Println(style.Subtle.Render(fmt.Sprintf(
 				"  no patch entries for %q in profile %q", relpath, p.Name,
 			)))
 			return nil
 		}
 
-		fmt.Println(style.Bold.Render(fmt.Sprintf(
+		style.Println(style.Bold.Render(fmt.Sprintf(
 			"Patch entries for %q in profile %q (%s):",
 			relpath, p.Name, formatOverrideType(override.OverrideType),
 		)))
-		fmt.Println()
+		style.Println()
 
 		for _, e := range entries {
-			fmt.Println(formatPatchEntry(e))
+			style.Println(formatPatchEntry(e))
 		}
 
 		return nil

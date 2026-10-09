@@ -106,13 +106,13 @@ Rules are shown in the order they will be applied during planning.`,
 		}
 
 		if len(rules) == 0 {
-			fmt.Println(style.Subtle.Render(fmt.Sprintf("  no remap rules for version %d in profile %q", mfv.ID, p.Name)))
+			style.Println(style.Subtle.Render(fmt.Sprintf("  no remap rules for version %d in profile %q", mfv.ID, p.Name)))
 			return nil
 		}
 
-		fmt.Println(style.Bold.Render(fmt.Sprintf("Remap rules for version %d in profile %q:", mfv.ID, p.Name)))
+		style.Println(style.Bold.Render(fmt.Sprintf("Remap rules for version %d in profile %q:", mfv.ID, p.Name)))
 		for _, rule := range rules {
-			fmt.Println(formatRemapRule(rule))
+			style.Println(formatRemapRule(rule))
 		}
 
 		return nil

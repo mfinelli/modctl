@@ -160,15 +160,15 @@ is passed.`,
 			}
 		} else {
 			missingFromDisk = true
-			fmt.Println(style.Warning.Render(fmt.Sprintf(
+			style.Println(style.Warning.Render(fmt.Sprintf(
 				"  warning: %q is not present on disk; showing backup content as full deletion",
 				relpath,
 			)))
-			fmt.Println()
+			style.Println()
 		}
 
-		fmt.Println(style.Bold.Render(fmt.Sprintf("Backup diff for %q:", relpath)))
-		fmt.Println()
+		style.Println(style.Bold.Render(fmt.Sprintf("Backup diff for %q:", relpath)))
+		style.Println()
 
 		diff, err := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
 			A:        difflib.SplitLines(string(backupData)),
@@ -182,22 +182,22 @@ is passed.`,
 		}
 
 		if diff == "" && !missingFromDisk {
-			fmt.Println(style.Subtle.Render("  no differences (on-disk file matches backup)"))
+			style.Println(style.Subtle.Render("  no differences (on-disk file matches backup)"))
 			return nil
 		}
 
 		for _, line := range strings.Split(diff, "\n") {
 			switch {
 			case strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---"):
-				fmt.Println(style.Bold.Render(line))
+				style.Println(style.Bold.Render(line))
 			case strings.HasPrefix(line, "@@"):
-				fmt.Println(style.Hunk.Render(line))
+				style.Println(style.Hunk.Render(line))
 			case strings.HasPrefix(line, "+"):
-				fmt.Println(style.Added.Render(line))
+				style.Println(style.Added.Render(line))
 			case strings.HasPrefix(line, "-"):
-				fmt.Println(style.Removed.Render(line))
+				style.Println(style.Removed.Render(line))
 			default:
-				fmt.Println(style.Subtle.Render(line))
+				style.Println(style.Subtle.Render(line))
 			}
 		}
 

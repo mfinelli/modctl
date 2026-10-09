@@ -106,7 +106,7 @@ var modsNexusUnlinkCmd = &cobra.Command{
 
 		// No-op check
 		if !nexusFileID.Valid {
-			fmt.Println(style.Subtle.Render(fmt.Sprintf(
+			style.Println(style.Subtle.Render(fmt.Sprintf(
 				"  mod_file_version %d is already unlinked (no changes made)",
 				mfv.ID,
 			)))
@@ -122,7 +122,7 @@ var modsNexusUnlinkCmd = &cobra.Command{
 			return fmt.Errorf("unlinking mod file version: %w", err)
 		}
 
-		fmt.Println(style.Subtle.Render(fmt.Sprintf(
+		style.Println(style.Subtle.Render(fmt.Sprintf(
 			"  unlinked mod_file_version %d (was linked to nexus file_id %d)",
 			mfv.ID, oldFileID,
 		)))

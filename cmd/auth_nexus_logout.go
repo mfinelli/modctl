@@ -44,8 +44,8 @@ visit your Nexus Mods account settings at:
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if viper.GetString("nexus.apikey") == "" {
-			fmt.Println(style.Warning.Render("  ⚠ no Nexus Mods API key is configured"))
-			fmt.Println()
+			style.Println(style.Warning.Render("  ⚠ no Nexus Mods API key is configured"))
+			style.Println()
 			return nil
 		}
 
@@ -79,10 +79,10 @@ visit your Nexus Mods account settings at:
 			return fmt.Errorf("write config file: %w", err)
 		}
 
-		fmt.Println(style.Success.Render("  ✓ Nexus Mods API key removed"))
-		fmt.Println(style.Subtle.Render("    Note: the key is still active on Nexus Mods, to revoke it visit:"))
-		fmt.Println(style.Subtle.Render("    https://www.nexusmods.com/users/myaccount?tab=api"))
-		fmt.Println()
+		style.Println(style.Success.Render("  ✓ Nexus Mods API key removed"))
+		style.Println(style.Subtle.Render("    Note: the key is still active on Nexus Mods, to revoke it visit:"))
+		style.Println(style.Subtle.Render("    https://www.nexusmods.com/users/myaccount?tab=api"))
+		style.Println()
 		return nil
 	},
 }

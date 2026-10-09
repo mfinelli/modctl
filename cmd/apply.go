@@ -137,7 +137,7 @@ Use --dry-run to preview the plan without making any changes. Add the
 				return fmt.Errorf("mark last operation failed: %w", err)
 			}
 			if applyAbort {
-				fmt.Println("Operation marked as failed. Run 'modctl apply' to reapply or 'modctl unapply' to clean up.")
+				style.Println("Operation marked as failed. Run 'modctl apply' to reapply or 'modctl unapply' to clean up.")
 				return nil
 			}
 		}
@@ -193,9 +193,9 @@ Use --dry-run to preview the plan without making any changes. Add the
 		if len(plans) > 1 {
 			targetLabel = "targets"
 		}
-		fmt.Println(style.Bold.Render(fmt.Sprintf("Applying %q → %s", p.Name, gi.DisplayName)) +
+		style.Println(style.Bold.Render(fmt.Sprintf("Applying %q → %s", p.Name, gi.DisplayName)) +
 			"  " + style.Subtle.Render(fmt.Sprintf("(%s: %s)", targetLabel, strings.Join(targetNames, ", "))))
-		fmt.Println()
+		style.Println()
 
 		bs := blobstore.Store{
 			ArchivesDir:  viper.GetString("archives_dir"),
@@ -262,7 +262,7 @@ Use --dry-run to preview the plan without making any changes. Add the
 
 		// Print an initial line so \r updates have something to overwrite
 		if !applyVerbose {
-			fmt.Printf("  [%*d/%d] ...", width, 0, total)
+			style.Printf("  [%*d/%d] ...", width, 0, total)
 		}
 
 		// With several targets in one run, say which one each op belongs to
@@ -283,16 +283,16 @@ Use --dry-run to preview the plan without making any changes. Add the
 				line += style.Subtle.Render("  " + detail)
 			}
 			if applyVerbose {
-				fmt.Println(line)
+				style.Println(line)
 			} else {
-				fmt.Printf("\r%-*s", 80, line)
+				style.Printf("\r%-*s", 80, line)
 			}
 		}
 
 		for _, plan := range plans {
 			currentTarget = plan.TargetName
 			if multiTarget && applyVerbose {
-				fmt.Println(style.Subtle.Render(fmt.Sprintf("  target: %s", plan.TargetName)))
+				style.Println(style.Subtle.Render(fmt.Sprintf("  target: %s", plan.TargetName)))
 			}
 
 			archiveMap := make(map[string]*archiveGroup)
@@ -356,7 +356,7 @@ Use --dry-run to preview the plan without making any changes. Add the
 					result, err := ext.DeployFile(ctx, db, q, planOp, stagingPath, plan.TargetRoot, gi.ID, plan.TargetID, p.ID, op.ID)
 					if err != nil {
 						if applyVerbose {
-							fmt.Println(style.Warning.Render(fmt.Sprintf("    ✗ %v", err)))
+							style.Println(style.Warning.Render(fmt.Sprintf("    ✗ %v", err)))
 						}
 						return markFailed(fmt.Errorf("deploy %q: %w", planOp.DestPath, err))
 					}
@@ -451,7 +451,7 @@ Use --dry-run to preview the plan without making any changes. Add the
 
 		// Clear the spinner line before printing summary
 		if !applyVerbose {
-			fmt.Print("\r" + strings.Repeat(" ", 80) + "\r")
+			style.Print("\r" + strings.Repeat(" ", 80) + "\r")
 		}
 
 		// Mark operation successful and update applied state in one transaction
@@ -487,38 +487,38 @@ Use --dry-run to preview the plan without making any changes. Add the
 		if !applyKeepStaging {
 			if err := ext.CleanupStaging(ctx); err != nil {
 				// Non-fatal - warn but don't fail the apply
-				fmt.Println(style.Warning.Render(fmt.Sprintf("  warning: cleanup staging: %v", err)))
+				style.Println(style.Warning.Render(fmt.Sprintf("  warning: cleanup staging: %v", err)))
 			}
 		} else {
-			fmt.Println(style.Subtle.Render(fmt.Sprintf("  staging kept at: %s", ext.StagingPathFor(""))))
+			style.Println(style.Subtle.Render(fmt.Sprintf("  staging kept at: %s", ext.StagingPathFor(""))))
 		}
 
 		// Summary
 		elapsed := time.Since(mustParseTime(op.StartedAt))
-		fmt.Println(style.Bold.Render(fmt.Sprintf("Apply complete in %.1fs", elapsed.Seconds())))
+		style.Println(style.Bold.Render(fmt.Sprintf("Apply complete in %.1fs", elapsed.Seconds())))
 		if countWrite > 0 {
-			fmt.Printf("  written:     %d\n", countWrite)
+			style.Printf("  written:     %d\n", countWrite)
 		}
 		if countOverwrite > 0 {
-			fmt.Printf("  overwritten: %d\n", countOverwrite)
+			style.Printf("  overwritten: %d\n", countOverwrite)
 		}
 		if countRemove > 0 {
-			fmt.Printf("  removed:     %d\n", countRemove)
+			style.Printf("  removed:     %d\n", countRemove)
 		}
 		if countRestore > 0 {
-			fmt.Printf("  restored:    %d\n", countRestore)
+			style.Printf("  restored:    %d\n", countRestore)
 		}
 		if countBackedUp > 0 {
-			fmt.Printf("  backed up:   %d\n", countBackedUp)
+			style.Printf("  backed up:   %d\n", countBackedUp)
 		}
 		var allWarnings []string
 		for _, plan := range plans {
 			allWarnings = append(allWarnings, plan.Warnings...)
 		}
 		if len(allWarnings) > 0 {
-			fmt.Println(style.Warning.Render(fmt.Sprintf("  warnings:    %d", len(allWarnings))))
+			style.Println(style.Warning.Render(fmt.Sprintf("  warnings:    %d", len(allWarnings))))
 			for _, w := range allWarnings {
-				fmt.Println(style.Warning.Render("    ⚠  " + w))
+				style.Println(style.Warning.Render("    ⚠  " + w))
 			}
 		}
 		return nil
@@ -567,9 +567,9 @@ func printApplyPlan(
 	gameName string,
 	showConflicts bool,
 ) {
-	fmt.Println(style.Bold.Render(fmt.Sprintf("Apply plan for %q → %s", profileName, gameName)) +
+	style.Println(style.Bold.Render(fmt.Sprintf("Apply plan for %q → %s", profileName, gameName)) +
 		"  " + style.Subtle.Render(fmt.Sprintf("(target: %s)", plan.TargetName)))
-	fmt.Println()
+	style.Println()
 
 	var (
 		countWrite     int
@@ -598,7 +598,7 @@ func printApplyPlan(
 			} else if op.OverrideID.Valid {
 				modInfo = style.Subtle.Render("(override)")
 			}
-			fmt.Printf("  %s %-50s %s %s\n", symbol, op.DestPath, modInfo, detail)
+			style.Printf("  %s %-50s %s %s\n", symbol, op.DestPath, modInfo, detail)
 			countWrite++
 			if op.File != nil && len(op.File.Conflicts) > 1 {
 				countConflict++
@@ -623,7 +623,7 @@ func printApplyPlan(
 			} else if op.OverrideID.Valid {
 				modInfo = style.Subtle.Render("(override)")
 			}
-			fmt.Printf("  %s %-50s %s %s\n", symbol, op.DestPath, modInfo, detail)
+			style.Printf("  %s %-50s %s %s\n", symbol, op.DestPath, modInfo, detail)
 			countOverwrite++
 			if op.File != nil && len(op.File.Conflicts) > 1 {
 				countConflict++
@@ -633,16 +633,16 @@ func printApplyPlan(
 			}
 
 		case planner.PlanOpRemove:
-			fmt.Printf("  %s %s\n", style.Removed.Render("-"), op.DestPath)
+			style.Printf("  %s %s\n", style.Removed.Render("-"), op.DestPath)
 			countRemove++
 
 		case planner.PlanOpRestoreBackup:
-			fmt.Printf("  %s %s\n", style.Restored.Render("↩"), op.DestPath)
+			style.Printf("  %s %s\n", style.Restored.Render("↩"), op.DestPath)
 			countRestore++
 		}
 	}
 
-	fmt.Println()
+	style.Println()
 
 	// Summary line
 	parts := []string{}
@@ -659,18 +659,18 @@ func printApplyPlan(
 		parts = append(parts, fmt.Sprintf("%d restore", countRestore))
 	}
 	total := countWrite + countOverwrite + countRemove + countRestore
-	fmt.Printf("  %d operations: %s\n", total, strings.Join(parts, ", "))
+	style.Printf("  %d operations: %s\n", total, strings.Join(parts, ", "))
 
 	if countConflict > 0 {
-		fmt.Printf("  %d conflict(s) resolved\n", countConflict)
+		style.Printf("  %d conflict(s) resolved\n", countConflict)
 	}
 	if countBackup > 0 {
-		fmt.Printf("  %d file(s) will be backed up\n", countBackup)
+		style.Printf("  %d file(s) will be backed up\n", countBackup)
 	}
 	if len(plan.Warnings) > 0 {
-		fmt.Println()
+		style.Println()
 		for _, w := range plan.Warnings {
-			fmt.Println(style.Warning.Render("  ⚠  " + w))
+			style.Println(style.Warning.Render("  ⚠  " + w))
 		}
 	}
 }
@@ -692,7 +692,7 @@ func printConflictLosers(pf *planner.PlanFile) {
 		if c.Won {
 			continue
 		}
-		fmt.Println(style.Subtle.Render(fmt.Sprintf("      ✗ %s", formatModInfoRaw(c))))
+		style.Println(style.Subtle.Render(fmt.Sprintf("      ✗ %s", formatModInfoRaw(c))))
 	}
 }
 

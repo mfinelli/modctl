@@ -99,13 +99,13 @@ TODO:
 		}
 
 		if len(rows) == 0 {
-			fmt.Println(style.Subtle.Render("No mods imported for this game yet."))
-			fmt.Println(style.Subtle.Render("Use `modctl mods import <archive>` to add one."))
+			style.Println(style.Subtle.Render("No mods imported for this game yet."))
+			style.Println(style.Subtle.Render("Use `modctl mods import <archive>` to add one."))
 			return nil
 		}
 
-		fmt.Println(style.Header.Render("Mods"))
-		fmt.Println()
+		style.Println(style.Header.Render("Mods"))
+		style.Println()
 
 		// Summary query is already "one row per page" (rn=1). We'll build a stable list of page IDs.
 		type pageSummary struct {
@@ -176,7 +176,7 @@ TODO:
 		if !modsListDetails {
 			for _, p := range pages {
 				// Header line
-				fmt.Printf("%d  %s\n", p.ModPageID, p.ModName)
+				style.Printf("%d  %s\n", p.ModPageID, p.ModName)
 
 				// Optional nexus ref
 				nexusRef := ""
@@ -209,15 +209,15 @@ TODO:
 					// TODO: add "nexus_latest=..." once Nexus API integration exists
 				}
 
-				fmt.Println(style.Subtle.Render(line))
-				fmt.Println()
+				style.Println(style.Subtle.Render(line))
+				style.Println()
 			}
 
 			return nil
 		}
 
 		for _, p := range pages {
-			fmt.Printf("%d  %s\n", p.ModPageID, p.ModName)
+			style.Printf("%d  %s\n", p.ModPageID, p.ModName)
 
 			nexusRef := ""
 			if p.NexusDomain.Valid && p.NexusModID.Valid {
@@ -232,7 +232,7 @@ TODO:
 				line += fmt.Sprintf("  nexus=%s", nexusRef)
 				// TODO: add "nexus_latest=..." once Nexus API integration exists
 			}
-			fmt.Println(style.Subtle.Render(line))
+			style.Println(style.Subtle.Render(line))
 
 			files, err := q.ListModFilesByPage(ctx, p.ModPageID)
 			if err != nil {
@@ -240,8 +240,8 @@ TODO:
 			}
 
 			if len(files) == 0 {
-				fmt.Println(style.Subtle.Render("  (no files)"))
-				fmt.Println()
+				style.Println(style.Subtle.Render("  (no files)"))
+				style.Println()
 				continue
 			}
 
@@ -250,14 +250,14 @@ TODO:
 				if f.IsPrimary != 0 {
 					primaryTag = " (primary)"
 				}
-				fmt.Println(style.Subtle.Render(fmt.Sprintf("  File: %s%s", f.Label, primaryTag)))
+				style.Println(style.Subtle.Render(fmt.Sprintf("  File: %s%s", f.Label, primaryTag)))
 
 				vers, err := q.ListModFileVersionsByFile(ctx, f.ID)
 				if err != nil && !errors.Is(err, sql.ErrNoRows) {
 					return fmt.Errorf("list versions (file_id=%d): %w", f.ID, err)
 				}
 				if len(vers) == 0 {
-					fmt.Println(style.Subtle.Render("    (no versions)"))
+					style.Println(style.Subtle.Render("    (no versions)"))
 					continue
 				}
 
@@ -274,11 +274,11 @@ TODO:
 					}
 
 					// TODO: think about also showing v.OriginalName later (only if not-null)
-					fmt.Println(style.Subtle.Render(vline))
+					style.Println(style.Subtle.Render(vline))
 				}
 			}
 
-			fmt.Println()
+			style.Println()
 		}
 
 		return nil

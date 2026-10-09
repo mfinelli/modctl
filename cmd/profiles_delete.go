@@ -30,6 +30,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -138,7 +139,7 @@ Safety checks:
 
 		// print a warning when doing the dangerous thing.
 		if isApplied && profilesDeleteYesReally {
-			fmt.Fprintf(os.Stderr,
+			style.Fprintf(os.Stderr,
 				"warning: deleting applied profile %q will not change files on disk; state will be considered unknown until apply/unapply reconciles it\n",
 				p.Name,
 			)
@@ -159,7 +160,7 @@ Safety checks:
 			return fmt.Errorf("commit: %w", err)
 		}
 
-		fmt.Printf("Deleted profile %q\n", p.Name)
+		style.Printf("Deleted profile %q\n", p.Name)
 
 		return nil
 	},

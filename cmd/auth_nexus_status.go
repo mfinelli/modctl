@@ -44,9 +44,9 @@ not count against your API request quota.`,
 
 		apiKey := viper.GetString("nexus.apikey")
 		if apiKey == "" {
-			fmt.Println(style.Warning.Render("  ⚠ not authenticated"))
-			fmt.Println(style.Subtle.Render("    run `modctl auth nexus login` to authenticate"))
-			fmt.Println()
+			style.Println(style.Warning.Render("  ⚠ not authenticated"))
+			style.Println(style.Subtle.Render("    run `modctl auth nexus login` to authenticate"))
+			style.Println()
 			return nil
 		}
 
@@ -59,15 +59,15 @@ not count against your API request quota.`,
 
 		info, err := client.ValidateUser()
 		if err != nil {
-			fmt.Println(style.Failure.Render("  ✗ API key is invalid or has been revoked"))
-			fmt.Println(style.Subtle.Render("    run `modctl auth nexus login` to re-authenticate"))
-			fmt.Println()
+			style.Println(style.Failure.Render("  ✗ API key is invalid or has been revoked"))
+			style.Println(style.Subtle.Render("    run `modctl auth nexus login` to re-authenticate"))
+			style.Println()
 			// Not returning the raw error - it's not useful to the user here
 			return fmt.Errorf("nexus API key validation failed")
 		}
 
-		fmt.Println(style.Success.Render("  ✓ authenticated with Nexus Mods"))
-		fmt.Println()
+		style.Println(style.Success.Render("  ✓ authenticated with Nexus Mods"))
+		style.Println()
 
 		var b strings.Builder
 		kv.Write(&b, "username:", info.Name)
@@ -77,7 +77,7 @@ not count against your API request quota.`,
 		if err != nil {
 			// Non-fatal: we already have the username, just skip quota display
 			logger.Warn("failed to load rate limit state", "error", err)
-			fmt.Print(b.String())
+			style.Print(b.String())
 			return nil
 		}
 
@@ -95,8 +95,8 @@ not count against your API request quota.`,
 		))
 		kv.Write(&b, "", "  "+style.Subtle.Render(fmt.Sprintf("resets in %s", style.Duration(time.Until(state.HourlyReset)))))
 
-		fmt.Print(b.String())
-		fmt.Println()
+		style.Print(b.String())
+		style.Println()
 		return nil
 	},
 }

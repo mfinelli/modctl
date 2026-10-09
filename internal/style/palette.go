@@ -30,7 +30,7 @@
 // one-line change here instead of a search through the commands.
 package style
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 // fg returns a style with the given ANSI color as its foreground.
 func fg(color string) lipgloss.Style {

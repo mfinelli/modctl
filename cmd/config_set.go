@@ -61,8 +61,8 @@ Valid keys:
 		}
 
 		if key == "nexus.apikey" {
-			fmt.Println(style.Subtle.Render("  Please note: your API key will be stored in plain text in the config file."))
-			fmt.Println()
+			style.Println(style.Subtle.Render("  Please note: your API key will be stored in plain text in the config file."))
+			style.Println()
 		}
 
 		configPath := viper.ConfigFileUsed()
@@ -100,7 +100,7 @@ Valid keys:
 			return fmt.Errorf("write config file: %w", err)
 		}
 
-		fmt.Println(style.Success.Render(fmt.Sprintf("  ✓ %s set in %s", key, configPath)))
+		style.Println(style.Success.Render(fmt.Sprintf("  ✓ %s set in %s", key, configPath)))
 
 		return nil
 	},

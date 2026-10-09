@@ -19,10 +19,12 @@
 package style
 
 import (
+	"image/color"
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -86,7 +88,6 @@ func TestRoles(t *testing.T) {
 		{"Pending", Pending, "11", false},
 
 		// text
-		{"Subtle", Subtle, "245", false},
 		{"Dim", Dim, "8", false},
 		{"Label", Label, "7", false},
 		{"Header", Header, "63", true},
@@ -104,6 +105,13 @@ func TestRoles(t *testing.T) {
 			assert.Equal(t, tc.bold, tc.style.GetBold())
 		})
 	}
+
+	t.Run("Subtle follows the terminal's colors", func(t *testing.T) {
+		t.Parallel()
+		// the profile that was detected when the program started decides which
+		assert.Equal(t, subtleColor(lipgloss.Writer.Profile), Subtle.GetForeground())
+		assert.False(t, Subtle.GetBold())
+	})
 
 	t.Run("text with no color", func(t *testing.T) {
 		t.Parallel()
@@ -140,6 +148,31 @@ func TestRoles(t *testing.T) {
 		assert.Equal(t, lipgloss.Color("10"), ContextBadge.GetBackground())
 		assert.True(t, ContextBadge.GetBold())
 	})
+}
+
+func TestSubtleColor(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		profile colorprofile.Profile
+		want    color.Color
+	}{
+		{colorprofile.TrueColor, lipgloss.Color("245")},
+		{colorprofile.ANSI256, lipgloss.Color("245")},
+		// the one case that differs: a 16 color terminal gets bright black
+		// by name, because converting 245 would give it white
+		{colorprofile.ANSI, lipgloss.BrightBlack},
+		// nothing is shown in color for these, but the color is still the
+		// right one if the same string is printed somewhere that has color
+		{colorprofile.ASCII, lipgloss.Color("245")},
+		{colorprofile.NoTTY, lipgloss.Color("245")},
+	}
+	for _, tc := range cases {
+		t.Run(tc.profile.String(), func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, subtleColor(tc.profile))
+		})
+	}
 }
 
 func TestDots(t *testing.T) {

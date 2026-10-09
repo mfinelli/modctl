@@ -93,7 +93,7 @@ provided.`,
 		}
 		isCurrent := a.ActiveGameInstallID == gi.ID
 
-		fmt.Println(renderGameInfo(gi, targets, profiles, isCurrent))
+		style.Println(renderGameInfo(gi, targets, profiles, isCurrent))
 		return nil
 	},
 }

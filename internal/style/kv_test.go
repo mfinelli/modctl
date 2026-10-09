@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -46,7 +47,8 @@ func TestKVLine(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, tc.want, tc.kv.Line(tc.label, tc.value))
+			// a styled line carries its escape sequences, so look at the text
+			assert.Equal(t, tc.want, ansi.Strip(tc.kv.Line(tc.label, tc.value)))
 		})
 	}
 }
@@ -61,7 +63,7 @@ func TestKVLinesAlign(t *testing.T) {
 	kv.Write(&b, "x:", "three")
 
 	// the values all start in the same column
-	lines := strings.Split(strings.TrimRight(b.String(), "\n"), "\n")
+	lines := strings.Split(strings.TrimRight(ansi.Strip(b.String()), "\n"), "\n")
 	assert.Len(t, lines, 3)
 	for i, v := range []string{"one", "two", "three"} {
 		assert.Equal(t, 2+10+1, strings.Index(lines[i], v), "line %d", i)

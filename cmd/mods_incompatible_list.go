@@ -86,7 +86,7 @@ of which profiles they appear in.`,
 			return fmt.Errorf("listing incompatibilities: %w", err)
 		}
 
-		fmt.Println(renderIncompatibilityList(pairs))
+		style.Println(renderIncompatibilityList(pairs))
 		return nil
 	},
 }

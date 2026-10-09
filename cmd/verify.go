@@ -59,8 +59,8 @@ Exits non-zero if any integrity issues are found. Version warnings
 
 		bundlePath := args[0]
 
-		fmt.Println(style.Bold.Render("Verifying bundle: " + bundlePath))
-		fmt.Println()
+		style.Println(style.Bold.Render("Verifying bundle: " + bundlePath))
+		style.Println()
 
 		bundle, err := restore.OpenAndValidate(ctx, bundlePath)
 		if err != nil {
@@ -69,31 +69,31 @@ Exits non-zero if any integrity issues are found. Version warnings
 		defer bundle.Close()
 
 		// manifest summary
-		fmt.Println(style.Bold.Render("Manifest"))
-		fmt.Println(style.Success.Render("  ✓ database integrity OK (sha256 matches manifest)"))
-		fmt.Println(style.Subtle.Render(fmt.Sprintf("  format version: %d", bundle.Manifest.ExportFormatVersion)))
-		fmt.Println(style.Subtle.Render(fmt.Sprintf("  export kind:    %s", bundle.Manifest.ExportKind)))
-		fmt.Println(style.Subtle.Render(fmt.Sprintf("  exported at:    %s", bundle.Manifest.ExportedAt.Format("2006-01-02 15:04:05 UTC"))))
-		fmt.Println(style.Subtle.Render(fmt.Sprintf("  modctl version: %s", bundle.Manifest.ModctlVersion)))
-		fmt.Println(style.Subtle.Render(fmt.Sprintf("  schema version: %d", bundle.Manifest.SchemaVersion)))
-		fmt.Println(style.Subtle.Render(fmt.Sprintf("  archives:       %d", bundle.Manifest.Counts.Archives)))
-		fmt.Println(style.Subtle.Render(fmt.Sprintf("  backups:        %d", bundle.Manifest.Counts.Backups)))
-		fmt.Println(style.Subtle.Render(fmt.Sprintf("  overrides:      %d", bundle.Manifest.Counts.Overrides)))
+		style.Println(style.Bold.Render("Manifest"))
+		style.Println(style.Success.Render("  ✓ database integrity OK (sha256 matches manifest)"))
+		style.Println(style.Subtle.Render(fmt.Sprintf("  format version: %d", bundle.Manifest.ExportFormatVersion)))
+		style.Println(style.Subtle.Render(fmt.Sprintf("  export kind:    %s", bundle.Manifest.ExportKind)))
+		style.Println(style.Subtle.Render(fmt.Sprintf("  exported at:    %s", bundle.Manifest.ExportedAt.Format("2006-01-02 15:04:05 UTC"))))
+		style.Println(style.Subtle.Render(fmt.Sprintf("  modctl version: %s", bundle.Manifest.ModctlVersion)))
+		style.Println(style.Subtle.Render(fmt.Sprintf("  schema version: %d", bundle.Manifest.SchemaVersion)))
+		style.Println(style.Subtle.Render(fmt.Sprintf("  archives:       %d", bundle.Manifest.Counts.Archives)))
+		style.Println(style.Subtle.Render(fmt.Sprintf("  backups:        %d", bundle.Manifest.Counts.Backups)))
+		style.Println(style.Subtle.Render(fmt.Sprintf("  overrides:      %d", bundle.Manifest.Counts.Overrides)))
 		if bundle.Manifest.Game != nil {
-			fmt.Println(style.Subtle.Render(fmt.Sprintf("  game:           %s (%s:%s)",
+			style.Println(style.Subtle.Render(fmt.Sprintf("  game:           %s (%s:%s)",
 				bundle.Manifest.Game.DisplayName,
 				bundle.Manifest.Game.StoreID,
 				bundle.Manifest.Game.StoreGameID,
 			)))
 		}
-		fmt.Println()
+		style.Println()
 
 		// version warnings (informational only, do not affect exit code)
 		bundleVer := "v" + bundle.Manifest.ModctlVersion
 		currentVer := "v" + rootCmd.Version
 		if semver.IsValid(bundleVer) && semver.IsValid(currentVer) &&
 			semver.Compare(bundleVer, currentVer) > 0 {
-			fmt.Println(style.Warning.Render(fmt.Sprintf(
+			style.Println(style.Warning.Render(fmt.Sprintf(
 				"  ⚠ bundle was created with modctl %s (current: %s)",
 				bundle.Manifest.ModctlVersion, rootCmd.Version,
 			)))
@@ -118,64 +118,64 @@ Exits non-zero if any integrity issues are found. Version warnings
 		var issues []string
 
 		// database integrity checks
-		fmt.Println(style.Bold.Render("Database Integrity"))
+		style.Println(style.Bold.Render("Database Integrity"))
 		bq := dbq.New(bundle.BundleDB)
 
 		dbIssues := checkBundleDB(ctx, bundle.BundleDB)
 		if len(dbIssues) == 0 {
-			fmt.Println(style.Success.Render("  ✓ quick_check OK"))
-			fmt.Println(style.Success.Render("  ✓ foreign_key_check OK"))
+			style.Println(style.Success.Render("  ✓ quick_check OK"))
+			style.Println(style.Success.Render("  ✓ foreign_key_check OK"))
 		} else {
 			for _, iss := range dbIssues {
-				fmt.Println(style.Failure.Render("  ✗ " + iss))
+				style.Println(style.Failure.Render("  ✗ " + iss))
 				issues = append(issues, iss)
 			}
 		}
-		fmt.Println()
+		style.Println()
 
 		// nexus cache integrity check
 		if bundle.Manifest.NexusCacheSha256 != "" {
-			fmt.Println(style.Bold.Render("Nexus Cache Integrity"))
+			style.Println(style.Bold.Render("Nexus Cache Integrity"))
 			cachePath := filepath.Join(bundle.BundleDir, "nexus_cache.db")
 			cacheIssues := checkBundleCacheDB(ctx, cachePath)
 			if len(cacheIssues) == 0 {
-				fmt.Println(style.Success.Render("  ✓ quick_check OK"))
+				style.Println(style.Success.Render("  ✓ quick_check OK"))
 			} else {
 				for _, iss := range cacheIssues {
-					fmt.Println(style.Failure.Render("  ✗ " + iss))
+					style.Println(style.Failure.Render("  ✗ " + iss))
 					issues = append(issues, iss)
 				}
 			}
-			fmt.Println()
+			style.Println()
 		} else {
-			fmt.Println(style.Bold.Render("Nexus Cache Integrity"))
-			fmt.Println(style.Subtle.Render("  (not present in bundle)"))
-			fmt.Println()
+			style.Println(style.Bold.Render("Nexus Cache Integrity"))
+			style.Println(style.Subtle.Render("  (not present in bundle)"))
+			style.Println()
 		}
 
 		// blob checks
-		fmt.Println(style.Bold.Render("Blob Integrity"))
+		style.Println(style.Bold.Render("Blob Integrity"))
 		blobIssues := checkBundleBlobs(ctx, bundle, bq)
 		if len(blobIssues) == 0 {
-			fmt.Println(style.Success.Render("  ✓ all blobs present, referenced, and hash correctly"))
+			style.Println(style.Success.Render("  ✓ all blobs present, referenced, and hash correctly"))
 		} else {
 			for _, iss := range blobIssues {
-				fmt.Println(style.Failure.Render("  ✗ " + iss))
+				style.Println(style.Failure.Render("  ✗ " + iss))
 				issues = append(issues, iss)
 			}
 		}
-		fmt.Println()
+		style.Println()
 
 		// final summary
-		fmt.Println(style.Bold.Render("Summary"))
+		style.Println(style.Bold.Render("Summary"))
 		if len(issues) == 0 {
-			fmt.Println(style.Success.Render("  ✓ bundle is valid and ready to import"))
+			style.Println(style.Success.Render("  ✓ bundle is valid and ready to import"))
 			return nil
 		}
 
-		fmt.Println(style.Failure.Render(fmt.Sprintf("  ✗ %d issue(s) found:", len(issues))))
+		style.Println(style.Failure.Render(fmt.Sprintf("  ✗ %d issue(s) found:", len(issues))))
 		for _, iss := range issues {
-			fmt.Println(style.Failure.Render("    • " + iss))
+			style.Println(style.Failure.Render("    • " + iss))
 		}
 
 		// return a plain error with no message so cobra doesn't double-print
@@ -274,7 +274,7 @@ func checkBundleBlobs(ctx context.Context, bundle *restore.Bundle, bq *dbq.Queri
 	checked := 0
 
 	if total > 0 {
-		fmt.Printf("  hashing blobs (0/%d)", total)
+		style.Printf("  hashing blobs (0/%d)", total)
 	}
 
 	for dirName := range kindDirs {
@@ -305,7 +305,7 @@ func checkBundleBlobs(ctx context.Context, bundle *restore.Bundle, bq *dbq.Queri
 			fileBlobs[name] = struct{}{}
 			checked++
 			if total > 0 {
-				fmt.Printf("\r  hashing blobs (%d/%d)", checked, total)
+				style.Printf("\r  hashing blobs (%d/%d)", checked, total)
 			}
 
 			// hash and verify
@@ -339,8 +339,8 @@ func checkBundleBlobs(ctx context.Context, bundle *restore.Bundle, bq *dbq.Queri
 	}
 
 	if total > 0 {
-		fmt.Printf("\r%-60s\r", "")
-		fmt.Printf("  hashed %d blob(s)\n", checked)
+		style.Printf("\r%-60s\r", "")
+		style.Printf("  hashed %d blob(s)\n", checked)
 	}
 
 	// check DB blobs are present as files

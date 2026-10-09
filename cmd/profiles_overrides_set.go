@@ -30,6 +30,7 @@ import (
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -195,9 +196,9 @@ winner for this path in the active profile.`,
 			return fmt.Errorf("commit: %w", err)
 		}
 
-		fmt.Printf("override set for %q in profile %q\n", relpath, p.Name)
+		style.Printf("override set for %q in profile %q\n", relpath, p.Name)
 		if !srcArchiveSha256.Valid {
-			fmt.Println("  note: no mod in this profile provides this path; override will write a net-new file")
+			style.Println("  note: no mod in this profile provides this path; override will write a net-new file")
 		}
 
 		return nil

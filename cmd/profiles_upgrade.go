@@ -29,6 +29,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -196,9 +197,9 @@ preserved.`,
 			newDesc += fmt.Sprintf(" (%s)", newOriginalName.String)
 		}
 
-		fmt.Printf("Upgraded %q in profile %q\n", mp.Name, p.Name)
-		fmt.Printf("  %s → %s (priority %d preserved)\n", oldDesc, newDesc, item.Priority)
-		fmt.Println("  run 'modctl apply' to apply changes to disk")
+		style.Printf("Upgraded %q in profile %q\n", mp.Name, p.Name)
+		style.Printf("  %s → %s (priority %d preserved)\n", oldDesc, newDesc, item.Priority)
+		style.Println("  run 'modctl apply' to apply changes to disk")
 
 		return nil
 	},

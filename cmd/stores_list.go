@@ -82,7 +82,7 @@ Only enabled stores are scanned during discovery.`,
 			})
 		}
 
-		fmt.Println(style.Table([]string{" Enabled ", " ID ", " Name "}, rows))
+		style.Println(style.Table([]string{" Enabled ", " ID ", " Name "}, rows))
 
 		return nil
 	},

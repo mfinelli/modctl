@@ -132,7 +132,7 @@ Note: requires archive extraction which may be slow for large archives.`,
 		}
 
 		if len(entries) == 0 {
-			fmt.Println(style.Subtle.Render(fmt.Sprintf(
+			style.Println(style.Subtle.Render(fmt.Sprintf(
 				"  no patch entries for %q in profile %q", relpath, p.Name,
 			)))
 			return nil
@@ -202,22 +202,22 @@ Note: requires archive extraction which may be slow for large archives.`,
 		}
 
 		// header
-		fmt.Println(style.Bold.Render(fmt.Sprintf(
+		style.Println(style.Bold.Render(fmt.Sprintf(
 			"Patch preview for %q in profile %q (%s, %d entries):",
 			relpath, p.Name, formatOverrideType(override.OverrideType), len(entries),
 		)))
-		fmt.Println()
+		style.Println()
 
 		if noBase {
-			fmt.Println(style.Warning.Render("  ⚠ no mod in this profile provides this path; showing result against empty document"))
-			fmt.Println()
+			style.Println(style.Warning.Render("  ⚠ no mod in this profile provides this path; showing result against empty document"))
+			style.Println()
 		}
 
 		if result.Skipped > 0 {
-			fmt.Println(style.Subtle.Render(fmt.Sprintf(
+			style.Println(style.Subtle.Render(fmt.Sprintf(
 				"  %d entry(ies) had no effect (key not found)", result.Skipped,
 			)))
-			fmt.Println()
+			style.Println()
 		}
 
 		// generate and display unified diff
@@ -233,7 +233,7 @@ Note: requires archive extraction which may be slow for large archives.`,
 		}
 
 		if diff == "" {
-			fmt.Println(style.Subtle.Render("  no changes (patch entries produce identical output)"))
+			style.Println(style.Subtle.Render("  no changes (patch entries produce identical output)"))
 			return nil
 		}
 
@@ -241,15 +241,15 @@ Note: requires archive extraction which may be slow for large archives.`,
 		for _, line := range strings.Split(diff, "\n") {
 			switch {
 			case strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---"):
-				fmt.Println(style.Bold.Render(line))
+				style.Println(style.Bold.Render(line))
 			case strings.HasPrefix(line, "@@"):
-				fmt.Println(style.Hunk.Render(line))
+				style.Println(style.Hunk.Render(line))
 			case strings.HasPrefix(line, "+"):
-				fmt.Println(style.Added.Render(line))
+				style.Println(style.Added.Render(line))
 			case strings.HasPrefix(line, "-"):
-				fmt.Println(style.Removed.Render(line))
+				style.Println(style.Removed.Render(line))
 			default:
-				fmt.Println(style.Subtle.Render(line))
+				style.Println(style.Subtle.Render(line))
 			}
 		}
 

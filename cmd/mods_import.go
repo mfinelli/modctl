@@ -164,7 +164,7 @@ has been safely stored and the database has been updated successfully.`,
 		defer prep.Cleanup()
 
 		if prep.Wrapped {
-			fmt.Println(style.Warning.Render("  ⚠ input was not a supported archive; wrapped into .tar.gz for storage"))
+			style.Println(style.Warning.Render("  ⚠ input was not a supported archive; wrapped into .tar.gz for storage"))
 		}
 
 		q := dbq.New(db)
@@ -212,12 +212,12 @@ has been safely stored and the database has been updated successfully.`,
 			if apiKey != "" {
 				client, err := nexusclient.New(ctx, apiKey, logger, rootCmd.Version)
 				if err != nil {
-					fmt.Println(style.Warning.Render(fmt.Sprintf("  ⚠ failed to initialize nexus client: %s", err)))
+					style.Println(style.Warning.Render(fmt.Sprintf("  ⚠ failed to initialize nexus client: %s", err)))
 				} else {
 					defer client.Close()
 					filesResp, err := client.GetModFiles(*gameDomain, *modID)
 					if err != nil {
-						fmt.Println(style.Warning.Render(fmt.Sprintf("  ⚠ failed to fetch nexus file list: %s", err)))
+						style.Println(style.Warning.Render(fmt.Sprintf("  ⚠ failed to fetch nexus file list: %s", err)))
 					} else {
 						// discard warnings/errors in this pre-fetch pass since we'll surface
 						// them again in the post import pass
@@ -253,9 +253,9 @@ has been safely stored and the database has been updated successfully.`,
 				slog.Default(),
 			)
 			if err != nil {
-				fmt.Println(style.Warning.Render("  ⚠ inventory scan failed - run 'mods scan-inventory' to retry"))
+				style.Println(style.Warning.Render("  ⚠ inventory scan failed - run 'mods scan-inventory' to retry"))
 			} else {
-				fmt.Println(style.Subtle.Render("  inventoried archive entries"))
+				style.Println(style.Subtle.Render("  inventoried archive entries"))
 			}
 		}
 
@@ -263,12 +263,12 @@ has been safely stored and the database has been updated successfully.`,
 		if modsImportNexusUrl != "" && !modsImportSkipNexusLink {
 			apiKey := viper.GetString("nexus.apikey")
 			if apiKey == "" {
-				fmt.Println(style.Subtle.Render("  nexus api key not configured, skipping link"))
+				style.Println(style.Subtle.Render("  nexus api key not configured, skipping link"))
 			} else {
 				client, err := nexusclient.New(ctx, apiKey, logger, rootCmd.Version)
 				if err != nil {
 					// Non-fatal, warn and continue
-					fmt.Println(style.Warning.Render(fmt.Sprintf("  ⚠ failed to initialize nexus client: %s", err)))
+					style.Println(style.Warning.Render(fmt.Sprintf("  ⚠ failed to initialize nexus client: %s", err)))
 				} else {
 					defer client.Close()
 					if err := attemptNexusLink(ctx, q, client, nexusLinkParams{
@@ -284,7 +284,7 @@ has been safely stored and the database has been updated successfully.`,
 						label:            modsImportLabel,
 						fileVersion:      modsImportFileVersion,
 					}); err != nil {
-						fmt.Println(style.Warning.Render(fmt.Sprintf("  ⚠ nexus link failed: %s", err)))
+						style.Println(style.Warning.Render(fmt.Sprintf("  ⚠ nexus link failed: %s", err)))
 					}
 				}
 			}
@@ -296,15 +296,15 @@ has been safely stored and the database has been updated successfully.`,
 				// Import is done; keep this as a loud error because the user asked for --rm.
 				return fmt.Errorf("import succeeded but failed to remove original file: %w", err)
 			}
-			fmt.Println(style.Subtle.Render("  removed original input file"))
+			style.Println(style.Subtle.Render("  removed original input file"))
 		}
 
-		fmt.Println("Imported:")
-		fmt.Printf("  mod_page_id: %d\n", pageID)
-		fmt.Printf("  mod_file_id: %d\n", fileID)
-		fmt.Printf("  mod_file_version_id: %d\n", versionID)
-		fmt.Printf("  sha256: %s\n", sha)
-		fmt.Printf("  size_bytes: %d\n", size)
+		style.Println("Imported:")
+		style.Printf("  mod_page_id: %d\n", pageID)
+		style.Printf("  mod_file_id: %d\n", fileID)
+		style.Printf("  mod_file_version_id: %d\n", versionID)
+		style.Printf("  sha256: %s\n", sha)
+		style.Printf("  size_bytes: %d\n", size)
 
 		return nil
 	},
@@ -517,7 +517,7 @@ func attemptNexusLink(
 		}); err != nil {
 			return fmt.Errorf("updating mod page name: %w", err)
 		}
-		fmt.Println(style.Subtle.Render(fmt.Sprintf("  updated mod page name: %s", modInfo.Name)))
+		style.Println(style.Subtle.Render(fmt.Sprintf("  updated mod page name: %s", modInfo.Name)))
 	}
 
 	// Fetch file list for identification
@@ -531,14 +531,14 @@ func attemptNexusLink(
 		return fmt.Errorf("identifying nexus file: %w", err)
 	}
 	for _, warn := range warnings {
-		fmt.Println(style.Warning.Render(fmt.Sprintf("  ⚠ %s", warn)))
+		style.Println(style.Warning.Render(fmt.Sprintf("  ⚠ %s", warn)))
 	}
 	if match == nil {
-		fmt.Println(style.Warning.Render("  ⚠ could not identify nexus file id - run `mods nexus link` to resolve"))
+		style.Println(style.Warning.Render("  ⚠ could not identify nexus file id - run `mods nexus link` to resolve"))
 		return nil
 	}
 
-	fmt.Println(style.Subtle.Render(fmt.Sprintf("  identified nexus file: %s v%s (file_id: %d, confidence: %s)",
+	style.Println(style.Subtle.Render(fmt.Sprintf("  identified nexus file: %s v%s (file_id: %d, confidence: %s)",
 		match.File.Name, match.File.Version, match.File.FileID, match.Confidence)))
 
 	if err := q.UpdateModFileVersionNexusFileID(ctx, dbq.UpdateModFileVersionNexusFileIDParams{
@@ -560,7 +560,7 @@ func attemptNexusLink(
 		}); err != nil {
 			return fmt.Errorf("updating version string: %w", err)
 		}
-		fmt.Println(style.Subtle.Render(fmt.Sprintf("  set version: %s", versionToStore)))
+		style.Println(style.Subtle.Render(fmt.Sprintf("  set version: %s", versionToStore)))
 	}
 
 	if !p.labelProvided {
@@ -570,7 +570,7 @@ func attemptNexusLink(
 		}); err != nil {
 			return fmt.Errorf("updating mod file label: %w", err)
 		}
-		fmt.Println(style.Subtle.Render(fmt.Sprintf("  updated mod file label: %s", match.File.Name)))
+		style.Println(style.Subtle.Render(fmt.Sprintf("  updated mod file label: %s", match.File.Name)))
 	}
 
 	return nil

@@ -125,31 +125,31 @@ func init() {
 // checkDb verifies the DB exists and is usable, and warns if migrations
 // are pending. Returns error only for non-recoverable failures.
 func checkDb(ctx context.Context) error {
-	fmt.Println(style.Header.Render("Database Checks"))
-	fmt.Println(style.Subtle.Render("  db: " + viper.GetString("database")))
-	fmt.Println()
+	style.Println(style.Header.Render("Database Checks"))
+	style.Println(style.Subtle.Render("  db: " + viper.GetString("database")))
+	style.Println()
 
 	// 1) DB file existence
 	dbPath := viper.GetString("database")
 	info, err := os.Stat(dbPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			fmt.Println(style.Failure.Render("  ✗ database does not exist"))
-			fmt.Println(style.Subtle.Render("    run `modctl init` to create the state directory and database"))
-			fmt.Println()
+			style.Println(style.Failure.Render("  ✗ database does not exist"))
+			style.Println(style.Subtle.Render("    run `modctl init` to create the state directory and database"))
+			style.Println()
 			return fmt.Errorf("database missing: %s", dbPath)
 		}
-		fmt.Println(style.Failure.Render("  ✗ could not stat database file"))
-		fmt.Println(style.Subtle.Render("    " + err.Error()))
-		fmt.Println()
+		style.Println(style.Failure.Render("  ✗ could not stat database file"))
+		style.Println(style.Subtle.Render("    " + err.Error()))
+		style.Println()
 		return fmt.Errorf("cannot stat database: %w", err)
 	}
 	if info.IsDir() {
-		fmt.Println(style.Failure.Render("  ✗ database path is a directory, expected a file"))
-		fmt.Println()
+		style.Println(style.Failure.Render("  ✗ database path is a directory, expected a file"))
+		style.Println()
 		return fmt.Errorf("database path is a directory: %s", dbPath)
 	}
-	fmt.Println(style.Success.Render("  ✓ database file exists"))
+	style.Println(style.Success.Render("  ✓ database file exists"))
 
 	// Keep doctor snappy.
 	ctxT, cancel := context.WithTimeout(ctx, 1*time.Second)
@@ -158,55 +158,55 @@ func checkDb(ctx context.Context) error {
 	// 2) Open DB + trivial query
 	db, err := internal.SetupDB()
 	if err != nil {
-		fmt.Println(style.Failure.Render("  ✗ could not open database"))
-		fmt.Println(style.Subtle.Render("    " + err.Error()))
-		fmt.Println()
+		style.Println(style.Failure.Render("  ✗ could not open database"))
+		style.Println(style.Subtle.Render("    " + err.Error()))
+		style.Println()
 		return fmt.Errorf("cannot open database: %w", err)
 	}
 	defer db.Close()
 
 	var one int
 	if err := db.QueryRowContext(ctxT, "SELECT 1").Scan(&one); err != nil || one != 1 {
-		fmt.Println(style.Failure.Render("  ✗ basic query failed (SELECT 1)"))
+		style.Println(style.Failure.Render("  ✗ basic query failed (SELECT 1)"))
 		if err != nil {
-			fmt.Println(style.Subtle.Render("    " + err.Error()))
+			style.Println(style.Subtle.Render("    " + err.Error()))
 		}
-		fmt.Println()
+		style.Println()
 		return fmt.Errorf("database not usable: %w", err)
 	}
-	fmt.Println(style.Success.Render("  ✓ basic query OK (SELECT 1)"))
+	style.Println(style.Success.Render("  ✓ basic query OK (SELECT 1)"))
 
 	// 3) migrations status
 	p, err := internal.GooseProvider(db)
 	if err != nil {
 		// if we can't determine migration state treat it as fatal
-		fmt.Println(style.Failure.Render("  ✗ could not determine migration status"))
-		fmt.Println(style.Subtle.Render("    " + err.Error()))
-		fmt.Println()
+		style.Println(style.Failure.Render("  ✗ could not determine migration status"))
+		style.Println(style.Subtle.Render("    " + err.Error()))
+		style.Println()
 		return fmt.Errorf("cannot determine migration status: %w", err)
 	}
 
 	pending, err := p.HasPending(ctx)
 	if err != nil {
 		// if we can't determine migration state treat it as fatal
-		fmt.Println(style.Failure.Render("  ✗ could not determine migration status"))
-		fmt.Println(style.Subtle.Render("    " + err.Error()))
-		fmt.Println()
+		style.Println(style.Failure.Render("  ✗ could not determine migration status"))
+		style.Println(style.Subtle.Render("    " + err.Error()))
+		style.Println()
 		return fmt.Errorf("cannot determine migration status: %w", err)
 	}
 
 	if pending {
 		current, target, verr := p.GetVersions(ctx)
 		if verr == nil {
-			fmt.Println(style.Warning.Render(fmt.Sprintf(
+			style.Println(style.Warning.Render(fmt.Sprintf(
 				"  ⚠ pending migrations (db=%d, target=%d)",
 				current, target,
 			)))
 		} else {
-			fmt.Println(style.Warning.Render("  ⚠ pending migrations - other commands will auto-migrate"))
+			style.Println(style.Warning.Render("  ⚠ pending migrations - other commands will auto-migrate"))
 		}
 	} else {
-		fmt.Println(style.Success.Render("  ✓ migrations up to date"))
+		style.Println(style.Success.Render("  ✓ migrations up to date"))
 	}
 
 	// 4) quick_check or integrity_check and foreign_key_check
@@ -219,8 +219,8 @@ func checkDb(ctx context.Context) error {
 
 	rows, err := db.QueryContext(ctx, pragma)
 	if err != nil {
-		fmt.Println(style.Failure.Render(fmt.Sprintf("  ✗ %s failed", label)))
-		fmt.Println(style.Subtle.Render("    " + err.Error()))
+		style.Println(style.Failure.Render(fmt.Sprintf("  ✗ %s failed", label)))
+		style.Println(style.Subtle.Render("    " + err.Error()))
 		return fmt.Errorf("%s failed: %w", label, err)
 	}
 	defer rows.Close()
@@ -237,11 +237,11 @@ func checkDb(ctx context.Context) error {
 	}
 
 	if len(problems) == 0 {
-		fmt.Println(style.Success.Render(fmt.Sprintf("  ✓ %s OK", label)))
+		style.Println(style.Success.Render(fmt.Sprintf("  ✓ %s OK", label)))
 	} else {
-		fmt.Println(style.Failure.Render(fmt.Sprintf("  ✗ %s reported corruption", label)))
+		style.Println(style.Failure.Render(fmt.Sprintf("  ✗ %s reported corruption", label)))
 		for _, p := range problems {
-			fmt.Println(style.Subtle.Render("    " + p))
+			style.Println(style.Subtle.Render("    " + p))
 		}
 		return fmt.Errorf("database integrity check failed")
 	}
@@ -249,8 +249,8 @@ func checkDb(ctx context.Context) error {
 	if deepCheck {
 		rows, err := db.QueryContext(ctx, "PRAGMA foreign_key_check;")
 		if err != nil {
-			fmt.Println(style.Failure.Render("  ✗ foreign_key_check failed"))
-			fmt.Println(style.Subtle.Render("    " + err.Error()))
+			style.Println(style.Failure.Render("  ✗ foreign_key_check failed"))
+			style.Println(style.Subtle.Render("    " + err.Error()))
 			return fmt.Errorf("foreign_key_check failed: %w", err)
 		}
 		defer rows.Close()
@@ -275,25 +275,25 @@ func checkDb(ctx context.Context) error {
 		}
 
 		if len(violations) == 0 {
-			fmt.Println(style.Success.Render("  ✓ foreign_key_check OK"))
+			style.Println(style.Success.Render("  ✓ foreign_key_check OK"))
 		} else {
-			fmt.Println(style.Failure.Render("  ✗ foreign_key_check reported violations"))
+			style.Println(style.Failure.Render("  ✗ foreign_key_check reported violations"))
 			for _, v := range violations {
-				fmt.Println(style.Subtle.Render("    " + v))
+				style.Println(style.Subtle.Render("    " + v))
 			}
 			return fmt.Errorf("foreign key violations detected")
 		}
 	}
 
-	fmt.Println()
+	style.Println()
 
 	return nil
 }
 
 func checkPaths() error {
-	fmt.Println(style.Header.Render("State Directory Checks"))
-	fmt.Println(style.Subtle.Render("  root: " + filepath.Join(xdg.DataHome, "modctl")))
-	fmt.Println()
+	style.Println(style.Header.Render("State Directory Checks"))
+	style.Println(style.Subtle.Render("  root: " + filepath.Join(xdg.DataHome, "modctl")))
+	style.Println()
 
 	required := []string{
 		viper.GetString("archives_dir"),
@@ -310,13 +310,13 @@ func checkPaths() error {
 		name := filepath.Base(path)
 		info, err := os.Stat(path)
 		if err != nil {
-			fmt.Println(style.Failure.Render(fmt.Sprintf("  ✗ %s: does not exist (%s)", name, path)))
+			style.Println(style.Failure.Render(fmt.Sprintf("  ✗ %s: does not exist (%s)", name, path)))
 			fatalErr = errors.New("missing required state directory")
 			continue
 		}
 
 		if !info.IsDir() {
-			fmt.Println(style.Failure.Render(fmt.Sprintf("  ✗ %s: not a directory (%s)", name, path)))
+			style.Println(style.Failure.Render(fmt.Sprintf("  ✗ %s: not a directory (%s)", name, path)))
 			fatalErr = errors.New("invalid state directory type")
 			continue
 		}
@@ -324,34 +324,34 @@ func checkPaths() error {
 		// Test writability by creating a temp file
 		testFile := filepath.Join(path, ".modctl-doctor-write-test")
 		if err := os.WriteFile(testFile, []byte("ok"), 0o600); err != nil {
-			fmt.Println(style.Failure.Render(fmt.Sprintf("  ✗ %s: not writable (%s)", name, path)))
+			style.Println(style.Failure.Render(fmt.Sprintf("  ✗ %s: not writable (%s)", name, path)))
 			fatalErr = errors.New("state directory not writable")
 			continue
 		}
 		_ = os.Remove(testFile)
 
-		fmt.Println(style.Success.Render(fmt.Sprintf("  ✓ %s: OK (%s)", name, path)))
+		style.Println(style.Success.Render(fmt.Sprintf("  ✓ %s: OK (%s)", name, path)))
 	}
 
-	fmt.Println()
+	style.Println()
 
 	return fatalErr
 }
 
 func checkBsdtar(ctx context.Context) error {
 	bsdtar := viper.GetString("bsdtar")
-	fmt.Println(style.Header.Render("bsdtar Checks"))
-	fmt.Println(style.Subtle.Render("  search: " + bsdtar))
-	fmt.Println()
+	style.Println(style.Header.Render("bsdtar Checks"))
+	style.Println(style.Subtle.Render("  search: " + bsdtar))
+	style.Println()
 
 	resolvedPath, err := exec.LookPath(bsdtar)
 	if err != nil {
-		fmt.Println(style.Failure.Render("  ✗ bsdtar not found in PATH"))
-		fmt.Println(style.Subtle.Render("    " + err.Error()))
+		style.Println(style.Failure.Render("  ✗ bsdtar not found in PATH"))
+		style.Println(style.Subtle.Render("    " + err.Error()))
 		return fmt.Errorf("bsdtar not found: %w", err)
 	}
 
-	fmt.Println(style.Success.Render("  ✓ bsdtar found: " + resolvedPath))
+	style.Println(style.Success.Render("  ✓ bsdtar found: " + resolvedPath))
 
 	// Use short timeout for all subprocess calls
 	cmdCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
@@ -360,13 +360,13 @@ func checkBsdtar(ctx context.Context) error {
 	versionCmd := exec.CommandContext(cmdCtx, resolvedPath, "--version")
 	versionOutput, err := versionCmd.CombinedOutput()
 	if err != nil {
-		fmt.Println(style.Failure.Render("  ✗ bsdtar --version failed"))
-		fmt.Println(style.Subtle.Render("    " + err.Error()))
+		style.Println(style.Failure.Render("  ✗ bsdtar --version failed"))
+		style.Println(style.Subtle.Render("    " + err.Error()))
 		return fmt.Errorf("bsdtar --version failed: %w", err)
 	}
 
-	fmt.Println(style.Success.Render("  ✓ bsdtar --version OK"))
-	fmt.Println(style.Subtle.Render("      " + strings.TrimSpace(string(versionOutput))))
+	style.Println(style.Success.Render("  ✓ bsdtar --version OK"))
+	style.Println(style.Subtle.Render("      " + strings.TrimSpace(string(versionOutput))))
 
 	tmpFile, err := os.CreateTemp("", "modctl-bsdtar-*.tar.gz")
 	if err != nil {
@@ -383,45 +383,45 @@ func checkBsdtar(ctx context.Context) error {
 	listCmd := exec.CommandContext(cmdCtx, resolvedPath, "-t", "-f", tmpPath)
 	listOutput, err := listCmd.CombinedOutput()
 	if err != nil {
-		fmt.Println(style.Failure.Render("  ✗ bsdtar failed to list sample archive"))
-		fmt.Println(style.Subtle.Render("    " + err.Error()))
+		style.Println(style.Failure.Render("  ✗ bsdtar failed to list sample archive"))
+		style.Println(style.Subtle.Render("    " + err.Error()))
 		return fmt.Errorf("bsdtar test archive failed: %w", err)
 	}
 
 	lines := strings.Split(strings.TrimSpace(string(listOutput)), "\n")
 
 	if len(lines) != 1 {
-		fmt.Println(style.Failure.Render("  ✗ unexpected archive contents"))
-		fmt.Println(style.Subtle.Render(fmt.Sprintf("    expected 1 entry, got %d", len(lines))))
+		style.Println(style.Failure.Render("  ✗ unexpected archive contents"))
+		style.Println(style.Subtle.Render(fmt.Sprintf("    expected 1 entry, got %d", len(lines))))
 		for _, e := range lines {
-			fmt.Println(style.Subtle.Render("    " + e))
+			style.Println(style.Subtle.Render("    " + e))
 		}
 		return fmt.Errorf("invalid sample archive contents")
 	}
 
 	if lines[0] != "hello.txt" {
-		fmt.Println(style.Failure.Render("  ✗ archive entry mismatch"))
-		fmt.Println(style.Subtle.Render("    expected: hello.txt"))
-		fmt.Println(style.Subtle.Render("    got:      " + lines[0]))
+		style.Println(style.Failure.Render("  ✗ archive entry mismatch"))
+		style.Println(style.Subtle.Render("    expected: hello.txt"))
+		style.Println(style.Subtle.Render("    got:      " + lines[0]))
 		return fmt.Errorf("archive contents incorrect")
 	}
 
-	fmt.Println(style.Success.Render("  ✓ bsdtar archive test OK"))
+	style.Println(style.Success.Render("  ✓ bsdtar archive test OK"))
 
-	fmt.Println()
+	style.Println()
 
 	return nil
 }
 
 func checkGameInstalls(ctx context.Context) error {
-	fmt.Println(style.Header.Render("Game Install Checks"))
-	fmt.Println()
+	style.Println(style.Header.Render("Game Install Checks"))
+	style.Println()
 
 	db, err := internal.SetupDB()
 	if err != nil {
-		fmt.Println(style.Failure.Render("  ✗ could not open database"))
-		fmt.Println(style.Subtle.Render("    " + err.Error()))
-		fmt.Println()
+		style.Println(style.Failure.Render("  ✗ could not open database"))
+		style.Println(style.Subtle.Render("    " + err.Error()))
+		style.Println()
 		return fmt.Errorf("cannot open database: %w", err)
 	}
 	defer db.Close()
@@ -430,15 +430,15 @@ func checkGameInstalls(ctx context.Context) error {
 
 	installs, err := q.ListAllGameInstalls(ctx)
 	if err != nil {
-		fmt.Println(style.Failure.Render("  ✗ could not list game installs"))
-		fmt.Println(style.Subtle.Render("    " + err.Error()))
-		fmt.Println()
+		style.Println(style.Failure.Render("  ✗ could not list game installs"))
+		style.Println(style.Subtle.Render("    " + err.Error()))
+		style.Println()
 		return fmt.Errorf("list game installs: %w", err)
 	}
 
 	if len(installs) == 0 {
-		fmt.Println(style.Subtle.Render("  no game installs found"))
-		fmt.Println()
+		style.Println(style.Subtle.Render("  no game installs found"))
+		style.Println()
 		return nil
 	}
 
@@ -446,14 +446,14 @@ func checkGameInstalls(ctx context.Context) error {
 		label := fmt.Sprintf("%s (%s:%s)", gi.DisplayName, gi.StoreID, gi.StoreGameID)
 
 		if !util.SqliteIntToBool(gi.IsPresent) {
-			fmt.Println(style.Warning.Render(fmt.Sprintf("  ⚠ %s: not present (game may have moved or been uninstalled)", label)))
+			style.Println(style.Warning.Render(fmt.Sprintf("  ⚠ %s: not present (game may have moved or been uninstalled)", label)))
 			continue
 		}
 
 		targets, err := q.ListTargetsForGameInstall(ctx, gi.ID)
 		if err != nil {
-			fmt.Println(style.Failure.Render(fmt.Sprintf("  ✗ %s: could not list targets", label)))
-			fmt.Println(style.Subtle.Render("    " + err.Error()))
+			style.Println(style.Failure.Render(fmt.Sprintf("  ✗ %s: could not list targets", label)))
+			style.Println(style.Subtle.Render("    " + err.Error()))
 			continue
 		}
 
@@ -464,7 +464,7 @@ func checkGameInstalls(ctx context.Context) error {
 			}
 			testFile := filepath.Join(t.RootPath, ".modctl-doctor-write-test")
 			if err := os.WriteFile(testFile, []byte("ok"), 0o600); err != nil {
-				fmt.Println(style.Failure.Render(fmt.Sprintf(
+				style.Println(style.Failure.Render(fmt.Sprintf(
 					"  ✗ %s: target %q not writable (%s)",
 					label, t.Name, t.RootPath,
 				)))
@@ -475,11 +475,11 @@ func checkGameInstalls(ctx context.Context) error {
 		}
 
 		if allOk {
-			fmt.Println(style.Success.Render(fmt.Sprintf("  ✓ %s: all targets writable", label)))
+			style.Println(style.Success.Render(fmt.Sprintf("  ✓ %s: all targets writable", label)))
 		}
 	}
 
-	fmt.Println()
+	style.Println()
 	return nil
 }
 
@@ -489,17 +489,17 @@ func checkGameInstalls(ctx context.Context) error {
 // For now this is "presence + size sanity". If rehashCheck is enabled we’ll
 // add a second pass later to stream-hash and update verified_at.
 func checkBlobs(ctx context.Context) error {
-	fmt.Println(style.Header.Render("Blob Store Checks"))
-	fmt.Println(style.Subtle.Render("  archives:  " + viper.GetString("archives_dir")))
-	fmt.Println(style.Subtle.Render("  backups:   " + viper.GetString("backups_dir")))
-	fmt.Println(style.Subtle.Render("  overrides: " + viper.GetString("overrides_dir")))
-	fmt.Println()
+	style.Println(style.Header.Render("Blob Store Checks"))
+	style.Println(style.Subtle.Render("  archives:  " + viper.GetString("archives_dir")))
+	style.Println(style.Subtle.Render("  backups:   " + viper.GetString("backups_dir")))
+	style.Println(style.Subtle.Render("  overrides: " + viper.GetString("overrides_dir")))
+	style.Println()
 
 	db, err := internal.SetupDB()
 	if err != nil {
-		fmt.Println(style.Failure.Render("  ✗ could not open database"))
-		fmt.Println(style.Subtle.Render("    " + err.Error()))
-		fmt.Println()
+		style.Println(style.Failure.Render("  ✗ could not open database"))
+		style.Println(style.Subtle.Render("    " + err.Error()))
+		style.Println()
 		return fmt.Errorf("cannot open database: %w", err)
 	}
 	defer db.Close()
@@ -521,9 +521,9 @@ func checkBlobs(ctx context.Context) error {
 	for _, kind := range kinds {
 		rows, err := q.ListBlobsByKind(ctx, string(kind))
 		if err != nil {
-			fmt.Println(style.Failure.Render(fmt.Sprintf("  ✗ %s: failed to list blobs", kind)))
-			fmt.Println(style.Subtle.Render("    " + err.Error()))
-			fmt.Println()
+			style.Println(style.Failure.Render(fmt.Sprintf("  ✗ %s: failed to list blobs", kind)))
+			style.Println(style.Subtle.Render("    " + err.Error()))
+			style.Println()
 			return fmt.Errorf("list blobs kind=%s: %w", kind, err)
 		}
 
@@ -547,7 +547,7 @@ func checkBlobs(ctx context.Context) error {
 						if b.OriginalName.Valid {
 							name = b.OriginalName.String
 						}
-						fmt.Println(style.Warning.Render(fmt.Sprintf(
+						style.Println(style.Warning.Render(fmt.Sprintf(
 							"    missing: %s %s",
 							style.ShortSha(b.Sha256), name,
 						)))
@@ -565,7 +565,7 @@ func checkBlobs(ctx context.Context) error {
 							} else if c.OriginalName.Valid {
 								parts = append(parts, "("+c.OriginalName.String+")")
 							}
-							fmt.Println(style.Warning.Render(fmt.Sprintf(
+							style.Println(style.Warning.Render(fmt.Sprintf(
 								"    missing: %s %s",
 								style.ShortSha(b.Sha256),
 								strings.Join(parts, " › "),
@@ -588,16 +588,16 @@ func checkBlobs(ctx context.Context) error {
 
 		switch {
 		case len(rows) == 0:
-			fmt.Println(style.Success.Render(fmt.Sprintf("  ✓ %s: no blobs recorded", kind)))
+			style.Println(style.Success.Render(fmt.Sprintf("  ✓ %s: no blobs recorded", kind)))
 		case missing == 0:
-			fmt.Println(style.Success.Render(fmt.Sprintf("  ✓ %s: %d/%d present", kind, len(rows), len(rows))))
+			style.Println(style.Success.Render(fmt.Sprintf("  ✓ %s: %d/%d present", kind, len(rows), len(rows))))
 		default:
-			fmt.Println(style.Warning.Render(fmt.Sprintf("  ⚠ %s: %d/%d present (%d missing)", kind, len(rows)-missing, len(rows), missing)))
+			style.Println(style.Warning.Render(fmt.Sprintf("  ⚠ %s: %d/%d present (%d missing)", kind, len(rows)-missing, len(rows), missing)))
 		}
 	}
 
 	if doctorRehash {
-		fmt.Println()
+		style.Println()
 		for _, kind := range kinds {
 			if err := rehashBlobs(ctx, q, bs, kind); err != nil {
 				return err
@@ -605,7 +605,7 @@ func checkBlobs(ctx context.Context) error {
 		}
 	}
 
-	fmt.Println()
+	style.Println()
 
 	return nil
 }
@@ -623,7 +623,7 @@ func rehashBlobs(
 
 	total := len(blobs)
 	if total == 0 {
-		fmt.Println(style.Subtle.Render(fmt.Sprintf("  %s: (no blobs)", kind)))
+		style.Println(style.Subtle.Render(fmt.Sprintf("  %s: (no blobs)", kind)))
 		return nil
 	}
 
@@ -635,22 +635,22 @@ func rehashBlobs(
 
 	label := fmt.Sprintf("  %s: rehash", kind)
 	// Print an initial line so \r updates have something to overwrite
-	fmt.Printf("%s (0/%d)", label, total)
+	style.Printf("%s (0/%d)", label, total)
 
 	for i, b := range blobs {
 		select {
 		case <-ctx.Done():
-			fmt.Print("\n")
+			style.Print("\n")
 			return ctx.Err()
 		default:
 		}
 
 		// Progress update (overwrite same line).
-		fmt.Printf("\r%s (%d/%d)", label, i+1, total)
+		style.Printf("\r%s (%d/%d)", label, i+1, total)
 
 		path, perr := bs.PathFor(kind, b.Sha256)
 		if perr != nil {
-			fmt.Print("\n")
+			style.Print("\n")
 			return fmt.Errorf("derive blob path kind=%s sha=%s: %w", kind, b.Sha256, perr)
 		}
 
@@ -660,11 +660,11 @@ func rehashBlobs(
 				skippedMissing++
 				continue
 			}
-			fmt.Print("\n")
+			style.Print("\n")
 			return fmt.Errorf("stat blob kind=%s sha=%s path=%s: %w", kind, b.Sha256, path, serr)
 		}
 		if st.Size() != b.SizeBytes {
-			fmt.Print("\n")
+			style.Print("\n")
 			return fmt.Errorf(
 				"blob size mismatch kind=%s sha=%s path=%s db=%d disk=%d",
 				kind, b.Sha256, path, b.SizeBytes, st.Size(),
@@ -673,7 +673,7 @@ func rehashBlobs(
 
 		f, err := os.Open(path)
 		if err != nil {
-			fmt.Print("\n")
+			style.Print("\n")
 			return fmt.Errorf("open blob kind=%s sha=%s path=%s: %w", kind, b.Sha256, path, err)
 		}
 
@@ -681,13 +681,13 @@ func rehashBlobs(
 		_, cerr := blobstore.CopyWithContext(ctx, h, f, buf)
 		_ = f.Close()
 		if cerr != nil {
-			fmt.Print("\n")
+			style.Print("\n")
 			return fmt.Errorf("hash blob kind=%s sha=%s path=%s: %w", kind, b.Sha256, path, cerr)
 		}
 
 		sumHex := hex.EncodeToString(h.Sum(nil))
 		if sumHex != b.Sha256 {
-			fmt.Print("\n")
+			style.Print("\n")
 			return fmt.Errorf(
 				"blob hash mismatch kind=%s expected=%s got=%s path=%s",
 				kind, b.Sha256, sumHex, path,
@@ -699,7 +699,7 @@ func rehashBlobs(
 			VerifiedAt: sql.NullString{String: now, Valid: true},
 			Sha256:     b.Sha256,
 		}); err != nil {
-			fmt.Print("\n")
+			style.Print("\n")
 			return fmt.Errorf("update verified_at sha=%s: %w", b.Sha256, err)
 		}
 
@@ -707,26 +707,26 @@ func rehashBlobs(
 	}
 
 	// Finish the progress line and print a summary
-	fmt.Print("\r") // return to start of line
-	fmt.Printf("%s (%d/%d)", label, total, total)
-	fmt.Print("\n")
+	style.Print("\r") // return to start of line
+	style.Printf("%s (%d/%d)", label, total, total)
+	style.Print("\n")
 	if skippedMissing > 0 {
-		fmt.Println(style.Subtle.Render(fmt.Sprintf("    skipped %d missing blobs", skippedMissing)))
+		style.Println(style.Subtle.Render(fmt.Sprintf("    skipped %d missing blobs", skippedMissing)))
 	}
-	fmt.Println(style.Subtle.Render(fmt.Sprintf("    verified %d blobs", hashed)))
+	style.Println(style.Subtle.Render(fmt.Sprintf("    verified %d blobs", hashed)))
 
 	return nil
 }
 
 func checkInstalledFiles(ctx context.Context) error {
-	fmt.Println(style.Header.Render("Installed File Checks"))
-	fmt.Println()
+	style.Println(style.Header.Render("Installed File Checks"))
+	style.Println()
 
 	db, err := internal.SetupDB()
 	if err != nil {
-		fmt.Println(style.Failure.Render("  ✗ could not open database"))
-		fmt.Println(style.Subtle.Render("    " + err.Error()))
-		fmt.Println()
+		style.Println(style.Failure.Render("  ✗ could not open database"))
+		style.Println(style.Subtle.Render("    " + err.Error()))
+		style.Println()
 		return fmt.Errorf("cannot open database: %w", err)
 	}
 	defer db.Close()
@@ -735,15 +735,15 @@ func checkInstalledFiles(ctx context.Context) error {
 
 	installs, err := q.GetGameInstallsWithAppliedProfile(ctx)
 	if err != nil {
-		fmt.Println(style.Failure.Render("  ✗ could not list applied game installs"))
-		fmt.Println(style.Subtle.Render("    " + err.Error()))
-		fmt.Println()
+		style.Println(style.Failure.Render("  ✗ could not list applied game installs"))
+		style.Println(style.Subtle.Render("    " + err.Error()))
+		style.Println()
 		return fmt.Errorf("list applied game installs: %w", err)
 	}
 
 	if len(installs) == 0 {
-		fmt.Println(style.Subtle.Render("  no applied game installs found"))
-		fmt.Println()
+		style.Println(style.Subtle.Render("  no applied game installs found"))
+		style.Println()
 		return nil
 	}
 
@@ -753,7 +753,7 @@ func checkInstalledFiles(ctx context.Context) error {
 		label := fmt.Sprintf("%s (%s:%s)", gi.DisplayName, gi.StoreID, gi.StoreGameID)
 
 		if !util.SqliteIntToBool(gi.IsPresent) {
-			fmt.Println(style.Warning.Render(fmt.Sprintf(
+			style.Println(style.Warning.Render(fmt.Sprintf(
 				"  ⚠ %s: skipping installed file check (game not present on disk)",
 				label,
 			)))
@@ -762,8 +762,8 @@ func checkInstalledFiles(ctx context.Context) error {
 
 		targets, err := q.ListTargetsForGameInstall(ctx, gi.ID)
 		if err != nil {
-			fmt.Println(style.Failure.Render(fmt.Sprintf("  ✗ %s: could not list targets", label)))
-			fmt.Println(style.Subtle.Render("    " + err.Error()))
+			style.Println(style.Failure.Render(fmt.Sprintf("  ✗ %s: could not list targets", label)))
+			style.Println(style.Subtle.Render("    " + err.Error()))
 			continue
 		}
 
@@ -774,13 +774,13 @@ func checkInstalledFiles(ctx context.Context) error {
 
 		files, err := q.GetInstalledFilesForGameInstall(ctx, gi.ID)
 		if err != nil {
-			fmt.Println(style.Failure.Render(fmt.Sprintf("  ✗ %s: could not list installed files", label)))
-			fmt.Println(style.Subtle.Render("    " + err.Error()))
+			style.Println(style.Failure.Render(fmt.Sprintf("  ✗ %s: could not list installed files", label)))
+			style.Println(style.Subtle.Render("    " + err.Error()))
 			continue
 		}
 
 		if len(files) == 0 {
-			fmt.Println(style.Subtle.Render(fmt.Sprintf("  %s: no installed files recorded", label)))
+			style.Println(style.Subtle.Render(fmt.Sprintf("  %s: no installed files recorded", label)))
 			continue
 		}
 
@@ -797,7 +797,7 @@ func checkInstalledFiles(ctx context.Context) error {
 			if !ok {
 				// target was removed from DB but installed_files row remains
 				missing++
-				fmt.Println(style.Warning.Render(fmt.Sprintf(
+				style.Println(style.Warning.Render(fmt.Sprintf(
 					"    missing target: target_id=%d relpath=%s",
 					f.TargetID, f.Relpath,
 				)))
@@ -810,7 +810,7 @@ func checkInstalledFiles(ctx context.Context) error {
 			if err != nil {
 				if errors.Is(err, os.ErrNotExist) {
 					missing++
-					fmt.Println(style.Warning.Render(fmt.Sprintf(
+					style.Println(style.Warning.Render(fmt.Sprintf(
 						"    missing: %s", f.Relpath,
 					)))
 					continue
@@ -825,7 +825,7 @@ func checkInstalledFiles(ctx context.Context) error {
 			// Size check first as a cheap pre-filter
 			if st.Size() != f.SizeBytes {
 				mismatched++
-				fmt.Println(style.Warning.Render(fmt.Sprintf(
+				style.Println(style.Warning.Render(fmt.Sprintf(
 					"    size mismatch: %s (expected %d got %d)",
 					f.Relpath, f.SizeBytes, st.Size(),
 				)))
@@ -847,7 +847,7 @@ func checkInstalledFiles(ctx context.Context) error {
 			actual := hex.EncodeToString(h.Sum(nil))
 			if actual != f.ContentSha256 {
 				mismatched++
-				fmt.Println(style.Warning.Render(fmt.Sprintf(
+				style.Println(style.Warning.Render(fmt.Sprintf(
 					"    content mismatch: %s (expected %s got %s)",
 					f.Relpath, style.ShortSha(f.ContentSha256), style.ShortSha(actual),
 				)))
@@ -857,12 +857,12 @@ func checkInstalledFiles(ctx context.Context) error {
 		switch {
 		case missing == 0 && mismatched == 0:
 			if doctorRehashInstalls {
-				fmt.Println(style.Success.Render(fmt.Sprintf(
+				style.Println(style.Success.Render(fmt.Sprintf(
 					"  ✓ %s: %d/%d files present and verified",
 					label, len(files), len(files),
 				)))
 			} else {
-				fmt.Println(style.Success.Render(fmt.Sprintf(
+				style.Println(style.Success.Render(fmt.Sprintf(
 					"  ✓ %s: %d/%d files present",
 					label, len(files), len(files),
 				)))
@@ -875,7 +875,7 @@ func checkInstalledFiles(ctx context.Context) error {
 			if mismatched > 0 {
 				parts = append(parts, fmt.Sprintf("%d content mismatch", mismatched))
 			}
-			fmt.Println(style.Warning.Render(fmt.Sprintf(
+			style.Println(style.Warning.Render(fmt.Sprintf(
 				"  ⚠ %s: %d/%d files present (%s)",
 				label, len(files)-missing, len(files),
 				strings.Join(parts, ", "),
@@ -883,6 +883,6 @@ func checkInstalledFiles(ctx context.Context) error {
 		}
 	}
 
-	fmt.Println()
+	style.Println()
 	return nil
 }

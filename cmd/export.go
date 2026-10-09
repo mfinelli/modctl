@@ -102,9 +102,9 @@ Examples:
 			}
 			opts.OutputPath = exportOutput
 
-			fmt.Println(style.Bold.Render("Exporting (full)"))
-			fmt.Println(style.Subtle.Render("  output: " + exportOutput))
-			fmt.Println()
+			style.Println(style.Bold.Render("Exporting (full)"))
+			style.Println(style.Subtle.Render("  output: " + exportOutput))
+			style.Println()
 
 			start := time.Now()
 			result, err := exporter.Full(ctx, db, q, bs, opts)
@@ -114,9 +114,9 @@ Examples:
 			warnSkippedBlobs(result)
 
 			st, _ := os.Stat(exportOutput)
-			fmt.Println(style.Success.Render(fmt.Sprintf("  ✓ export complete in %.1fs", time.Since(start).Seconds())))
+			style.Println(style.Success.Render(fmt.Sprintf("  ✓ export complete in %.1fs", time.Since(start).Seconds())))
 			if st != nil {
-				fmt.Println(style.Subtle.Render(fmt.Sprintf("  size: %s", style.Bytes(st.Size()))))
+				style.Println(style.Subtle.Render(fmt.Sprintf("  size: %s", style.Bytes(st.Size()))))
 			}
 			return nil
 		}
@@ -132,12 +132,12 @@ Examples:
 		}
 		opts.OutputPath = exportOutput
 
-		fmt.Println(style.Bold.Render(fmt.Sprintf("Exporting %s", gi.DisplayName)))
-		fmt.Println(style.Subtle.Render("  output: " + exportOutput))
+		style.Println(style.Bold.Render(fmt.Sprintf("Exporting %s", gi.DisplayName)))
+		style.Println(style.Subtle.Render("  output: " + exportOutput))
 		if exportSkipInventory {
-			fmt.Println(style.Subtle.Render("  inventory: skipped"))
+			style.Println(style.Subtle.Render("  inventory: skipped"))
 		}
-		fmt.Println()
+		style.Println()
 
 		start := time.Now()
 		result, err := exporter.Game(ctx, db, q, bs, gi, opts)
@@ -147,9 +147,9 @@ Examples:
 		warnSkippedBlobs(result)
 
 		st, _ := os.Stat(exportOutput)
-		fmt.Println(style.Success.Render(fmt.Sprintf("  ✓ export complete in %.1fs", time.Since(start).Seconds())))
+		style.Println(style.Success.Render(fmt.Sprintf("  ✓ export complete in %.1fs", time.Since(start).Seconds())))
 		if st != nil {
-			fmt.Println(style.Subtle.Render(fmt.Sprintf("  size: %s", style.Bytes(st.Size()))))
+			style.Println(style.Subtle.Render(fmt.Sprintf("  size: %s", style.Bytes(st.Size()))))
 		}
 
 		return nil
@@ -160,15 +160,15 @@ Examples:
 func printExportProgress(p exporter.Progress) {
 	switch p.Kind {
 	case exporter.VerifyStarted:
-		fmt.Printf("  verifying blobs (0/%d)", p.Total)
+		style.Printf("  verifying blobs (0/%d)", p.Total)
 	case exporter.VerifyBlob:
-		fmt.Printf("\r  verifying blobs (%d/%d)", p.Done, p.Total)
+		style.Printf("\r  verifying blobs (%d/%d)", p.Done, p.Total)
 	case exporter.VerifyFinished:
-		fmt.Printf("\r%-60s\r", "")
-		fmt.Printf("  verified %d blob(s)\n", p.Total)
+		style.Printf("\r%-60s\r", "")
+		style.Printf("  verified %d blob(s)\n", p.Total)
 	case exporter.VerifyFailed:
 		// end the progress line so the error starts on a line of its own
-		fmt.Print("\n")
+		style.Print("\n")
 	}
 }
 
@@ -176,7 +176,7 @@ func printExportProgress(p exporter.Progress) {
 // because they were missing from disk.
 func warnSkippedBlobs(r exporter.Result) {
 	for _, sha := range r.SkippedBlobs {
-		fmt.Fprintf(os.Stderr, "warning: blob %s missing from disk, skipped in export\n", style.ShortSha(sha))
+		style.Fprintf(os.Stderr, "warning: blob %s missing from disk, skipped in export\n", style.ShortSha(sha))
 	}
 }
 

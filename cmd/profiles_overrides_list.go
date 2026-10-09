@@ -92,7 +92,7 @@ Run 'profiles overrides status' for full staleness detail.`,
 		}
 
 		if len(overrides) == 0 {
-			fmt.Println(style.Subtle.Render(fmt.Sprintf(
+			style.Println(style.Subtle.Render(fmt.Sprintf(
 				"  no overrides for profile %q", p.Name,
 			)))
 			return nil
@@ -108,10 +108,10 @@ Run 'profiles overrides status' for full staleness detail.`,
 			stalenessMap[s.OverrideID] = s.Staleness
 		}
 
-		fmt.Println(style.Bold.Render(fmt.Sprintf(
+		style.Println(style.Bold.Render(fmt.Sprintf(
 			"Overrides for profile %q (%d):", p.Name, len(overrides),
 		)))
-		fmt.Println()
+		style.Println()
 
 		for _, o := range overrides {
 			staleness := stalenessMap[o.ID]
@@ -130,7 +130,7 @@ Run 'profiles overrides status' for full staleness detail.`,
 				}
 			}
 
-			fmt.Printf("  %s%s\n", o.Relpath, statusTag)
+			style.Printf("  %s%s\n", o.Relpath, statusTag)
 			kvIndented.Print("type:", formatOverrideType(o.OverrideType))
 			if o.BlobSha256.Valid {
 				kvIndented.Print("blob:", style.ShortSha(o.BlobSha256.String))
@@ -138,7 +138,7 @@ Run 'profiles overrides status' for full staleness detail.`,
 			if o.Notes.Valid && strings.TrimSpace(o.Notes.String) != "" {
 				kvIndented.Print("notes:", o.Notes.String)
 			}
-			fmt.Println()
+			style.Println()
 		}
 
 		return nil

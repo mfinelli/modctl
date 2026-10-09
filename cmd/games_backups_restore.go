@@ -150,7 +150,7 @@ the command warns and requires --force to proceed.`,
 							relpath,
 						)
 					}
-					fmt.Println(style.Warning.Render(fmt.Sprintf(
+					style.Println(style.Warning.Render(fmt.Sprintf(
 						"  warning: %q has been modified since modctl installed it, restoring backup anyway",
 						relpath,
 					)))
@@ -161,7 +161,7 @@ the command warns and requires --force to proceed.`,
 		// Warn if profile is currently applied
 		appliedState, err := q.GetGameInstallAppliedState(ctx, gi.ID)
 		if err == nil && appliedState.AppliedProfileID.Valid {
-			fmt.Println(style.Warning.Render(
+			style.Println(style.Warning.Render(
 				"  warning: the active profile is currently applied; running apply again will overwrite this path\n" +
 					"  consider adding a write-once or skip-backup rule if you want to preserve this behavior permanently",
 			))
@@ -175,7 +175,7 @@ the command warns and requires --force to proceed.`,
 			return fmt.Errorf("restore backup: %w", err)
 		}
 
-		fmt.Printf("Restored backup for %q\n", relpath)
+		style.Printf("Restored backup for %q\n", relpath)
 		return nil
 	},
 }

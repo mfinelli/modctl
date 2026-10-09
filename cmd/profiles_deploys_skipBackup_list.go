@@ -104,13 +104,13 @@ var profilesDeploysSkipBackupListCmd = &cobra.Command{
 		}
 
 		if len(patterns) == 0 {
-			fmt.Println(style.Subtle.Render(fmt.Sprintf("  no skip-backup patterns for version %d in profile %q", mfv.ID, p.Name)))
+			style.Println(style.Subtle.Render(fmt.Sprintf("  no skip-backup patterns for version %d in profile %q", mfv.ID, p.Name)))
 			return nil
 		}
 
-		fmt.Println(style.Bold.Render(fmt.Sprintf("Skip-backup patterns for version %d in profile %q:", mfv.ID, p.Name)))
+		style.Println(style.Bold.Render(fmt.Sprintf("Skip-backup patterns for version %d in profile %q:", mfv.ID, p.Name)))
 		for _, row := range patterns {
-			fmt.Printf("  %s\n", row.Pattern)
+			style.Printf("  %s\n", row.Pattern)
 		}
 		return nil
 	},

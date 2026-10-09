@@ -30,6 +30,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
 )
@@ -203,7 +204,7 @@ targets cannot be used.`,
 			return fmt.Errorf("commit: %w", err)
 		}
 
-		fmt.Printf("Added version %d to profile %q (item_id=%d, priority=%d, enabled=%t, target=%s)\n",
+		style.Printf("Added version %d to profile %q (item_id=%d, priority=%d, enabled=%t, target=%s)\n",
 			mfv.ID, p.Name, itemID, priority, enabledVal != 0, target.Name)
 
 		return nil

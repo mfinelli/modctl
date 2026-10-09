@@ -158,7 +158,7 @@ on the same path - run 'modctl apply --dry-run' for a precise diff.`,
 			}
 		}
 
-		fmt.Println(renderProfileStatus(
+		style.Println(renderProfileStatus(
 			p,
 			gi,
 			items,

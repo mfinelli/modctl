@@ -119,7 +119,7 @@ Use --dry-run to preview the plan without making any changes.`,
 				return fmt.Errorf("mark last operation failed: %w", err)
 			}
 			if unapplyAbort {
-				fmt.Println("Operation marked as failed. Run 'modctl apply' to reapply or 'modctl unapply' to clean up.")
+				style.Println("Operation marked as failed. Run 'modctl apply' to reapply or 'modctl unapply' to clean up.")
 				return nil
 			}
 		}
@@ -170,7 +170,7 @@ Use --dry-run to preview the plan without making any changes.`,
 			totalOps += len(plan.Ops)
 		}
 		if totalOps == 0 {
-			fmt.Println(style.Subtle.Render(
+			style.Println(style.Subtle.Render(
 				"  nothing to unapply: no tool-managed files found"))
 			return nil
 		}
@@ -203,9 +203,9 @@ Use --dry-run to preview the plan without making any changes.`,
 		if len(activeTargets) > 1 {
 			targetLabel = "targets"
 		}
-		fmt.Println(style.Bold.Render(header) +
+		style.Println(style.Bold.Render(header) +
 			"  " + style.Subtle.Render(fmt.Sprintf("(%s: %s)", targetLabel, strings.Join(activeTargets, ", "))))
-		fmt.Println()
+		style.Println()
 
 		bs := blobstore.Store{
 			ArchivesDir: viper.GetString("archives_dir"),
@@ -242,7 +242,7 @@ Use --dry-run to preview the plan without making any changes.`,
 
 		// Print an initial line so \r updates have something to overwrite
 		if !unapplyPrintOps {
-			fmt.Printf("  [%*d/%d] ...", width, 0, total)
+			style.Printf("  [%*d/%d] ...", width, 0, total)
 		}
 
 		// With several targets in one run, say which one each op belongs to
@@ -256,9 +256,9 @@ Use --dry-run to preview the plan without making any changes.`,
 				line += style.Subtle.Render("  " + currentTarget)
 			}
 			if unapplyPrintOps {
-				fmt.Println(line)
+				style.Println(line)
 			} else {
-				fmt.Printf("\r%-*s", 80, line)
+				style.Printf("\r%-*s", 80, line)
 			}
 		}
 
@@ -276,7 +276,7 @@ Use --dry-run to preview the plan without making any changes.`,
 		for _, plan := range plans {
 			currentTarget = plan.TargetName
 			if multiTarget && unapplyPrintOps && len(plan.Ops) > 0 {
-				fmt.Println(style.Subtle.Render(fmt.Sprintf("  target: %s", plan.TargetName)))
+				style.Println(style.Subtle.Render(fmt.Sprintf("  target: %s", plan.TargetName)))
 			}
 
 			var removedPaths []string
@@ -313,7 +313,7 @@ Use --dry-run to preview the plan without making any changes.`,
 
 		// Clear spinner line
 		if !unapplyPrintOps {
-			fmt.Print("\r" + strings.Repeat(" ", 80) + "\r")
+			style.Print("\r" + strings.Repeat(" ", 80) + "\r")
 		}
 
 		// Mark operation successful and clear applied state in one transaction
@@ -343,17 +343,17 @@ Use --dry-run to preview the plan without making any changes.`,
 
 		// Summary
 		elapsed := time.Since(mustParseTime(op.StartedAt))
-		fmt.Println(style.Bold.Render(fmt.Sprintf("Unapply complete in %.1fs", elapsed.Seconds())))
+		style.Println(style.Bold.Render(fmt.Sprintf("Unapply complete in %.1fs", elapsed.Seconds())))
 		if countRemove > 0 {
-			fmt.Printf("  removed:   %d\n", countRemove)
+			style.Printf("  removed:   %d\n", countRemove)
 		}
 		if countRestore > 0 {
-			fmt.Printf("  restored:  %d\n", countRestore)
+			style.Printf("  restored:  %d\n", countRestore)
 		}
 		if len(allWarnings) > 0 {
-			fmt.Println(style.Warning.Render(fmt.Sprintf("  warnings:  %d", len(allWarnings))))
+			style.Println(style.Warning.Render(fmt.Sprintf("  warnings:  %d", len(allWarnings))))
 			for _, w := range allWarnings {
-				fmt.Println(style.Warning.Render("    ⚠  " + w))
+				style.Println(style.Warning.Render("    ⚠  " + w))
 			}
 		}
 		return nil
@@ -393,23 +393,23 @@ func printUnapplyPlan(
 		header += "  " + style.Subtle.Render("(last applied: \""+appliedProfileName+"\")")
 	}
 	header = style.Bold.Render(header) + "  " + style.Subtle.Render(fmt.Sprintf("(target: %s)", plan.TargetName))
-	fmt.Println(header)
-	fmt.Println()
+	style.Println(header)
+	style.Println()
 
 	var countRemove, countRestore int
 
 	for _, op := range plan.Ops {
 		switch op.Kind {
 		case planner.PlanOpRemove:
-			fmt.Printf("  %s %s\n", style.Removed.Render("-"), op.DestPath)
+			style.Printf("  %s %s\n", style.Removed.Render("-"), op.DestPath)
 			countRemove++
 		case planner.PlanOpRestoreBackup:
-			fmt.Printf("  %s %s\n", style.Restored.Render("↩"), op.DestPath)
+			style.Printf("  %s %s\n", style.Restored.Render("↩"), op.DestPath)
 			countRestore++
 		}
 	}
 
-	fmt.Println()
+	style.Println()
 
 	parts := []string{}
 	if countRemove > 0 {
@@ -419,12 +419,12 @@ func printUnapplyPlan(
 		parts = append(parts, fmt.Sprintf("%d restore", countRestore))
 	}
 	total := countRemove + countRestore
-	fmt.Printf("  %d operations: %s\n", total, strings.Join(parts, ", "))
+	style.Printf("  %d operations: %s\n", total, strings.Join(parts, ", "))
 
 	if len(plan.Warnings) > 0 {
-		fmt.Println()
+		style.Println()
 		for _, w := range plan.Warnings {
-			fmt.Println(style.Warning.Render("  ⚠  " + w))
+			style.Println(style.Warning.Render("  ⚠  " + w))
 		}
 	}
 }

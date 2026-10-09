@@ -27,6 +27,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
 )
@@ -119,10 +120,10 @@ versions are ignored when computing the applied mod set.`,
 			return err
 		}
 		if !changed {
-			fmt.Printf("Version %d is already disabled in profile %q\n", mfvID, p.Name)
+			style.Printf("Version %d is already disabled in profile %q\n", mfvID, p.Name)
 			return nil
 		}
-		fmt.Printf("Disabled version %d in profile %q\n", mfvID, p.Name)
+		style.Printf("Disabled version %d in profile %q\n", mfvID, p.Name)
 		return nil
 	},
 }

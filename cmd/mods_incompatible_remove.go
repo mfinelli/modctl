@@ -27,6 +27,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -122,7 +123,7 @@ The order of the two IDs does not matter.`,
 			return fmt.Errorf("no incompatibility flag found between mod pages %d and %d", mpA.ID, mpB.ID)
 		}
 
-		fmt.Printf("Removed incompatibility flag between mod pages %d and %d\n", mpA.ID, mpB.ID)
+		style.Printf("Removed incompatibility flag between mod pages %d and %d\n", mpA.ID, mpB.ID)
 		return nil
 	},
 }

@@ -18,10 +18,7 @@
 
 package style
 
-import (
-	"fmt"
-	"strings"
-)
+import "strings"
 
 // KV lays out label/value lines so that the values line up:
 //
@@ -60,5 +57,5 @@ func (kv KV) Write(b *strings.Builder, label, value string) {
 
 // Print prints the line for a label and value.
 func (kv KV) Print(label, value string) {
-	fmt.Print(kv.Line(label, value))
+	Print(kv.Line(label, value))
 }

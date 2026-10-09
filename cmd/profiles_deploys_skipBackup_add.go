@@ -29,6 +29,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -123,7 +124,7 @@ Examples:
 			return fmt.Errorf("add skip-backup pattern: %w", err)
 		}
 
-		fmt.Printf("Added skip-backup pattern %q for version %d in profile %q\n", pattern, mfv.ID, p.Name)
+		style.Printf("Added skip-backup pattern %q for version %d in profile %q\n", pattern, mfv.ID, p.Name)
 		return nil
 	},
 }

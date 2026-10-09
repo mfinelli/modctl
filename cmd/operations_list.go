@@ -73,10 +73,10 @@ Use --limit to change the number of operations shown.`,
 				return fmt.Errorf("list operations: %w", err)
 			}
 			if len(ops) == 0 {
-				fmt.Println(style.Subtle.Render("  no operations found"))
+				style.Println(style.Subtle.Render("  no operations found"))
 				return nil
 			}
-			fmt.Println(renderAllOperations(ops))
+			style.Println(renderAllOperations(ops))
 			return nil
 		}
 
@@ -106,11 +106,11 @@ Use --limit to change the number of operations shown.`,
 		}
 
 		if len(ops) == 0 {
-			fmt.Println(style.Subtle.Render(fmt.Sprintf("  no operations found for %s", gi.DisplayName)))
+			style.Println(style.Subtle.Render(fmt.Sprintf("  no operations found for %s", gi.DisplayName)))
 			return nil
 		}
 
-		fmt.Println(renderGameOperations(ops, gi.DisplayName))
+		style.Println(renderGameOperations(ops, gi.DisplayName))
 		return nil
 	},
 }

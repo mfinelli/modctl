@@ -19,7 +19,6 @@
 package cmd
 
 import (
-	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -47,9 +46,9 @@ default value.`,
 			configPath = filepath.Join(xdg.ConfigHome, "modctl", "config.toml")
 		}
 
-		fmt.Println(style.Header.Render("Configuration"))
-		fmt.Println(style.Subtle.Render("  file: " + configPath))
-		fmt.Println()
+		style.Println(style.Header.Render("Configuration"))
+		style.Println(style.Subtle.Render("  file: " + configPath))
+		style.Println()
 
 		for _, key := range knownConfigKeys {
 			value, fromFile := resolveConfigKey(key)

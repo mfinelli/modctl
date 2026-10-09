@@ -26,6 +26,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -98,6 +99,6 @@ func persistActiveGameInstall(gi dbq.GameInstall) error {
 		return err
 	}
 
-	fmt.Printf("Active game set to %s (%s)\n", fullSel, gi.DisplayName)
+	style.Printf("Active game set to %s (%s)\n", fullSel, gi.DisplayName)
 	return nil
 }

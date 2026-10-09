@@ -196,11 +196,11 @@ Binary files are detected automatically and refused unless --force is passed.`,
 			modInfo += " " + winner.VersionString
 		}
 
-		fmt.Println(style.Bold.Render(fmt.Sprintf(
+		style.Println(style.Bold.Render(fmt.Sprintf(
 			"Apply preview for %q in profile %q:", relpath, p.Name,
 		)))
-		fmt.Println(style.Subtle.Render(fmt.Sprintf("  winner: %s", modInfo)))
-		fmt.Println()
+		style.Println(style.Subtle.Render(fmt.Sprintf("  winner: %s", modInfo)))
+		style.Println()
 
 		diff, err := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
 			A:        difflib.SplitLines(string(onDiskData)),
@@ -214,22 +214,22 @@ Binary files are detected automatically and refused unless --force is passed.`,
 		}
 
 		if diff == "" {
-			fmt.Println(style.Subtle.Render("  no differences (on-disk file matches what apply would write)"))
+			style.Println(style.Subtle.Render("  no differences (on-disk file matches what apply would write)"))
 			return nil
 		}
 
 		for _, line := range strings.Split(diff, "\n") {
 			switch {
 			case strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---"):
-				fmt.Println(style.Bold.Render(line))
+				style.Println(style.Bold.Render(line))
 			case strings.HasPrefix(line, "@@"):
-				fmt.Println(style.Hunk.Render(line))
+				style.Println(style.Hunk.Render(line))
 			case strings.HasPrefix(line, "+"):
-				fmt.Println(style.Added.Render(line))
+				style.Println(style.Added.Render(line))
 			case strings.HasPrefix(line, "-"):
-				fmt.Println(style.Removed.Render(line))
+				style.Println(style.Removed.Render(line))
 			default:
-				fmt.Println(style.Subtle.Render(line))
+				style.Println(style.Subtle.Render(line))
 			}
 		}
 

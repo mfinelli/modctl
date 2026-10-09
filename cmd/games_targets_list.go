@@ -78,7 +78,7 @@ var gamesTargetsListCmd = &cobra.Command{
 		}
 
 		if len(targets) == 0 {
-			fmt.Println("No targets found.")
+			style.Println("No targets found.")
 			return nil
 		}
 
@@ -97,7 +97,7 @@ var gamesTargetsListCmd = &cobra.Command{
 			})
 		}
 
-		fmt.Println(style.Table([]string{" ID ", " Name ", " Path ", " Origin ", " State "}, rows))
+		style.Println(style.Table([]string{" ID ", " Name ", " Path ", " Origin ", " State "}, rows))
 		return nil
 	},
 }

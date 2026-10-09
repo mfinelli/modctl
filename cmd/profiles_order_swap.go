@@ -29,6 +29,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -178,7 +179,7 @@ without having to choose unused priority numbers.`,
 			return fmt.Errorf("commit: %w", err)
 		}
 
-		fmt.Printf("Swapped priorities in profile %q: %d(%d) <-> %d(%d)\n",
+		style.Printf("Swapped priorities in profile %q: %d(%d) <-> %d(%d)\n",
 			p.Name, mfvA.ID, b.Priority, mfvB.ID, a.Priority)
 
 		return nil
