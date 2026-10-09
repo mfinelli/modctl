@@ -311,14 +311,14 @@ func checkBundleBlobs(ctx context.Context, bundle *restore.Bundle, bq *dbq.Queri
 			// hash and verify
 			f, err := os.Open(path)
 			if err != nil {
-				issues = append(issues, fmt.Sprintf("open blob %s...: %s", name[:16], err))
+				issues = append(issues, fmt.Sprintf("open blob %s: %s", style.ShortSha(name), err))
 				return nil
 			}
 			h := sha256.New()
 			_, cerr := blobstore.CopyWithContext(ctx, h, f, buf)
 			f.Close()
 			if cerr != nil {
-				issues = append(issues, fmt.Sprintf("hash blob %s...: %s", name[:16], cerr))
+				issues = append(issues, fmt.Sprintf("hash blob %s: %s", style.ShortSha(name), cerr))
 				return nil
 			}
 			actual := hex.EncodeToString(h.Sum(nil))
@@ -347,7 +347,7 @@ func checkBundleBlobs(ctx context.Context, bundle *restore.Bundle, bq *dbq.Queri
 	for sha := range dbBlobs {
 		if _, ok := fileBlobs[sha]; !ok {
 			issues = append(issues, fmt.Sprintf(
-				"blob %s... is in database but missing from bundle", sha[:16],
+				"blob %s is in database but missing from bundle", style.ShortSha(sha),
 			))
 		}
 	}
@@ -356,7 +356,7 @@ func checkBundleBlobs(ctx context.Context, bundle *restore.Bundle, bq *dbq.Queri
 	for sha := range fileBlobs {
 		if _, ok := dbBlobs[sha]; !ok {
 			issues = append(issues, fmt.Sprintf(
-				"blob %s... is in bundle but has no database row (orphan)", sha[:16],
+				"blob %s is in bundle but has no database row (orphan)", style.ShortSha(sha),
 			))
 		}
 	}

@@ -401,7 +401,7 @@ func extractBlob(
 	// verify blob hash before extracting
 	actual, err := hashFile(blobPath)
 	if err != nil {
-		return fmt.Errorf("hash blob %s: %w", sha[:16], err)
+		return fmt.Errorf("hash blob %s: %w", style.ShortSha(sha), err)
 	}
 	if actual != sha {
 		return fmt.Errorf(

@@ -548,8 +548,8 @@ func checkBlobs(ctx context.Context) error {
 							name = b.OriginalName.String
 						}
 						fmt.Println(style.Warning.Render(fmt.Sprintf(
-							"    missing: %s... %s",
-							b.Sha256[:16], name,
+							"    missing: %s %s",
+							style.ShortSha(b.Sha256), name,
 						)))
 					} else {
 						for _, c := range contexts {
@@ -566,8 +566,8 @@ func checkBlobs(ctx context.Context) error {
 								parts = append(parts, "("+c.OriginalName.String+")")
 							}
 							fmt.Println(style.Warning.Render(fmt.Sprintf(
-								"    missing: %s... %s",
-								b.Sha256[:16],
+								"    missing: %s %s",
+								style.ShortSha(b.Sha256),
 								strings.Join(parts, " › "),
 							)))
 						}
@@ -849,7 +849,7 @@ func checkInstalledFiles(ctx context.Context) error {
 				mismatched++
 				fmt.Println(style.Warning.Render(fmt.Sprintf(
 					"    content mismatch: %s (expected %s got %s)",
-					f.Relpath, f.ContentSha256[:16], actual[:16],
+					f.Relpath, style.ShortSha(f.ContentSha256), style.ShortSha(actual),
 				)))
 			}
 		}

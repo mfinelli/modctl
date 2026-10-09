@@ -158,11 +158,7 @@ TODO:
 			if !ns.Valid || ns.String == "" {
 				return "—"
 			}
-			s := ns.String
-			if len(s) > 12 {
-				s = s[:12]
-			}
-			return s
+			return style.ShortSha(ns.String)
 		}
 		strOrDash := func(ns sql.NullString) string {
 			if !ns.Valid || ns.String == "" {
@@ -270,13 +266,7 @@ TODO:
 						"    v%d  imported_at=%s  sha=%s",
 						v.ID,
 						v.CreatedAt,
-						func() string {
-							s := v.ArchiveSha256
-							if len(s) > 12 {
-								s = s[:12]
-							}
-							return s
-						}(),
+						style.ShortSha(v.ArchiveSha256),
 					)
 
 					if v.VersionString.Valid && v.VersionString.String != "" {

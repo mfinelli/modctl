@@ -323,7 +323,7 @@ func runGC(
 
 		name := style.ShortSha(b.Sha256)
 		if b.OriginalName.Valid {
-			name = fmt.Sprintf("%s %s", b.OriginalName.String, style.Subtle.Render("("+b.Sha256[:16]+"...)"))
+			name = fmt.Sprintf("%s %s", b.OriginalName.String, style.Subtle.Render("("+style.ShortSha(b.Sha256)+")"))
 		}
 
 		if opts.dryRun {
