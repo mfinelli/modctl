@@ -25,13 +25,13 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -60,8 +60,6 @@ the command warns and requires --force to proceed.`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-
 		ctx := cmd.Context()
 		relpath := filepath.Clean(args[0])
 
@@ -152,7 +150,7 @@ the command warns and requires --force to proceed.`,
 							relpath,
 						)
 					}
-					fmt.Println(warnStyle.Render(fmt.Sprintf(
+					fmt.Println(style.Warning.Render(fmt.Sprintf(
 						"  warning: %q has been modified since modctl installed it, restoring backup anyway",
 						relpath,
 					)))
@@ -163,7 +161,7 @@ the command warns and requires --force to proceed.`,
 		// Warn if profile is currently applied
 		appliedState, err := q.GetGameInstallAppliedState(ctx, gi.ID)
 		if err == nil && appliedState.AppliedProfileID.Valid {
-			fmt.Println(warnStyle.Render(
+			fmt.Println(style.Warning.Render(
 				"  warning: the active profile is currently applied; running apply again will overwrite this path\n" +
 					"  consider adding a write-once or skip-backup rule if you want to preserve this behavior permanently",
 			))

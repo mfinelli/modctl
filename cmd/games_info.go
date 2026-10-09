@@ -22,12 +22,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
 )
@@ -103,44 +103,11 @@ func init() {
 }
 
 func renderGameInfo(gi dbq.GameInstall, targets []dbq.Target, profiles []dbq.Profile, isCurrentContext bool) string {
-	// styles
-	cardBorder := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		Padding(0, 1)
-
-	titleStyle := lipgloss.NewStyle().
-		Bold(true)
-
-	selectorStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("8")) // gray
-
-	sectionTitleStyle := lipgloss.NewStyle().
-		Bold(true).
-		MarginTop(1)
-
-	activeTagStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("10"))
-
-	warningBanner := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("11")).
-		Border(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("11")).
-		Padding(0, 1)
-
-	contextBadge := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("0")).
-		Background(lipgloss.Color("10")).
-		Padding(0, 1).
-		Bold(true)
-
-	inactiveProfileStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("8"))
-
-	activeDot := lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render("●")
-	inactiveDot := lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render("○")
-
 	// Header card
+	kv := style.KV{Indent: 2, Width: 12}
+	kvInactive := style.KV{Indent: 6, Width: 12, Dim: true}
+	kvIndented := style.KV{Indent: 6, Width: 12}
+
 	fullSel := internal.FullSelector(gi.StoreID, gi.StoreGameID, gi.InstanceID)
 	shortSel := internal.ShortSelector(gi.StoreID, gi.StoreGameID, gi.InstanceID)
 	selText := fullSel
@@ -148,14 +115,14 @@ func renderGameInfo(gi dbq.GameInstall, targets []dbq.Target, profiles []dbq.Pro
 		selText = fmt.Sprintf("%s (short: %s)", fullSel, shortSel)
 	}
 
-	headerContent := titleStyle.Render(gi.DisplayName) + "\n" +
-		selectorStyle.Render(selText)
+	headerContent := style.Title.Render(gi.DisplayName) + "\n" +
+		style.Dim.Render(selText)
 
 	if isCurrentContext {
-		headerContent += "\n\n" + contextBadge.Render("CURRENT ACTIVE CONTEXT")
+		headerContent += "\n\n" + style.ContextBadge.Render("CURRENT ACTIVE CONTEXT")
 	}
 
-	header := cardBorder.Render(headerContent)
+	header := style.Card.Render(headerContent)
 
 	var b strings.Builder
 	b.WriteString(header)
@@ -164,72 +131,72 @@ func renderGameInfo(gi dbq.GameInstall, targets []dbq.Target, profiles []dbq.Pro
 	// Not present warning
 	if gi.IsPresent == 0 {
 		b.WriteString("\n")
-		b.WriteString(warningBanner.Render("⚠  This install is not currently present on disk"))
+		b.WriteString(style.Banner.Render("⚠  This install is not currently present on disk"))
 		b.WriteString("\n")
 	}
 
 	// Install section
-	b.WriteString(sectionTitleStyle.Render("Install") + "\n")
-	writeKV(&b, "ID:", fmt.Sprintf("%d", gi.ID))
-	writeKV(&b, "Store:", gi.StoreID)
-	writeKV(&b, "Store ID:", gi.StoreGameID)
-	writeKV(&b, "Instance:", gi.InstanceID)
-	writeKV(&b, "Path:", gi.InstallRoot)
+	b.WriteString(style.Section.Render("Install") + "\n")
+	kv.Write(&b, "ID:", fmt.Sprintf("%d", gi.ID))
+	kv.Write(&b, "Store:", gi.StoreID)
+	kv.Write(&b, "Store ID:", gi.StoreGameID)
+	kv.Write(&b, "Instance:", gi.InstanceID)
+	kv.Write(&b, "Path:", gi.InstallRoot)
 
 	present := "yes"
 	if gi.IsPresent == 0 {
 		present = "no"
 	}
-	writeKV(&b, "Present:", present)
+	kv.Write(&b, "Present:", present)
 
 	if gi.LastSeenAt.Valid {
-		writeKV(&b, "Last seen:", gi.LastSeenAt.String)
+		kv.Write(&b, "Last seen:", gi.LastSeenAt.String)
 	}
 
 	// Notes
 	if gi.Notes.Valid && strings.TrimSpace(gi.Notes.String) != "" {
-		b.WriteString("\n" + sectionTitleStyle.Render("Notes") + "\n")
+		b.WriteString("\n" + style.Section.Render("Notes") + "\n")
 		b.WriteString("  " + gi.Notes.String + "\n")
 	}
 
 	// Targets
-	b.WriteString("\n" + sectionTitleStyle.Render("Targets") + "\n")
+	b.WriteString("\n" + style.Section.Render("Targets") + "\n")
 	if len(targets) == 0 {
 		b.WriteString("  (none)\n")
 	} else {
 		for _, t := range targets {
 			b.WriteString("  • " + t.Name + "\n")
-			writeKVIndented(&b, "path:", t.RootPath)
-			writeKVIndented(&b, "origin:", t.Origin)
+			kvIndented.Write(&b, "path:", t.RootPath)
+			kvIndented.Write(&b, "origin:", t.Origin)
 			if !internal.TargetEnabled(t) {
-				writeKVIndented(&b, "state:", "disabled")
+				kvIndented.Write(&b, "state:", "disabled")
 			}
 		}
 	}
 
 	// Profiles
-	b.WriteString("\n" + sectionTitleStyle.Render("Profiles") + "\n")
+	b.WriteString("\n" + style.Section.Render("Profiles") + "\n")
 	if len(profiles) == 0 {
 		b.WriteString("  (none)\n")
 	} else {
 		for _, p := range profiles {
-			dot := inactiveDot
+			dot := style.InactiveDot()
 			line := "  "
 
 			if p.IsActive != 0 {
-				dot = activeDot
+				dot = style.ActiveDot()
 			}
 
 			line += dot + " " + p.Name
 
 			if util.SqliteIntToBool(p.IsActive) {
-				line += "   " + activeTagStyle.Render("(active)")
+				line += "   " + style.ActiveTag.Render("(active)")
 			}
 
-			b.WriteString(inactiveProfileStyle.Render(line) + "\n")
+			b.WriteString(style.Inactive.Render(line) + "\n")
 
 			if p.Description.Valid && strings.TrimSpace(p.Description.String) != "" {
-				writeKVIndentedInactive(&b, "description:", p.Description.String)
+				kvInactive.Write(&b, "description:", p.Description.String)
 			}
 
 			b.WriteString("\n")
@@ -237,32 +204,4 @@ func renderGameInfo(gi dbq.GameInstall, targets []dbq.Target, profiles []dbq.Pro
 	}
 
 	return strings.TrimRight(b.String(), "\n")
-}
-
-func writeKV(b *strings.Builder, label, value string) {
-	labelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("7")).
-		Width(12)
-
-	b.WriteString("  " + labelStyle.Render(label) + " " + value + "\n")
-}
-
-func writeKVIndented(b *strings.Builder, label, value string) {
-	labelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("7")).
-		Width(12)
-
-	b.WriteString("      " + labelStyle.Render(label) + " " + value + "\n")
-}
-
-func writeKVIndentedInactive(b *strings.Builder, label, value string) {
-	labelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("7")).
-		Width(12)
-
-	inactiveProfileStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("8"))
-
-	line := "      " + labelStyle.Render(label) + " " + value + "\n"
-	b.WriteString(inactiveProfileStyle.Render(line))
 }

@@ -147,7 +147,12 @@ Examples:
 			return err
 		}
 
-		return internal.AddRemapRule(ctx, db, q, itemID, ruleType, intVal, textVal, profilesRemapAddPosition)
+		position, err := internal.AddRemapRule(ctx, db, q, itemID, ruleType, intVal, textVal, profilesRemapAddPosition)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Added %s rule at position %d\n", ruleType, position)
+		return nil
 	},
 }
 

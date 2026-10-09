@@ -24,13 +24,13 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-sqlite3"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -59,9 +59,6 @@ known crashes, conflicting game mechanics, or anything else.`,
 	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO extract this
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-
 		ctx := cmd.Context()
 
 		err := internal.EnsureDBExists()
@@ -157,7 +154,7 @@ known crashes, conflicting game mechanics, or anything else.`,
 		fmt.Printf("  %s (id: %d)\n", pageA.Name, pageA.ID)
 		fmt.Printf("  %s (id: %d)\n", pageB.Name, pageB.ID)
 		if modsIncompatibleAddReason != "" {
-			fmt.Println(subtleStyle.Render(fmt.Sprintf("  reason: %s", modsIncompatibleAddReason)))
+			fmt.Println(style.Subtle.Render(fmt.Sprintf("  reason: %s", modsIncompatibleAddReason)))
 		}
 
 		return nil

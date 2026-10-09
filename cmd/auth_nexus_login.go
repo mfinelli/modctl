@@ -25,8 +25,8 @@ import (
 	"path/filepath"
 
 	"github.com/adrg/xdg"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/internal/nexusclient"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -49,19 +49,14 @@ you complete authorization.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO extract these
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-		errStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("1"))
-
 		if viper.GetString("nexus.apikey") != "" && !authNexusLoginForce {
-			fmt.Println(errStyle.Render("  ✗ a Nexus Mods API key is already configured"))
-			fmt.Println(subtleStyle.Render("    run with --force to replace it"))
+			fmt.Println(style.Failure.Render("  ✗ a Nexus Mods API key is already configured"))
+			fmt.Println(style.Subtle.Render("    run with --force to replace it"))
 			fmt.Println()
 			return fmt.Errorf("nexus API key already set")
 		}
 
-		fmt.Println(subtleStyle.Render("  Connecting to Nexus Mods SSO..."))
+		fmt.Println(style.Subtle.Render("  Connecting to Nexus Mods SSO..."))
 
 		ctx, cancel := context.WithTimeout(cmd.Context(), nexusclient.DefaultSSOTimeout)
 		defer cancel()
@@ -69,8 +64,8 @@ you complete authorization.`,
 		apiKey, err := nexusclient.Login(ctx, os.Stderr)
 		if err != nil {
 			fmt.Println()
-			fmt.Println(errStyle.Render("  ✗ authentication failed"))
-			fmt.Println(subtleStyle.Render("    " + err.Error()))
+			fmt.Println(style.Failure.Render("  ✗ authentication failed"))
+			fmt.Println(style.Subtle.Render("    " + err.Error()))
 			fmt.Println()
 			return fmt.Errorf("nexus SSO login: %w", err)
 		}
@@ -103,9 +98,9 @@ you complete authorization.`,
 		}
 
 		fmt.Println()
-		fmt.Println(okStyle.Render("  ✓ authenticated with Nexus Mods"))
-		fmt.Println(subtleStyle.Render("    API key saved to " + configPath))
-		fmt.Println(subtleStyle.Render("    Note: the key is stored in plain text (mode 0600)"))
+		fmt.Println(style.Success.Render("  ✓ authenticated with Nexus Mods"))
+		fmt.Println(style.Subtle.Render("    API key saved to " + configPath))
+		fmt.Println(style.Subtle.Render("    Note: the key is stored in plain text (mode 0600)"))
 		fmt.Println()
 
 		return nil

@@ -31,20 +31,24 @@ import (
 )
 
 var (
-	profilesRemapCopyGame    string
-	profilesRemapCopyProfile string
+	profilesDeploysCopyGame    string
+	profilesDeploysCopyProfile string
 )
 
-var profilesRemapCopyCmd = &cobra.Command{
-	Use:   "copy", // <src_mod_file_version_id> <dst_mod_file_version_id>
-	Short: "Copy remap rules from one mod version to another in a profile",
-	Long: `Copy remap rules from one mod version to another within the same profile.
+var profilesDeploysCopyCmd = &cobra.Command{
+	Use:   "copy <src_mod_file_version_id> <dst_mod_file_version_id>",
+	Short: "Copy all deployment rules from one mod version to another in a profile",
+	Long: `Copy all deployment rules, both skip-backup and write-once patterns, from one
+mod version to another within the same profile. Both kinds are copied in a
+single transaction, so either all of them are copied or none are.
 
-If the destination already has remap rules they will be replaced.
-If the source has no remap rules this is a no-op.
+For each kind that the source has patterns of, the patterns the destination
+already has of that kind are replaced. A kind the source has none of is left as
+it is on the destination.
 
-This is useful when upgrading a mod: copy the remap rules from the old
-version to the new version before removing the old version from the profile.`,
+This is useful when manually swapping mod versions and you want to preserve the
+deployment rules from the old version. To copy only one kind, use
+'deploys skip-backup copy' or 'deploys write-once copy'.`,
 	Args: cobra.ExactArgs(2),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) >= 2 {
@@ -56,8 +60,7 @@ version to the new version before removing the old version from the profile.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		err := internal.EnsureDBExists()
-		if err != nil {
+		if err := internal.EnsureDBExists(); err != nil {
 			return err
 		}
 		db, err := internal.SetupDB()
@@ -65,14 +68,13 @@ version to the new version before removing the old version from the profile.`,
 			return fmt.Errorf("error setting up database: %w", err)
 		}
 		defer db.Close()
-		err = internal.MigrateDB(ctx, db)
-		if err != nil {
+		if err := internal.MigrateDB(ctx, db); err != nil {
 			return fmt.Errorf("error migrating database: %w", err)
 		}
 
 		q := dbq.New(db)
 
-		if profilesRemapCopyGame == "" {
+		if profilesDeploysCopyGame == "" {
 			active, err := state.LoadActive()
 			if err != nil {
 				return fmt.Errorf("load active selection: %w", err)
@@ -80,15 +82,15 @@ version to the new version before removing the old version from the profile.`,
 			if active.ActiveGameInstallID == 0 {
 				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
 			}
-			profilesRemapCopyGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
+			profilesDeploysCopyGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
 		}
 
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesRemapCopyGame)
+		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesDeploysCopyGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesRemapCopyProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesDeploysCopyProfile)
 		if err != nil {
 			return err
 		}
@@ -113,32 +115,38 @@ version to the new version before removing the old version from the profile.`,
 			return fmt.Errorf("destination: %w", err)
 		}
 
-		copied, err := internal.CopyRemapConfig(ctx, db, q, srcItemID, dstItemID)
+		skipBackup, writeOnce, err := internal.CopyDeployRules(ctx, db, q, srcItemID, dstItemID)
 		if err != nil {
 			return err
 		}
-		if copied == 0 {
-			fmt.Printf("Version %d in profile %q has no remap rules to copy\n", mfvSrc.ID, p.Name)
+		if skipBackup == 0 && writeOnce == 0 {
+			fmt.Printf("Version %d in profile %q has no deploy rules to copy\n", mfvSrc.ID, p.Name)
 			return nil
 		}
-		fmt.Printf("Copied %d remap rule(s) from version %d to version %d in profile %q\n",
-			copied, mfvSrc.ID, mfvDst.ID, p.Name)
+		if skipBackup > 0 {
+			fmt.Printf("Copied %d skip-backup pattern(s) from version %d to version %d in profile %q\n",
+				skipBackup, mfvSrc.ID, mfvDst.ID, p.Name)
+		}
+		if writeOnce > 0 {
+			fmt.Printf("Copied %d write-once pattern(s) from version %d to version %d in profile %q\n",
+				writeOnce, mfvSrc.ID, mfvDst.ID, p.Name)
+		}
 		return nil
 	},
 }
 
 func init() {
-	profilesRemapCmd.AddCommand(profilesRemapCopyCmd)
+	profilesDeploysCmd.AddCommand(profilesDeploysCopyCmd)
 
-	profilesRemapCopyCmd.PersistentFlags().StringVarP(&profilesRemapCopyGame, "game", "g", "",
+	profilesDeploysCopyCmd.PersistentFlags().StringVarP(&profilesDeploysCopyGame, "game", "g", "",
 		"Override the currently active game")
-	profilesRemapCopyCmd.RegisterFlagCompletionFunc("game",
+	profilesDeploysCopyCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return completion.GameInstallSelectors(cmd, toComplete)
 		})
-	profilesRemapCopyCmd.PersistentFlags().StringVarP(&profilesRemapCopyProfile, "profile", "p", "",
+	profilesDeploysCopyCmd.PersistentFlags().StringVarP(&profilesDeploysCopyProfile, "profile", "p", "",
 		"Override the currently active profile")
-	profilesRemapCopyCmd.RegisterFlagCompletionFunc("profile",
+	profilesDeploysCopyCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return completion.ProfileNames(cmd, toComplete)
 		})

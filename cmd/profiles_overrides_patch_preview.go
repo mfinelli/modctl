@@ -26,7 +26,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
@@ -35,6 +34,7 @@ import (
 	"github.com/mfinelli/modctl/internal/extractor"
 	"github.com/mfinelli/modctl/internal/patchapply"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -60,14 +60,6 @@ Note: requires archive extraction which may be slow for large archives.`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO extract these somewhere
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		boldStyle := lipgloss.NewStyle().Bold(true)
-		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-		addStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
-		removeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
-		hunkStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
-
 		ctx := cmd.Context()
 		relpath := filepath.Clean(args[0])
 
@@ -140,7 +132,7 @@ Note: requires archive extraction which may be slow for large archives.`,
 		}
 
 		if len(entries) == 0 {
-			fmt.Println(subtleStyle.Render(fmt.Sprintf(
+			fmt.Println(style.Subtle.Render(fmt.Sprintf(
 				"  no patch entries for %q in profile %q", relpath, p.Name,
 			)))
 			return nil
@@ -210,19 +202,19 @@ Note: requires archive extraction which may be slow for large archives.`,
 		}
 
 		// header
-		fmt.Println(boldStyle.Render(fmt.Sprintf(
+		fmt.Println(style.Bold.Render(fmt.Sprintf(
 			"Patch preview for %q in profile %q (%s, %d entries):",
 			relpath, p.Name, formatOverrideType(override.OverrideType), len(entries),
 		)))
 		fmt.Println()
 
 		if noBase {
-			fmt.Println(warnStyle.Render("  ⚠ no mod in this profile provides this path; showing result against empty document"))
+			fmt.Println(style.Warning.Render("  ⚠ no mod in this profile provides this path; showing result against empty document"))
 			fmt.Println()
 		}
 
 		if result.Skipped > 0 {
-			fmt.Println(subtleStyle.Render(fmt.Sprintf(
+			fmt.Println(style.Subtle.Render(fmt.Sprintf(
 				"  %d entry(ies) had no effect (key not found)", result.Skipped,
 			)))
 			fmt.Println()
@@ -241,7 +233,7 @@ Note: requires archive extraction which may be slow for large archives.`,
 		}
 
 		if diff == "" {
-			fmt.Println(subtleStyle.Render("  no changes (patch entries produce identical output)"))
+			fmt.Println(style.Subtle.Render("  no changes (patch entries produce identical output)"))
 			return nil
 		}
 
@@ -249,15 +241,15 @@ Note: requires archive extraction which may be slow for large archives.`,
 		for _, line := range strings.Split(diff, "\n") {
 			switch {
 			case strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---"):
-				fmt.Println(boldStyle.Render(line))
+				fmt.Println(style.Bold.Render(line))
 			case strings.HasPrefix(line, "@@"):
-				fmt.Println(hunkStyle.Render(line))
+				fmt.Println(style.Hunk.Render(line))
 			case strings.HasPrefix(line, "+"):
-				fmt.Println(addStyle.Render(line))
+				fmt.Println(style.Added.Render(line))
 			case strings.HasPrefix(line, "-"):
-				fmt.Println(removeStyle.Render(line))
+				fmt.Println(style.Removed.Render(line))
 			default:
-				fmt.Println(subtleStyle.Render(line))
+				fmt.Println(style.Subtle.Render(line))
 			}
 		}
 

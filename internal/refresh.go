@@ -32,7 +32,6 @@ import (
 
 	"github.com/adrg/xdg"
 	"github.com/andygrunwald/vdf"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"go.finelli.dev/util"
 )
@@ -51,17 +50,103 @@ type RefreshResult struct {
 	Returned []string // display names of installs that were missing and came back
 	Missing  []string // display names of installs that disappeared
 	Skipped  []string // display names of installs that were filtered out
+
+	// Warnings are the non-fatal problems found along the way, in the order
+	// they were found.
 	Warnings []string
+
+	// Changes is what happened to each install, in the order to show them:
+	// the installs that disappeared first, then the ones that were found.
+	Changes []RefreshChange
 }
 
-type RefreshStyles struct {
-	Bold   lipgloss.Style
-	Subtle lipgloss.Style
-	Warn   lipgloss.Style
-	Green  lipgloss.Style
-	Red    lipgloss.Style
-	Yellow lipgloss.Style
-	Cyan   lipgloss.Style
+// RefreshChangeKind says what a refresh found out about an install.
+type RefreshChangeKind int
+
+const (
+	RefreshNew      RefreshChangeKind = iota // seen for the first time
+	RefreshReturned                          // was missing and has come back
+	RefreshUpdated                           // seen again, as before
+	RefreshMissing                           // was present and has gone
+)
+
+// RefreshChange is what a refresh found out about one install.
+type RefreshChange struct {
+	Name string
+	Kind RefreshChangeKind
+}
+
+// knownInstall is an install modctl already has a record of.
+type knownInstall struct {
+	storeGameID, instanceID, displayName string
+	present                              bool
+}
+
+// foundInstall is an install seen during a scan.
+type foundInstall struct {
+	storeGameID, instanceID, displayName string
+}
+
+// classifyInstalls works out what a scan changed. Installs that were present
+// but were not found come first, by name so that the order is stable; then
+// the installs that were found, in the order they were found, each as new
+// (never seen), returned (known but missing) or updated (known and present).
+func classifyInstalls(known []knownInstall, found []foundInstall) []RefreshChange {
+	type key struct{ storeGameID, instanceID string }
+
+	knownByKey := make(map[key]knownInstall, len(known))
+	for _, k := range known {
+		knownByKey[key{k.storeGameID, k.instanceID}] = k
+	}
+	foundSet := make(map[key]struct{}, len(found))
+	for _, f := range found {
+		foundSet[key{f.storeGameID, f.instanceID}] = struct{}{}
+	}
+
+	var missing []string
+	for _, k := range known {
+		if !k.present {
+			continue
+		}
+		if _, ok := foundSet[key{k.storeGameID, k.instanceID}]; !ok {
+			missing = append(missing, k.displayName)
+		}
+	}
+	sort.Strings(missing)
+
+	changes := make([]RefreshChange, 0, len(missing)+len(found))
+	for _, name := range missing {
+		changes = append(changes, RefreshChange{name, RefreshMissing})
+	}
+	for _, f := range found {
+		prev, isKnown := knownByKey[key{f.storeGameID, f.instanceID}]
+		switch {
+		case !isKnown:
+			changes = append(changes, RefreshChange{f.displayName, RefreshNew})
+		case !prev.present:
+			changes = append(changes, RefreshChange{f.displayName, RefreshReturned})
+		default:
+			changes = append(changes, RefreshChange{f.displayName, RefreshUpdated})
+		}
+	}
+	return changes
+}
+
+// addChanges records the changes in the per-kind lists as well as in Changes.
+func (r *RefreshResult) addChanges(changes []RefreshChange) {
+	r.Changes = append(r.Changes, changes...)
+	for _, c := range changes {
+		switch c.Kind {
+		case RefreshNew:
+			r.New = append(r.New, c.Name)
+		case RefreshReturned:
+			r.Returned = append(r.Returned, c.Name)
+		case RefreshUpdated:
+			r.Updated = append(r.Updated, c.Name)
+		case RefreshMissing:
+			r.Missing = append(r.Missing, c.Name)
+		}
+	}
 }
 
 type steamInstall struct {
@@ -69,7 +154,10 @@ type steamInstall struct {
 	steamappsDir string // e.g. ~/.local/share/Steam/steamapps
 }
 
-func ScanStores(ctx context.Context, db *sql.DB, styles RefreshStyles) (RefreshResult, error) {
+// ScanStores rescans every enabled store and updates the game installs in the
+// database. It prints nothing: what it found is in the result. If it fails
+// part way, the result still holds the warnings found up to then.
+func ScanStores(ctx context.Context, db *sql.DB) (RefreshResult, error) {
 	q := dbq.New(db)
 	stores, err := q.ListEnabledStores(ctx)
 	if err != nil {
@@ -80,10 +168,7 @@ func ScanStores(ctx context.Context, db *sql.DB, styles RefreshStyles) (RefreshR
 	for _, store := range stores {
 		switch store.Implementation {
 		case "steam":
-			result, err := refreshSteam(ctx, db, q, styles)
-			if err != nil {
-				return RefreshResult{}, err
-			}
+			result, err := refreshSteam(ctx, db, q)
 
 			combined.New = append(combined.New, result.New...)
 			combined.Updated = append(combined.Updated, result.Updated...)
@@ -91,21 +176,25 @@ func ScanStores(ctx context.Context, db *sql.DB, styles RefreshStyles) (RefreshR
 			combined.Missing = append(combined.Missing, result.Missing...)
 			combined.Skipped = append(combined.Skipped, result.Skipped...)
 			combined.Warnings = append(combined.Warnings, result.Warnings...)
+			combined.Changes = append(combined.Changes, result.Changes...)
+
+			if err != nil {
+				return combined, err
+			}
 		default:
-			fmt.Println(styles.Warn.Render(fmt.Sprintf("  ⚠ store implementation %q is not supported", store.Implementation)))
+			combined.Warnings = append(combined.Warnings,
+				fmt.Sprintf("store implementation %q is not supported", store.Implementation))
 		}
 	}
 
 	return combined, nil
 }
 
-func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries, styles RefreshStyles) (RefreshResult, error) {
+func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries) (RefreshResult, error) {
 	var result RefreshResult
 
 	libs, didScan, warns, err := discoverSteamLibraries()
-	for _, w := range warns {
-		fmt.Println(styles.Warn.Render(fmt.Sprintf("  ⚠ %s", w)))
-	}
+	result.Warnings = append(result.Warnings, warns...)
 	if err != nil {
 		return result, fmt.Errorf("error scanning for steam libraries: %w", err)
 	}
@@ -118,9 +207,6 @@ func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries, styles Refres
 	installs, skips, warns, err := discoverSteamInstalls(libs, instanceByLib)
 	result.Skipped = append(result.Skipped, skips...)
 	result.Warnings = append(result.Warnings, warns...)
-	for _, w := range warns {
-		fmt.Println(styles.Warn.Render(fmt.Sprintf("  ⚠ %s", w)))
-	}
 	if err != nil {
 		return result, fmt.Errorf("error enumerating steam installs: %w", err)
 	}
@@ -131,36 +217,15 @@ func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries, styles Refres
 		return result, fmt.Errorf("list existing steam installs: %w", err)
 	}
 
-	type existingKey struct{ gameID, instanceID string }
-	type existingVal struct {
-		displayName string
-		isPresent   bool
+	known := make([]knownInstall, len(existing))
+	for i, e := range existing {
+		known[i] = knownInstall{e.StoreGameID, e.InstanceID, e.DisplayName, e.IsPresent != 0}
 	}
-	existingMap := make(map[existingKey]existingVal, len(existing))
-	for _, e := range existing {
-		existingMap[existingKey{e.StoreGameID, e.InstanceID}] = existingVal{
-			displayName: e.DisplayName,
-			isPresent:   e.IsPresent != 0,
-		}
+	found := make([]foundInstall, len(installs))
+	for i, di := range installs {
+		found[i] = foundInstall{di.params.StoreGameID, di.params.InstanceID, di.params.DisplayName}
 	}
-
-	// Build a set of what we're about to upsert for missing detection
-	type upsertKey struct{ gameID, instanceID string }
-	upsertSet := make(map[upsertKey]struct{}, len(installs))
-	for _, di := range installs {
-		upsertSet[upsertKey{di.params.StoreGameID, di.params.InstanceID}] = struct{}{}
-	}
-
-	// Detect missing: was present before, not in discovered set now
-	for k, v := range existingMap {
-		if v.isPresent {
-			if _, found := upsertSet[upsertKey(k)]; !found {
-				result.Missing = append(result.Missing, v.displayName)
-				fmt.Println(styles.Red.Render(fmt.Sprintf("  - %s", v.displayName)) +
-					styles.Subtle.Render("  (no longer present)"))
-			}
-		}
-	}
+	changes := classifyInstalls(known, found)
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -191,27 +256,14 @@ func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries, styles Refres
 		if err := qtx.EnsureDefaultProfile(ctx, id); err != nil {
 			return result, fmt.Errorf("error ensuring default profile for install_id=%d: %w", id, err)
 		}
-
-		// Classify and print
-		k := existingKey{di.params.StoreGameID, di.params.InstanceID}
-		if prev, known := existingMap[k]; !known {
-			result.New = append(result.New, di.params.DisplayName)
-			fmt.Println(styles.Green.Render(fmt.Sprintf("  + %s", di.params.DisplayName)) +
-				styles.Subtle.Render("  (new)"))
-		} else if !prev.isPresent {
-			result.Returned = append(result.Returned, di.params.DisplayName)
-			fmt.Println(styles.Cyan.Render(fmt.Sprintf("  ↩ %s", di.params.DisplayName)) +
-				styles.Subtle.Render("  (returned)"))
-		} else {
-			result.Updated = append(result.Updated, di.params.DisplayName)
-			fmt.Println(styles.Subtle.Render(fmt.Sprintf("  = %s", di.params.DisplayName)))
-		}
 	}
 
 	if err := tx.Commit(); err != nil {
 		return result, fmt.Errorf("error committing transaction: %w", err)
 	}
 
+	// only report changes that were actually saved
+	result.addChanges(changes)
 	return result, nil
 }
 

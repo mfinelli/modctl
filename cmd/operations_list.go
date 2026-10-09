@@ -25,12 +25,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -51,9 +51,6 @@ Use --limit to change the number of operations shown.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: extract
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-
 		ctx := cmd.Context()
 
 		if err := internal.EnsureDBExists(); err != nil {
@@ -76,7 +73,7 @@ Use --limit to change the number of operations shown.`,
 				return fmt.Errorf("list operations: %w", err)
 			}
 			if len(ops) == 0 {
-				fmt.Println(subtleStyle.Render("  no operations found"))
+				fmt.Println(style.Subtle.Render("  no operations found"))
 				return nil
 			}
 			fmt.Println(renderAllOperations(ops))
@@ -109,7 +106,7 @@ Use --limit to change the number of operations shown.`,
 		}
 
 		if len(ops) == 0 {
-			fmt.Println(subtleStyle.Render(fmt.Sprintf("  no operations found for %s", gi.DisplayName)))
+			fmt.Println(style.Subtle.Render(fmt.Sprintf("  no operations found for %s", gi.DisplayName)))
 			return nil
 		}
 
@@ -137,8 +134,7 @@ func init() {
 
 func renderAllOperations(ops []dbq.ListAllOperationsRow) string {
 	var b strings.Builder
-	boldStyle := lipgloss.NewStyle().Bold(true)
-	b.WriteString(boldStyle.Render("Operations (all games)"))
+	b.WriteString(style.Bold.Render("Operations (all games)"))
 	b.WriteString("\n\n")
 	for _, op := range ops {
 		gameName := "(unknown game)"
@@ -157,8 +153,7 @@ func renderAllOperations(ops []dbq.ListAllOperationsRow) string {
 
 func renderGameOperations(ops []dbq.ListOperationsForGameInstallRow, gameName string) string {
 	var b strings.Builder
-	boldStyle := lipgloss.NewStyle().Bold(true)
-	b.WriteString(boldStyle.Render(fmt.Sprintf("Operations for %s", gameName)))
+	b.WriteString(style.Bold.Render(fmt.Sprintf("Operations for %s", gameName)))
 	b.WriteString("\n\n")
 	for _, op := range ops {
 		b.WriteString(formatOperationLine(
@@ -182,24 +177,17 @@ func formatOperationLine(
 	message sql.NullString,
 	gameName string,
 ) string {
-	// TODO extract styles
-	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
-	failedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
-	runningStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
-	subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-
 	// Status symbol
 	var statusStr string
 	switch status {
 	case "success":
-		statusStr = successStyle.Render("✓")
+		statusStr = style.Good.Render("✓")
 	case "failed":
-		statusStr = failedStyle.Render("✗")
+		statusStr = style.Bad.Render("✗")
 	case "running":
-		statusStr = runningStyle.Render("⟳")
+		statusStr = style.Pending.Render("⟳")
 	default:
-		statusStr = subtleStyle.Render("?")
+		statusStr = style.Subtle.Render("?")
 	}
 
 	// Elapsed time
@@ -208,20 +196,20 @@ func formatOperationLine(
 		t1, err1 := time.Parse("2006-01-02T15:04:05.000Z", startedAt)
 		t2, err2 := time.Parse("2006-01-02T15:04:05.000Z", finishedAt.String)
 		if err1 == nil && err2 == nil {
-			elapsed = subtleStyle.Render(fmt.Sprintf("(%.1fs)", t2.Sub(t1).Seconds()))
+			elapsed = style.Subtle.Render(fmt.Sprintf("(%.1fs)", t2.Sub(t1).Seconds()))
 		}
 	}
 
 	// Profile name
 	profile := ""
 	if profileName.Valid {
-		profile = subtleStyle.Render(fmt.Sprintf("%q", profileName.String))
+		profile = style.Subtle.Render(fmt.Sprintf("%q", profileName.String))
 	}
 
 	// Game name (only for --all)
 	game := ""
 	if gameName != "" {
-		game = subtleStyle.Render(fmt.Sprintf("[%s]", gameName))
+		game = style.Subtle.Render(fmt.Sprintf("[%s]", gameName))
 	}
 
 	var sb strings.Builder
@@ -240,7 +228,7 @@ func formatOperationLine(
 
 	// Error message on next line if failed
 	if status == "failed" && message.Valid && strings.TrimSpace(message.String) != "" {
-		sb.WriteString("         " + warnStyle.Render(fmt.Sprintf("error: %s", message.String)) + "\n")
+		sb.WriteString("         " + style.Warning.Render(fmt.Sprintf("error: %s", message.String)) + "\n")
 	}
 
 	return sb.String()

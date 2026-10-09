@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/internal/nexusclient"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -40,17 +40,12 @@ not count against your API request quota.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: extract
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("7")).Width(16)
-		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-		errStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("1"))
-		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+		kv := style.KV{Indent: 2, Width: 16}
 
 		apiKey := viper.GetString("nexus.apikey")
 		if apiKey == "" {
-			fmt.Println(warnStyle.Render("  ⚠ not authenticated"))
-			fmt.Println(subtleStyle.Render("    run `modctl auth nexus login` to authenticate"))
+			fmt.Println(style.Warning.Render("  ⚠ not authenticated"))
+			fmt.Println(style.Subtle.Render("    run `modctl auth nexus login` to authenticate"))
 			fmt.Println()
 			return nil
 		}
@@ -64,18 +59,18 @@ not count against your API request quota.`,
 
 		info, err := client.ValidateUser()
 		if err != nil {
-			fmt.Println(errStyle.Render("  ✗ API key is invalid or has been revoked"))
-			fmt.Println(subtleStyle.Render("    run `modctl auth nexus login` to re-authenticate"))
+			fmt.Println(style.Failure.Render("  ✗ API key is invalid or has been revoked"))
+			fmt.Println(style.Subtle.Render("    run `modctl auth nexus login` to re-authenticate"))
 			fmt.Println()
 			// Not returning the raw error - it's not useful to the user here
 			return fmt.Errorf("nexus API key validation failed")
 		}
 
-		fmt.Println(okStyle.Render("  ✓ authenticated with Nexus Mods"))
+		fmt.Println(style.Success.Render("  ✓ authenticated with Nexus Mods"))
 		fmt.Println()
 
 		var b strings.Builder
-		b.WriteString("  " + labelStyle.Render("username:") + " " + info.Name + "\n")
+		kv.Write(&b, "username:", info.Name)
 
 		// Rate limit state was updated as a side effect of ValidateUser
 		state, err := nexusclient.LoadRateLimitState()
@@ -88,21 +83,17 @@ not count against your API request quota.`,
 
 		hourly, daily := state.EffectiveRemaining()
 
-		b.WriteString("  " + labelStyle.Render("daily quota:") + " " +
-			fmt.Sprintf("%s / %d requests remaining",
-				formatQuota(daily, state.DailyLimit),
-				state.DailyLimit,
-			) + "\n")
-		b.WriteString("  " + labelStyle.Render("") + "   " +
-			subtleStyle.Render(fmt.Sprintf("resets in %s", formatDuration(time.Until(state.DailyReset)))) + "\n")
+		kv.Write(&b, "daily quota:", fmt.Sprintf("%s / %d requests remaining",
+			formatQuota(daily, state.DailyLimit),
+			state.DailyLimit,
+		))
+		kv.Write(&b, "", "  "+style.Subtle.Render(fmt.Sprintf("resets in %s", style.Duration(time.Until(state.DailyReset)))))
 
-		b.WriteString("  " + labelStyle.Render("hourly quota:") + " " +
-			fmt.Sprintf("%s / %d requests remaining",
-				formatQuota(hourly, state.HourlyLimit),
-				state.HourlyLimit,
-			) + "\n")
-		b.WriteString("  " + labelStyle.Render("") + "   " +
-			subtleStyle.Render(fmt.Sprintf("resets in %s", formatDuration(time.Until(state.HourlyReset)))) + "\n")
+		kv.Write(&b, "hourly quota:", fmt.Sprintf("%s / %d requests remaining",
+			formatQuota(hourly, state.HourlyLimit),
+			state.HourlyLimit,
+		))
+		kv.Write(&b, "", "  "+style.Subtle.Render(fmt.Sprintf("resets in %s", style.Duration(time.Until(state.HourlyReset)))))
 
 		fmt.Print(b.String())
 		fmt.Println()
@@ -120,35 +111,10 @@ func formatQuota(remaining, limit int) string {
 	s := fmt.Sprintf("%d", remaining)
 	switch {
 	case remaining == 0:
-		return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("1")).Render(s)
+		return style.Failure.Render(s)
 	case limit > 0 && remaining*100/limit < 20:
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render(s)
+		return style.Warning.Render(s)
 	default:
 		return s
-	}
-}
-
-// formatDuration renders a duration as a human-readable string, e.g.
-// "23h 4m", "47m", "30s". Negative durations (reset already passed) return
-// "now".
-func formatDuration(d time.Duration) string {
-	if d <= 0 {
-		return "now"
-	}
-	d = d.Round(time.Second)
-	h := int(d.Hours())
-	m := int(d.Minutes()) % 60
-	s := int(d.Seconds()) % 60
-	switch {
-	case h > 0 && m > 0:
-		return fmt.Sprintf("%dh %dm", h, m)
-	case h > 0:
-		return fmt.Sprintf("%dh", h)
-	case m > 0 && s > 0:
-		return fmt.Sprintf("%dm %ds", m, s)
-	case m > 0:
-		return fmt.Sprintf("%dm", m)
-	default:
-		return fmt.Sprintf("%ds", s)
 	}
 }

@@ -26,7 +26,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
@@ -35,6 +34,7 @@ import (
 	"github.com/mfinelli/modctl/internal/extractor"
 	"github.com/mfinelli/modctl/internal/planner"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -67,12 +67,6 @@ Binary files are detected automatically and refused unless --force is passed.`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		boldStyle := lipgloss.NewStyle().Bold(true)
-		addStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
-		removeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
-		hunkStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
-
 		ctx := cmd.Context()
 		relpath := filepath.Clean(args[0])
 
@@ -202,10 +196,10 @@ Binary files are detected automatically and refused unless --force is passed.`,
 			modInfo += " " + winner.VersionString
 		}
 
-		fmt.Println(boldStyle.Render(fmt.Sprintf(
+		fmt.Println(style.Bold.Render(fmt.Sprintf(
 			"Apply preview for %q in profile %q:", relpath, p.Name,
 		)))
-		fmt.Println(subtleStyle.Render(fmt.Sprintf("  winner: %s", modInfo)))
+		fmt.Println(style.Subtle.Render(fmt.Sprintf("  winner: %s", modInfo)))
 		fmt.Println()
 
 		diff, err := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
@@ -220,22 +214,22 @@ Binary files are detected automatically and refused unless --force is passed.`,
 		}
 
 		if diff == "" {
-			fmt.Println(subtleStyle.Render("  no differences (on-disk file matches what apply would write)"))
+			fmt.Println(style.Subtle.Render("  no differences (on-disk file matches what apply would write)"))
 			return nil
 		}
 
 		for _, line := range strings.Split(diff, "\n") {
 			switch {
 			case strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---"):
-				fmt.Println(boldStyle.Render(line))
+				fmt.Println(style.Bold.Render(line))
 			case strings.HasPrefix(line, "@@"):
-				fmt.Println(hunkStyle.Render(line))
+				fmt.Println(style.Hunk.Render(line))
 			case strings.HasPrefix(line, "+"):
-				fmt.Println(addStyle.Render(line))
+				fmt.Println(style.Added.Render(line))
 			case strings.HasPrefix(line, "-"):
-				fmt.Println(removeStyle.Render(line))
+				fmt.Println(style.Removed.Render(line))
 			default:
-				fmt.Println(subtleStyle.Render(line))
+				fmt.Println(style.Subtle.Render(line))
 			}
 		}
 

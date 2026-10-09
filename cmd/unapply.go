@@ -26,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
@@ -36,6 +35,7 @@ import (
 	"github.com/mfinelli/modctl/internal/lock"
 	"github.com/mfinelli/modctl/internal/planner"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -170,7 +170,7 @@ Use --dry-run to preview the plan without making any changes.`,
 			totalOps += len(plan.Ops)
 		}
 		if totalOps == 0 {
-			fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render(
+			fmt.Println(style.Subtle.Render(
 				"  nothing to unapply: no tool-managed files found"))
 			return nil
 		}
@@ -183,20 +183,13 @@ Use --dry-run to preview the plan without making any changes.`,
 			}
 		}
 
-		// TODO extract these styles somewhere
-		boldStyle := lipgloss.NewStyle().Bold(true)
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-		redStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
-		cyanStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("14"))
-
 		// Dry-run output
 		if unapplyDryRun {
 			for _, plan := range plans {
 				if len(plan.Ops) == 0 {
 					continue
 				}
-				printUnapplyPlan(plan, gi.DisplayName, appliedProfileName, boldStyle, subtleStyle, warnStyle, redStyle, cyanStyle)
+				printUnapplyPlan(plan, gi.DisplayName, appliedProfileName)
 			}
 			return nil
 		}
@@ -204,14 +197,14 @@ Use --dry-run to preview the plan without making any changes.`,
 		// Real unapply
 		header := fmt.Sprintf("Unapplying %s", gi.DisplayName)
 		if appliedProfileName != "" {
-			header += fmt.Sprintf("  %s", subtleStyle.Render("(last applied: \""+appliedProfileName+"\")"))
+			header += fmt.Sprintf("  %s", style.Subtle.Render("(last applied: \""+appliedProfileName+"\")"))
 		}
 		targetLabel := "target"
 		if len(activeTargets) > 1 {
 			targetLabel = "targets"
 		}
-		fmt.Println(boldStyle.Render(header) +
-			"  " + subtleStyle.Render(fmt.Sprintf("(%s: %s)", targetLabel, strings.Join(activeTargets, ", "))))
+		fmt.Println(style.Bold.Render(header) +
+			"  " + style.Subtle.Render(fmt.Sprintf("(%s: %s)", targetLabel, strings.Join(activeTargets, ", "))))
 		fmt.Println()
 
 		bs := blobstore.Store{
@@ -260,7 +253,7 @@ Use --dry-run to preview the plan without making any changes.`,
 			current++
 			line := fmt.Sprintf("  "+fmtCounter+" %s %s", current, total, symbol, path)
 			if multiTarget {
-				line += subtleStyle.Render("  " + currentTarget)
+				line += style.Subtle.Render("  " + currentTarget)
 			}
 			if unapplyPrintOps {
 				fmt.Println(line)
@@ -283,7 +276,7 @@ Use --dry-run to preview the plan without making any changes.`,
 		for _, plan := range plans {
 			currentTarget = plan.TargetName
 			if multiTarget && unapplyPrintOps && len(plan.Ops) > 0 {
-				fmt.Println(subtleStyle.Render(fmt.Sprintf("  target: %s", plan.TargetName)))
+				fmt.Println(style.Subtle.Render(fmt.Sprintf("  target: %s", plan.TargetName)))
 			}
 
 			var removedPaths []string
@@ -291,7 +284,7 @@ Use --dry-run to preview the plan without making any changes.`,
 			for _, planOp := range plan.Ops {
 				switch planOp.Kind {
 				case planner.PlanOpRemove:
-					printOp(redStyle.Render("-"), planOp.DestPath)
+					printOp(style.Removed.Render("-"), planOp.DestPath)
 					if _, err := ext.RemoveFile(ctx, db, q, planOp, plan.TargetRoot, gi.ID, plan.TargetID, op.ID); err != nil {
 						return markFailed(fmt.Errorf("remove %q: %w", planOp.DestPath, err))
 					}
@@ -299,7 +292,7 @@ Use --dry-run to preview the plan without making any changes.`,
 					removedPaths = append(removedPaths, planOp.DestPath)
 
 				case planner.PlanOpRestoreBackup:
-					printOp(cyanStyle.Render("↩"), planOp.DestPath)
+					printOp(style.Restored.Render("↩"), planOp.DestPath)
 					if _, err := ext.RestoreFile(ctx, db, q, planOp, plan.TargetRoot, gi.ID, plan.TargetID, op.ID); err != nil {
 						return markFailed(fmt.Errorf("restore %q: %w", planOp.DestPath, err))
 					}
@@ -350,7 +343,7 @@ Use --dry-run to preview the plan without making any changes.`,
 
 		// Summary
 		elapsed := time.Since(mustParseTime(op.StartedAt))
-		fmt.Println(boldStyle.Render(fmt.Sprintf("Unapply complete in %.1fs", elapsed.Seconds())))
+		fmt.Println(style.Bold.Render(fmt.Sprintf("Unapply complete in %.1fs", elapsed.Seconds())))
 		if countRemove > 0 {
 			fmt.Printf("  removed:   %d\n", countRemove)
 		}
@@ -358,9 +351,9 @@ Use --dry-run to preview the plan without making any changes.`,
 			fmt.Printf("  restored:  %d\n", countRestore)
 		}
 		if len(allWarnings) > 0 {
-			fmt.Println(warnStyle.Render(fmt.Sprintf("  warnings:  %d", len(allWarnings))))
+			fmt.Println(style.Warning.Render(fmt.Sprintf("  warnings:  %d", len(allWarnings))))
 			for _, w := range allWarnings {
-				fmt.Println(warnStyle.Render("    ⚠  " + w))
+				fmt.Println(style.Warning.Render("    ⚠  " + w))
 			}
 		}
 		return nil
@@ -394,13 +387,12 @@ func printUnapplyPlan(
 	plan planner.Plan,
 	gameName string,
 	appliedProfileName string,
-	bold, subtle, warn, red, cyan lipgloss.Style,
 ) {
 	header := fmt.Sprintf("Unapply plan for %s", gameName)
 	if appliedProfileName != "" {
-		header += "  " + subtle.Render("(last applied: \""+appliedProfileName+"\")")
+		header += "  " + style.Subtle.Render("(last applied: \""+appliedProfileName+"\")")
 	}
-	header = bold.Render(header) + "  " + subtle.Render(fmt.Sprintf("(target: %s)", plan.TargetName))
+	header = style.Bold.Render(header) + "  " + style.Subtle.Render(fmt.Sprintf("(target: %s)", plan.TargetName))
 	fmt.Println(header)
 	fmt.Println()
 
@@ -409,10 +401,10 @@ func printUnapplyPlan(
 	for _, op := range plan.Ops {
 		switch op.Kind {
 		case planner.PlanOpRemove:
-			fmt.Printf("  %s %s\n", red.Render("-"), op.DestPath)
+			fmt.Printf("  %s %s\n", style.Removed.Render("-"), op.DestPath)
 			countRemove++
 		case planner.PlanOpRestoreBackup:
-			fmt.Printf("  %s %s\n", cyan.Render("↩"), op.DestPath)
+			fmt.Printf("  %s %s\n", style.Restored.Render("↩"), op.DestPath)
 			countRestore++
 		}
 	}
@@ -432,7 +424,7 @@ func printUnapplyPlan(
 	if len(plan.Warnings) > 0 {
 		fmt.Println()
 		for _, w := range plan.Warnings {
-			fmt.Println(warn.Render("  ⚠  " + w))
+			fmt.Println(style.Warning.Render("  ⚠  " + w))
 		}
 	}
 }

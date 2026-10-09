@@ -25,12 +25,12 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -56,10 +56,6 @@ TODO:
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: extract these somewhere else
-		headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-
 		ctx := cmd.Context()
 
 		err := internal.EnsureDBExists()
@@ -103,12 +99,12 @@ TODO:
 		}
 
 		if len(rows) == 0 {
-			fmt.Println(subtleStyle.Render("No mods imported for this game yet."))
-			fmt.Println(subtleStyle.Render("Use `modctl mods import <archive>` to add one."))
+			fmt.Println(style.Subtle.Render("No mods imported for this game yet."))
+			fmt.Println(style.Subtle.Render("Use `modctl mods import <archive>` to add one."))
 			return nil
 		}
 
-		fmt.Println(headerStyle.Render("Mods"))
+		fmt.Println(style.Header.Render("Mods"))
 		fmt.Println()
 
 		// Summary query is already "one row per page" (rn=1). We'll build a stable list of page IDs.
@@ -162,11 +158,7 @@ TODO:
 			if !ns.Valid || ns.String == "" {
 				return "—"
 			}
-			s := ns.String
-			if len(s) > 12 {
-				s = s[:12]
-			}
-			return s
+			return style.ShortSha(ns.String)
 		}
 		strOrDash := func(ns sql.NullString) string {
 			if !ns.Valid || ns.String == "" {
@@ -217,7 +209,7 @@ TODO:
 					// TODO: add "nexus_latest=..." once Nexus API integration exists
 				}
 
-				fmt.Println(subtleStyle.Render(line))
+				fmt.Println(style.Subtle.Render(line))
 				fmt.Println()
 			}
 
@@ -240,7 +232,7 @@ TODO:
 				line += fmt.Sprintf("  nexus=%s", nexusRef)
 				// TODO: add "nexus_latest=..." once Nexus API integration exists
 			}
-			fmt.Println(subtleStyle.Render(line))
+			fmt.Println(style.Subtle.Render(line))
 
 			files, err := q.ListModFilesByPage(ctx, p.ModPageID)
 			if err != nil {
@@ -248,7 +240,7 @@ TODO:
 			}
 
 			if len(files) == 0 {
-				fmt.Println(subtleStyle.Render("  (no files)"))
+				fmt.Println(style.Subtle.Render("  (no files)"))
 				fmt.Println()
 				continue
 			}
@@ -258,14 +250,14 @@ TODO:
 				if f.IsPrimary != 0 {
 					primaryTag = " (primary)"
 				}
-				fmt.Println(subtleStyle.Render(fmt.Sprintf("  File: %s%s", f.Label, primaryTag)))
+				fmt.Println(style.Subtle.Render(fmt.Sprintf("  File: %s%s", f.Label, primaryTag)))
 
 				vers, err := q.ListModFileVersionsByFile(ctx, f.ID)
 				if err != nil && !errors.Is(err, sql.ErrNoRows) {
 					return fmt.Errorf("list versions (file_id=%d): %w", f.ID, err)
 				}
 				if len(vers) == 0 {
-					fmt.Println(subtleStyle.Render("    (no versions)"))
+					fmt.Println(style.Subtle.Render("    (no versions)"))
 					continue
 				}
 
@@ -274,13 +266,7 @@ TODO:
 						"    v%d  imported_at=%s  sha=%s",
 						v.ID,
 						v.CreatedAt,
-						func() string {
-							s := v.ArchiveSha256
-							if len(s) > 12 {
-								s = s[:12]
-							}
-							return s
-						}(),
+						style.ShortSha(v.ArchiveSha256),
 					)
 
 					if v.VersionString.Valid && v.VersionString.String != "" {
@@ -288,7 +274,7 @@ TODO:
 					}
 
 					// TODO: think about also showing v.OriginalName later (only if not-null)
-					fmt.Println(subtleStyle.Render(vline))
+					fmt.Println(style.Subtle.Render(vline))
 				}
 			}
 

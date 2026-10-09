@@ -23,12 +23,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -47,11 +47,7 @@ Run 'profiles overrides status' for full staleness detail.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: extract
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		boldStyle := lipgloss.NewStyle().Bold(true)
-		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-		greenStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
+		kvIndented := style.KV{Indent: 6, Width: 16}
 
 		ctx := cmd.Context()
 
@@ -96,7 +92,7 @@ Run 'profiles overrides status' for full staleness detail.`,
 		}
 
 		if len(overrides) == 0 {
-			fmt.Println(subtleStyle.Render(fmt.Sprintf(
+			fmt.Println(style.Subtle.Render(fmt.Sprintf(
 				"  no overrides for profile %q", p.Name,
 			)))
 			return nil
@@ -112,7 +108,7 @@ Run 'profiles overrides status' for full staleness detail.`,
 			stalenessMap[s.OverrideID] = s.Staleness
 		}
 
-		fmt.Println(boldStyle.Render(fmt.Sprintf(
+		fmt.Println(style.Bold.Render(fmt.Sprintf(
 			"Overrides for profile %q (%d):", p.Name, len(overrides),
 		)))
 		fmt.Println()
@@ -123,28 +119,24 @@ Run 'profiles overrides status' for full staleness detail.`,
 			var statusTag string
 			switch staleness {
 			case "stale":
-				statusTag = "  " + warnStyle.Render("⚠ may be stale")
+				statusTag = "  " + style.Warning.Render("⚠ may be stale")
 			case "no_base":
-				statusTag = "  " + warnStyle.Render("⚠ no base mod")
+				statusTag = "  " + style.Warning.Render("⚠ no base mod")
 			case "anchor_lost":
-				statusTag = "  " + warnStyle.Render("⚠ anchor lost")
+				statusTag = "  " + style.Warning.Render("⚠ anchor lost")
 			default:
 				if o.SourceArchiveSha256.Valid {
-					statusTag = "  " + greenStyle.Render("✓")
+					statusTag = "  " + style.Good.Render("✓")
 				}
 			}
 
-			labelStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("7")).
-				Width(16)
-
 			fmt.Printf("  %s%s\n", o.Relpath, statusTag)
-			fmt.Printf("      %s %s\n", labelStyle.Render("type:"), formatOverrideType(o.OverrideType))
+			kvIndented.Print("type:", formatOverrideType(o.OverrideType))
 			if o.BlobSha256.Valid {
-				fmt.Printf("      %s %s\n", labelStyle.Render("blob:"), truncateSha(o.BlobSha256.String))
+				kvIndented.Print("blob:", style.ShortSha(o.BlobSha256.String))
 			}
 			if o.Notes.Valid && strings.TrimSpace(o.Notes.String) != "" {
-				fmt.Printf("      %s %s\n", labelStyle.Render("notes:"), o.Notes.String)
+				kvIndented.Print("notes:", o.Notes.String)
 			}
 			fmt.Println()
 		}

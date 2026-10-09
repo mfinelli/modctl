@@ -21,12 +21,12 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/charmbracelet/lipgloss/table"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -97,10 +97,7 @@ var gamesTargetsListCmd = &cobra.Command{
 			})
 		}
 
-		tbl := table.New().
-			Headers(" ID ", " Name ", " Path ", " Origin ", " State ").
-			Rows(rows...)
-		fmt.Println(tbl)
+		fmt.Println(style.Table([]string{" ID ", " Name ", " Path ", " Origin ", " State "}, rows))
 		return nil
 	},
 }

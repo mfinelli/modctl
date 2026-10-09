@@ -24,12 +24,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -47,10 +47,6 @@ Entries are shown in the order they will be applied.`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO extract
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		boldStyle := lipgloss.NewStyle().Bold(true)
-
 		ctx := cmd.Context()
 		relpath := filepath.Clean(args[0])
 
@@ -123,13 +119,13 @@ Entries are shown in the order they will be applied.`,
 		}
 
 		if len(entries) == 0 {
-			fmt.Println(subtleStyle.Render(fmt.Sprintf(
+			fmt.Println(style.Subtle.Render(fmt.Sprintf(
 				"  no patch entries for %q in profile %q", relpath, p.Name,
 			)))
 			return nil
 		}
 
-		fmt.Println(boldStyle.Render(fmt.Sprintf(
+		fmt.Println(style.Bold.Render(fmt.Sprintf(
 			"Patch entries for %q in profile %q (%s):",
 			relpath, p.Name, formatOverrideType(override.OverrideType),
 		)))
@@ -177,16 +173,16 @@ func formatPatchEntry(e dbq.OverridePatchEntry) string {
 	if e.EntryValue.Valid {
 		b.WriteString(fmt.Sprintf(" = %s", e.EntryValue.String))
 	} else {
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render(" (unset)"))
+		b.WriteString(style.Subtle.Render(" (unset)"))
 	}
 
 	switch e.PatchType {
 	case "ini_unset", "yaml_unset", "json_unset", "xml_unset":
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render(" [-]"))
+		b.WriteString(style.Removed.Render(" [-]"))
 	case "ini_set", "yaml_set", "json_set", "xml_set":
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render(" [+]"))
+		b.WriteString(style.Added.Render(" [+]"))
 	case "xml_clear":
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render(" [~]"))
+		b.WriteString(style.Yellow.Render(" [~]"))
 	}
 
 	return b.String()

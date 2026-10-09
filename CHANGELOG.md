@@ -27,6 +27,8 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 - `profiles add` and `profiles preview` default to the only enabled target
   when `game_dir` is disabled, and refuse disabled targets.
 - Apply and unapply output now shows which target is being processed.
+- Add `profiles deploys copy` to copy both skip-backup and write-once patterns
+  from one mod version to another in one step.
 - Import, `verify` and `extract` now work with bundles exported by older
   versions: the bundle's database is migrated to the current schema in a
   temporary copy before it is read.

@@ -716,14 +716,17 @@ Both rules can be applied to the same path. The resulting behavior is:
 ### Commands
 
 ```
+profiles deploys copy <src_mod_file_version_id> <dst_mod_file_version_id>
 profiles deploys skip-backup add|remove|list|copy <mod_file_version_id> <pattern>
 profiles deploys write-once add|remove|list|copy <mod_file_version_id> <pattern>
 ```
 
 When upgrading a mod version via `profiles upgrade`, all deployment rules are
 preserved automatically since the profile item is updated in place. Manual
-copying via the `copy` subcommand is only needed when moving rules between
-two distinct profile items.
+copying via the `copy` subcommands (`deploys copy` for both kinds in one
+transaction, or `skip-backup copy` / `write-once copy` for one kind) is only
+needed when moving rules between two distinct profile items. In every case a
+kind the source has no patterns of is left alone on the destination.
 
 ## 10. Backup inspection and management
 
@@ -1290,6 +1293,8 @@ create|list|rename|delete|set-active|apply|diff|add|remove|enable|disable|order|
   run.
 - `profiles overrides set|edit|status|unset|list|copy` - manage mod overrides
 - `profiles overrides patch set|unset|remove|list|preview` - manage structured mod overrides
+- `profiles deploys copy` - copy both kinds of deployment rules from one mod
+  version to another in a single transaction.
 - `profiles deploys skip-backup add|remove|list|copy` - manage skip-backup patterns
   for a mod version within a profile. Patterns are evaluated against the final
   remapped destination path. Files matching a skip-backup pattern are never
@@ -1409,6 +1414,41 @@ Key behavior:
 - "intent changes" (enable/disable/order) are cheap
 - apply performs reconciliation
 - always support --dry-run where destructive
+
+### Terminal output styling
+
+All terminal styling lives in `internal/style`; no command defines its own
+styles (a test fails if `lipgloss.NewStyle()` appears anywhere else). The
+package has two layers:
+
+- the **palette**: the ANSI colors modctl uses, with the bright variants named
+  separately (`Green` and `BrightGreen`, and so on);
+- the **roles**: styles named for what they are used for, defined in terms of the
+  palette. Commands use roles.
+
+The roles follow how the output is used. Lines that report how something went
+(`Success`, `Failure`, `Warning`, `Info`) use the plain colors. Per-item markers
+and state (`Added`, `Removed`, `Changed`, `Restored`, `Unchanged`, `Active`,
+`Inactive`, `Good`, `Bad`, `Pending`) use the bright colors. Text roles
+(`Subtle`, `Dim`, `Label`, `Header`, `Section`, `Bold`) and the containers
+(`Card`, `Banner`) round it out. A command that needs a style that has no role
+yet adds one rather than using a palette color directly, so that restyling a
+function is a one-line change in `roles.go`.
+
+The package also holds how output is laid out and formatted, so that every
+command does it the same way and it can be tested in one place: `KV` for
+aligned label/value lines (one `KV` per group of lines, sized to the longest
+label), `Table` for tables, and `Bytes`, `Age`, `Duration` and `ShortSha` for
+sizes, times and hashes.
+
+Code under `internal/` does not print. Anything that is shown to the user is
+rendered by the command in `cmd/`, using `internal/style`. Functions that do
+work return what happened (a changed flag, a count, a list of changes) and the
+command decides how to say it; long-running work reports how it is going through
+a callback (see `exporter.Options.Progress`) rather than writing to the
+terminal. The one exception is code that is handed an `io.Writer` to write to,
+such as the Nexus SSO flow. This keeps that code testable, and means it can drive
+something other than a line-oriented terminal, such as a TUI.
 
 ### command-specifc information
 

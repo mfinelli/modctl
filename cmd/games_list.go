@@ -21,11 +21,11 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/charmbracelet/lipgloss/table"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
 )
@@ -110,11 +110,7 @@ specific store. Or use --all to include games from all stores.
 			})
 		}
 
-		t := table.New().
-			Headers(" ID ", " Selector ", " Name ", " Path ", " Present ", " Last Seen ").
-			Rows(rows...)
-
-		fmt.Println(t)
+		fmt.Println(style.Table([]string{" ID ", " Selector ", " Name ", " Path ", " Present ", " Last Seen "}, rows))
 
 		return nil
 	},

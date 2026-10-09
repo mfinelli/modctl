@@ -70,11 +70,12 @@ func EnsureRemapConfig(ctx context.Context, qtx *dbq.Queries, itemID int64) (int
 
 // AddRemapRule adds a single remap rule to the config for a profile item,
 // creating the config if it does not exist yet. The position is auto-assigned
-// as MAX(position)+1 unless overridePos is >= 0.
-func AddRemapRule(ctx context.Context, db *sql.DB, q *dbq.Queries, itemID int64, ruleType string, intVal sql.NullInt64, textVal sql.NullString, overridePos int64) error {
+// as MAX(position)+1 unless overridePos is >= 0. It returns the position the
+// rule was added at.
+func AddRemapRule(ctx context.Context, db *sql.DB, q *dbq.Queries, itemID int64, ruleType string, intVal sql.NullInt64, textVal sql.NullString, overridePos int64) (position int64, err error) {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
+		return 0, fmt.Errorf("begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
@@ -82,14 +83,14 @@ func AddRemapRule(ctx context.Context, db *sql.DB, q *dbq.Queries, itemID int64,
 
 	configID, err := EnsureRemapConfig(ctx, qtx, itemID)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	pos := overridePos
 	if pos < 0 {
 		maxPos, err := qtx.GetMaxRemapRulePosition(ctx, configID)
 		if err != nil {
-			return fmt.Errorf("get max remap rule position: %w", err)
+			return 0, fmt.Errorf("get max remap rule position: %w", err)
 		}
 		pos = maxPos + 1
 	}
@@ -102,33 +103,32 @@ func AddRemapRule(ctx context.Context, db *sql.DB, q *dbq.Queries, itemID int64,
 		TextValue:     textVal,
 	})
 	if err != nil {
-		return fmt.Errorf("create remap rule: %w", err)
+		return 0, fmt.Errorf("create remap rule: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit: %w", err)
+		return 0, fmt.Errorf("commit: %w", err)
 	}
 
-	fmt.Printf("Added %s rule at position %d\n", ruleType, result.Position)
-	return nil
+	return result.Position, nil
 }
 
 // ClearRemapConfig deletes all remap rules for a profile item's config and
 // removes the config itself, leaving remap_config_id NULL on the profile item.
-// No-op if the profile item has no remap config.
-func ClearRemapConfig(ctx context.Context, db *sql.DB, q *dbq.Queries, itemID int64, profileName string, versionID int64) error {
+// No-op if the profile item has no remap config. It reports whether there was
+// a config to clear.
+func ClearRemapConfig(ctx context.Context, db *sql.DB, q *dbq.Queries, itemID int64) (cleared bool, err error) {
 	configID, err := q.GetProfileItemRemapConfigID(ctx, itemID)
 	if err != nil {
-		return fmt.Errorf("get remap config id: %w", err)
+		return false, fmt.Errorf("get remap config id: %w", err)
 	}
 	if !configID.Valid {
-		fmt.Printf("Version %d in profile %q has no remap rules\n", versionID, profileName)
-		return nil
+		return false, nil
 	}
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
+		return false, fmt.Errorf("begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
@@ -139,38 +139,37 @@ func ClearRemapConfig(ctx context.Context, db *sql.DB, q *dbq.Queries, itemID in
 		RemapConfigID: sql.NullInt64{Valid: false},
 		ID:            itemID,
 	}); err != nil {
-		return fmt.Errorf("unlink remap config: %w", err)
+		return false, fmt.Errorf("unlink remap config: %w", err)
 	}
 
 	// Deleting the config cascades to remap_rules via ON DELETE CASCADE
 	if err := qtx.DeleteRemapConfig(ctx, configID.Int64); err != nil {
-		return fmt.Errorf("delete remap config: %w", err)
+		return false, fmt.Errorf("delete remap config: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit: %w", err)
+		return false, fmt.Errorf("commit: %w", err)
 	}
 
-	fmt.Printf("Cleared remap rules for version %d in profile %q\n", versionID, profileName)
-	return nil
+	return true, nil
 }
 
 // CopyRemapConfig copies remap rules from one profile item to another within
 // the same profile. If the destination already has a config its rules are
-// replaced. If the source has no config this is a no-op.
-func CopyRemapConfig(ctx context.Context, db *sql.DB, q *dbq.Queries, srcItemID, dstItemID int64, srcVersionID, dstVersionID int64, profileName string) error {
+// replaced. If the source has no config this is a no-op. It returns the number
+// of rules copied.
+func CopyRemapConfig(ctx context.Context, db *sql.DB, q *dbq.Queries, srcItemID, dstItemID int64) (copied int, err error) {
 	srcRules, err := q.ListRemapRulesForProfileItem(ctx, srcItemID)
 	if err != nil {
-		return fmt.Errorf("list source remap rules: %w", err)
+		return 0, fmt.Errorf("list source remap rules: %w", err)
 	}
 	if len(srcRules) == 0 {
-		fmt.Printf("Version %d in profile %q has no remap rules to copy\n", srcVersionID, profileName)
-		return nil
+		return 0, nil
 	}
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
+		return 0, fmt.Errorf("begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
@@ -179,30 +178,30 @@ func CopyRemapConfig(ctx context.Context, db *sql.DB, q *dbq.Queries, srcItemID,
 	// Clear existing config on dst if present
 	dstConfigID, err := qtx.GetProfileItemRemapConfigID(ctx, dstItemID)
 	if err != nil {
-		return fmt.Errorf("get dst remap config id: %w", err)
+		return 0, fmt.Errorf("get dst remap config id: %w", err)
 	}
 	if dstConfigID.Valid {
 		if err := qtx.SetProfileItemRemapConfig(ctx, dbq.SetProfileItemRemapConfigParams{
 			RemapConfigID: sql.NullInt64{Valid: false},
 			ID:            dstItemID,
 		}); err != nil {
-			return fmt.Errorf("unlink dst remap config: %w", err)
+			return 0, fmt.Errorf("unlink dst remap config: %w", err)
 		}
 		if err := qtx.DeleteRemapConfig(ctx, dstConfigID.Int64); err != nil {
-			return fmt.Errorf("delete dst remap config: %w", err)
+			return 0, fmt.Errorf("delete dst remap config: %w", err)
 		}
 	}
 
 	// Create a fresh config for dst
 	newConfigID, err := qtx.CreateRemapConfig(ctx)
 	if err != nil {
-		return fmt.Errorf("create dst remap config: %w", err)
+		return 0, fmt.Errorf("create dst remap config: %w", err)
 	}
 	if err := qtx.SetProfileItemRemapConfig(ctx, dbq.SetProfileItemRemapConfigParams{
 		RemapConfigID: sql.NullInt64{Int64: newConfigID, Valid: true},
 		ID:            dstItemID,
 	}); err != nil {
-		return fmt.Errorf("link dst remap config: %w", err)
+		return 0, fmt.Errorf("link dst remap config: %w", err)
 	}
 
 	// Copy rules preserving positions
@@ -214,15 +213,13 @@ func CopyRemapConfig(ctx context.Context, db *sql.DB, q *dbq.Queries, srcItemID,
 			IntValue:      rule.IntValue,
 			TextValue:     rule.TextValue,
 		}); err != nil {
-			return fmt.Errorf("copy remap rule at position %d: %w", rule.Position, err)
+			return 0, fmt.Errorf("copy remap rule at position %d: %w", rule.Position, err)
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit: %w", err)
+		return 0, fmt.Errorf("commit: %w", err)
 	}
 
-	fmt.Printf("Copied %d remap rule(s) from version %d to version %d in profile %q\n",
-		len(srcRules), srcVersionID, dstVersionID, profileName)
-	return nil
+	return len(srcRules), nil
 }

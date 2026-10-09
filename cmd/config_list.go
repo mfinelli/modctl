@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"github.com/adrg/xdg"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -40,23 +40,15 @@ default value.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO extract
-		headerStyle := lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("63"))
-		labelStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("7")).
-			Width(16)
-		subtleStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("245"))
+		kv := style.KV{Indent: 2, Width: 16}
 
 		configPath := viper.ConfigFileUsed()
 		if configPath == "" {
 			configPath = filepath.Join(xdg.ConfigHome, "modctl", "config.toml")
 		}
 
-		fmt.Println(headerStyle.Render("Configuration"))
-		fmt.Println(subtleStyle.Render("  file: " + configPath))
+		fmt.Println(style.Header.Render("Configuration"))
+		fmt.Println(style.Subtle.Render("  file: " + configPath))
 		fmt.Println()
 
 		for _, key := range knownConfigKeys {
@@ -67,12 +59,12 @@ default value.`,
 				value = maskAPIKey(value)
 			}
 
-			origin := subtleStyle.Render("(default)")
+			origin := style.Subtle.Render("(default)")
 			if fromFile {
-				origin = subtleStyle.Render("(set)")
+				origin = style.Subtle.Render("(set)")
 			}
 
-			fmt.Printf("  %s %s  %s\n", labelStyle.Render(key+":"), value, origin)
+			kv.Print(key+":", value+"  "+origin)
 		}
 
 		return nil

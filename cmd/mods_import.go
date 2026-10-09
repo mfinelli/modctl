@@ -34,7 +34,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/archivescanner"
@@ -45,6 +44,7 @@ import (
 	"github.com/mfinelli/modctl/internal/nexus"
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -94,10 +94,6 @@ has been safely stored and the database has been updated successfully.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-
-		// TODO: extract these somewhere else
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 
 		err := internal.EnsureDBExists()
 		if err != nil {
@@ -168,7 +164,7 @@ has been safely stored and the database has been updated successfully.`,
 		defer prep.Cleanup()
 
 		if prep.Wrapped {
-			fmt.Println(warnStyle.Render("  ⚠ input was not a supported archive; wrapped into .tar.gz for storage"))
+			fmt.Println(style.Warning.Render("  ⚠ input was not a supported archive; wrapped into .tar.gz for storage"))
 		}
 
 		q := dbq.New(db)
@@ -216,12 +212,12 @@ has been safely stored and the database has been updated successfully.`,
 			if apiKey != "" {
 				client, err := nexusclient.New(ctx, apiKey, logger, rootCmd.Version)
 				if err != nil {
-					fmt.Println(warnStyle.Render(fmt.Sprintf("  ⚠ failed to initialize nexus client: %s", err)))
+					fmt.Println(style.Warning.Render(fmt.Sprintf("  ⚠ failed to initialize nexus client: %s", err)))
 				} else {
 					defer client.Close()
 					filesResp, err := client.GetModFiles(*gameDomain, *modID)
 					if err != nil {
-						fmt.Println(warnStyle.Render(fmt.Sprintf("  ⚠ failed to fetch nexus file list: %s", err)))
+						fmt.Println(style.Warning.Render(fmt.Sprintf("  ⚠ failed to fetch nexus file list: %s", err)))
 					} else {
 						// discard warnings/errors in this pre-fetch pass since we'll surface
 						// them again in the post import pass
@@ -257,9 +253,9 @@ has been safely stored and the database has been updated successfully.`,
 				slog.Default(),
 			)
 			if err != nil {
-				fmt.Println(warnStyle.Render("  ⚠ inventory scan failed - run 'mods scan-inventory' to retry"))
+				fmt.Println(style.Warning.Render("  ⚠ inventory scan failed - run 'mods scan-inventory' to retry"))
 			} else {
-				fmt.Println(subtleStyle.Render("  inventoried archive entries"))
+				fmt.Println(style.Subtle.Render("  inventoried archive entries"))
 			}
 		}
 
@@ -267,12 +263,12 @@ has been safely stored and the database has been updated successfully.`,
 		if modsImportNexusUrl != "" && !modsImportSkipNexusLink {
 			apiKey := viper.GetString("nexus.apikey")
 			if apiKey == "" {
-				fmt.Println(subtleStyle.Render("  nexus api key not configured, skipping link"))
+				fmt.Println(style.Subtle.Render("  nexus api key not configured, skipping link"))
 			} else {
 				client, err := nexusclient.New(ctx, apiKey, logger, rootCmd.Version)
 				if err != nil {
 					// Non-fatal, warn and continue
-					fmt.Println(warnStyle.Render(fmt.Sprintf("  ⚠ failed to initialize nexus client: %s", err)))
+					fmt.Println(style.Warning.Render(fmt.Sprintf("  ⚠ failed to initialize nexus client: %s", err)))
 				} else {
 					defer client.Close()
 					if err := attemptNexusLink(ctx, q, client, nexusLinkParams{
@@ -288,7 +284,7 @@ has been safely stored and the database has been updated successfully.`,
 						label:            modsImportLabel,
 						fileVersion:      modsImportFileVersion,
 					}); err != nil {
-						fmt.Println(warnStyle.Render(fmt.Sprintf("  ⚠ nexus link failed: %s", err)))
+						fmt.Println(style.Warning.Render(fmt.Sprintf("  ⚠ nexus link failed: %s", err)))
 					}
 				}
 			}
@@ -300,7 +296,7 @@ has been safely stored and the database has been updated successfully.`,
 				// Import is done; keep this as a loud error because the user asked for --rm.
 				return fmt.Errorf("import succeeded but failed to remove original file: %w", err)
 			}
-			fmt.Println(subtleStyle.Render("  removed original input file"))
+			fmt.Println(style.Subtle.Render("  removed original input file"))
 		}
 
 		fmt.Println("Imported:")
@@ -507,10 +503,6 @@ func attemptNexusLink(
 	client *nexusclient.Client,
 	p nexusLinkParams,
 ) error {
-	// TODO: extract these somewhere else
-	subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-
 	// Always try to fetch mod info - useful for name even if file ID fails
 	modInfo, err := client.GetModCached(p.gameDomain, p.modID)
 	if err != nil {
@@ -525,7 +517,7 @@ func attemptNexusLink(
 		}); err != nil {
 			return fmt.Errorf("updating mod page name: %w", err)
 		}
-		fmt.Println(subtleStyle.Render(fmt.Sprintf("  updated mod page name: %s", modInfo.Name)))
+		fmt.Println(style.Subtle.Render(fmt.Sprintf("  updated mod page name: %s", modInfo.Name)))
 	}
 
 	// Fetch file list for identification
@@ -539,14 +531,14 @@ func attemptNexusLink(
 		return fmt.Errorf("identifying nexus file: %w", err)
 	}
 	for _, warn := range warnings {
-		fmt.Println(warnStyle.Render(fmt.Sprintf("  ⚠ %s", warn)))
+		fmt.Println(style.Warning.Render(fmt.Sprintf("  ⚠ %s", warn)))
 	}
 	if match == nil {
-		fmt.Println(warnStyle.Render("  ⚠ could not identify nexus file id - run `mods nexus link` to resolve"))
+		fmt.Println(style.Warning.Render("  ⚠ could not identify nexus file id - run `mods nexus link` to resolve"))
 		return nil
 	}
 
-	fmt.Println(subtleStyle.Render(fmt.Sprintf("  identified nexus file: %s v%s (file_id: %d, confidence: %s)",
+	fmt.Println(style.Subtle.Render(fmt.Sprintf("  identified nexus file: %s v%s (file_id: %d, confidence: %s)",
 		match.File.Name, match.File.Version, match.File.FileID, match.Confidence)))
 
 	if err := q.UpdateModFileVersionNexusFileID(ctx, dbq.UpdateModFileVersionNexusFileIDParams{
@@ -568,7 +560,7 @@ func attemptNexusLink(
 		}); err != nil {
 			return fmt.Errorf("updating version string: %w", err)
 		}
-		fmt.Println(subtleStyle.Render(fmt.Sprintf("  set version: %s", versionToStore)))
+		fmt.Println(style.Subtle.Render(fmt.Sprintf("  set version: %s", versionToStore)))
 	}
 
 	if !p.labelProvided {
@@ -578,7 +570,7 @@ func attemptNexusLink(
 		}); err != nil {
 			return fmt.Errorf("updating mod file label: %w", err)
 		}
-		fmt.Println(subtleStyle.Render(fmt.Sprintf("  updated mod file label: %s", match.File.Name)))
+		fmt.Println(style.Subtle.Render(fmt.Sprintf("  updated mod file label: %s", match.File.Name)))
 	}
 
 	return nil

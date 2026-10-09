@@ -23,12 +23,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -103,27 +103,24 @@ func init() {
 }
 
 func renderIncompatibilityList(pairs []dbq.ListModIncompatibilitiesRow) string {
-	// TODO: extract these somewhere
-	subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	sectionTitleStyle := lipgloss.NewStyle().Bold(true).MarginTop(1)
-	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+	kvIndented := style.KV{Indent: 6, Width: 12}
 
 	var b strings.Builder
 
-	b.WriteString(sectionTitleStyle.Render(fmt.Sprintf("Incompatibilities (%d)", len(pairs))) + "\n")
+	b.WriteString(style.Section.Render(fmt.Sprintf("Incompatibilities (%d)", len(pairs))) + "\n")
 
 	if len(pairs) == 0 {
-		b.WriteString(subtleStyle.Render("  (none)") + "\n")
+		b.WriteString(style.Subtle.Render("  (none)") + "\n")
 		return strings.TrimRight(b.String(), "\n")
 	}
 
 	for _, pair := range pairs {
 		b.WriteString(fmt.Sprintf("  %s\n",
-			warnStyle.Render(fmt.Sprintf("⚠  %s × %s",
+			style.Warning.Render(fmt.Sprintf("⚠  %s × %s",
 				pair.ModPageNameA, pair.ModPageNameB))))
-		writeKVIndented(&b, "ids:", fmt.Sprintf("%d, %d", pair.ModPageIDA, pair.ModPageIDB))
+		kvIndented.Write(&b, "ids:", fmt.Sprintf("%d, %d", pair.ModPageIDA, pair.ModPageIDB))
 		if pair.Reason.Valid && strings.TrimSpace(pair.Reason.String) != "" {
-			writeKVIndented(&b, "reason:", pair.Reason.String)
+			kvIndented.Write(&b, "reason:", pair.Reason.String)
 		}
 		b.WriteString("\n")
 	}

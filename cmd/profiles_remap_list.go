@@ -22,12 +22,12 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -51,10 +51,6 @@ Rules are shown in the order they will be applied during planning.`,
 	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: extract elsewhere
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		boldStyle := lipgloss.NewStyle().Bold(true)
-
 		ctx := cmd.Context()
 
 		err := internal.EnsureDBExists()
@@ -110,11 +106,11 @@ Rules are shown in the order they will be applied during planning.`,
 		}
 
 		if len(rules) == 0 {
-			fmt.Println(subtleStyle.Render(fmt.Sprintf("  no remap rules for version %d in profile %q", mfv.ID, p.Name)))
+			fmt.Println(style.Subtle.Render(fmt.Sprintf("  no remap rules for version %d in profile %q", mfv.ID, p.Name)))
 			return nil
 		}
 
-		fmt.Println(boldStyle.Render(fmt.Sprintf("Remap rules for version %d in profile %q:", mfv.ID, p.Name)))
+		fmt.Println(style.Bold.Render(fmt.Sprintf("Remap rules for version %d in profile %q:", mfv.ID, p.Name)))
 		for _, rule := range rules {
 			fmt.Println(formatRemapRule(rule))
 		}

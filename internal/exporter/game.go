@@ -44,31 +44,31 @@ func Game(
 	bs blobstore.Store,
 	gi dbq.GameInstall,
 	opts Options,
-) error {
+) (Result, error) {
 	if !opts.NoVerify {
 		var toVerify []blobToVerify
 		archiveBlobs, err := q.ListArchiveBlobsForGameInstall(ctx, gi.ID)
 		if err != nil {
-			return fmt.Errorf("list archive blobs: %w", err)
+			return Result{}, fmt.Errorf("list archive blobs: %w", err)
 		}
 		for _, b := range archiveBlobs {
 			toVerify = append(toVerify, blobToVerify{b.Sha256, blobstore.KindArchive})
 		}
 		overrideBlobs, err := q.ListOverrideBlobsForGameInstall(ctx, gi.ID)
 		if err != nil {
-			return fmt.Errorf("list override blobs: %w", err)
+			return Result{}, fmt.Errorf("list override blobs: %w", err)
 		}
 		for _, b := range overrideBlobs {
 			toVerify = append(toVerify, blobToVerify{b.Sha256, blobstore.KindOverride})
 		}
-		if err := verifyBlobs(ctx, q, bs, toVerify); err != nil {
-			return fmt.Errorf("blob verification failed: %w", err)
+		if err := verifyBlobs(ctx, q, bs, toVerify, opts.Progress); err != nil {
+			return Result{}, fmt.Errorf("blob verification failed: %w", err)
 		}
 	}
 
 	out, err := os.Create(opts.OutputPath)
 	if err != nil {
-		return fmt.Errorf("create output file: %w", err)
+		return Result{}, fmt.Errorf("create output file: %w", err)
 	}
 
 	// clean up partial output on any failure
@@ -82,7 +82,7 @@ func Game(
 
 	zw, err := zstd.NewWriter(out)
 	if err != nil {
-		return fmt.Errorf("create zstd writer: %w", err)
+		return Result{}, fmt.Errorf("create zstd writer: %w", err)
 	}
 	defer zw.Close()
 
@@ -94,7 +94,7 @@ func Game(
 		ctx, q, gi, opts.SkipInventory,
 	)
 	if err != nil {
-		return fmt.Errorf("build game-scoped database: %w", err)
+		return Result{}, fmt.Errorf("build game-scoped database: %w", err)
 	}
 	defer os.Remove(scopedDBPath)
 
@@ -103,7 +103,7 @@ func Game(
 		ctx, q, opts.CacheDBPath, gi.ID,
 	)
 	if err != nil {
-		return fmt.Errorf("build game-scoped nexus cache: %w", err)
+		return Result{}, fmt.Errorf("build game-scoped nexus cache: %w", err)
 	}
 	if cacheDBPath != "" {
 		defer os.Remove(cacheDBPath)
@@ -112,17 +112,17 @@ func Game(
 	// 2. Get schema version from source DB
 	schemaVersion, err := currentSchemaVersion(ctx, db)
 	if err != nil {
-		return fmt.Errorf("get schema version: %w", err)
+		return Result{}, fmt.Errorf("get schema version: %w", err)
 	}
 
 	// 3. Collect blobs referenced by this game
 	archiveBlobs, err := q.ListArchiveBlobsForGameInstall(ctx, gi.ID)
 	if err != nil {
-		return fmt.Errorf("list archive blobs for game: %w", err)
+		return Result{}, fmt.Errorf("list archive blobs for game: %w", err)
 	}
 	overrideBlobs, err := q.ListOverrideBlobsForGameInstall(ctx, gi.ID)
 	if err != nil {
-		return fmt.Errorf("list override blobs for game: %w", err)
+		return Result{}, fmt.Errorf("list override blobs for game: %w", err)
 	}
 
 	// 4. Write manifest
@@ -146,18 +146,18 @@ func Game(
 		},
 	}
 	if err := writeManifest(tw, manifest); err != nil {
-		return fmt.Errorf("write manifest: %w", err)
+		return Result{}, fmt.Errorf("write manifest: %w", err)
 	}
 
 	// 5. Write scoped database
 	if err := writeFileToTar(tw, scopedDBPath, DatabaseFilename); err != nil {
-		return fmt.Errorf("write database: %w", err)
+		return Result{}, fmt.Errorf("write database: %w", err)
 	}
 
 	// 5b. Write scoped nexus cache if present
 	if cacheDBPath != "" {
 		if err := writeFileToTar(tw, cacheDBPath, "nexus_cache.db"); err != nil {
-			return fmt.Errorf("write nexus cache: %w", err)
+			return Result{}, fmt.Errorf("write nexus cache: %w", err)
 		}
 	}
 
@@ -166,7 +166,7 @@ func Game(
 	for _, b := range archiveBlobs {
 		skip, err := writeBlobToTar(ctx, tw, bs, blobstore.KindArchive, b.Sha256)
 		if err != nil {
-			return fmt.Errorf("write archive blob %s: %w", b.Sha256, err)
+			return Result{}, fmt.Errorf("write archive blob %s: %w", b.Sha256, err)
 		}
 		if skip {
 			skipped = append(skipped, b.Sha256)
@@ -177,7 +177,7 @@ func Game(
 	for _, b := range overrideBlobs {
 		skip, err := writeBlobToTar(ctx, tw, bs, blobstore.KindOverride, b.Sha256)
 		if err != nil {
-			return fmt.Errorf("write override blob %s: %w", b.Sha256, err)
+			return Result{}, fmt.Errorf("write override blob %s: %w", b.Sha256, err)
 		}
 		if skip {
 			skipped = append(skipped, b.Sha256)
@@ -185,22 +185,17 @@ func Game(
 	}
 
 	if err := tw.Close(); err != nil {
-		return fmt.Errorf("close tar: %w", err)
+		return Result{}, fmt.Errorf("close tar: %w", err)
 	}
 	if err := zw.Close(); err != nil {
-		return fmt.Errorf("close zstd: %w", err)
+		return Result{}, fmt.Errorf("close zstd: %w", err)
 	}
 	if err := out.Close(); err != nil {
-		return fmt.Errorf("close output: %w", err)
+		return Result{}, fmt.Errorf("close output: %w", err)
 	}
 	success = true
 
-	// TODO: we should probably push this up to the caller
-	for _, sha := range skipped {
-		fmt.Fprintf(os.Stderr, "warning: blob %s... missing from disk, skipped in export\n", sha[:16])
-	}
-
-	return nil
+	return Result{SkippedBlobs: skipped}, nil
 }
 
 // buildGameScopedDB constructs a fresh SQLite database containing only rows
