@@ -133,6 +133,8 @@ type installSummary struct {
 }
 
 func renderSystemStatus(summaries []installSummary) string {
+	kvIndented := style.KV{Indent: 6, Width: 16}
+
 	activeDot := style.Active.Render("●")
 	inactiveDot := style.Inactive.Render("○")
 
@@ -157,7 +159,7 @@ func renderSystemStatus(summaries []installSummary) string {
 			if s.install.LastSeenAt.Valid {
 				t, err := time.Parse("2006-01-02T15:04:05.000Z", s.install.LastSeenAt.String)
 				if err == nil {
-					age = fmt.Sprintf(" - last seen %s", formatAge(t))
+					age = fmt.Sprintf(" - last seen %s", style.Age(t))
 				}
 			}
 			headerLine += "  " + style.Warning.Render("(not present"+age+")")
@@ -170,20 +172,20 @@ func renderSystemStatus(summaries []installSummary) string {
 			if s.install.AppliedAt.Valid {
 				t, err := time.Parse("2006-01-02T15:04:05.000Z", s.install.AppliedAt.String)
 				if err == nil {
-					appliedAgo = style.Subtle.Render(fmt.Sprintf(" (applied %s)", formatAge(t)))
+					appliedAgo = style.Subtle.Render(fmt.Sprintf(" (applied %s)", style.Age(t)))
 				}
 			}
-			writeKVIndented16(&b, "profile:", s.appliedProfile.Name+appliedAgo)
+			kvIndented.Write(&b, "profile:", s.appliedProfile.Name+appliedAgo)
 		} else {
-			writeKVIndented16(&b, "profile:", style.Subtle.Render("(none applied)"))
+			kvIndented.Write(&b, "profile:", style.Subtle.Render("(none applied)"))
 		}
 
 		// File and backup counts - only show if non-zero or something is applied
 		if s.fileCount > 0 || s.install.AppliedProfileID.Valid {
-			writeKVIndented16(&b, "managed:", fmt.Sprintf("%d files", s.fileCount))
+			kvIndented.Write(&b, "managed:", fmt.Sprintf("%d files", s.fileCount))
 		}
 		if s.backupCount > 0 {
-			writeKVIndented16(&b, "backups:", fmt.Sprintf("%d files", s.backupCount))
+			kvIndented.Write(&b, "backups:", fmt.Sprintf("%d files", s.backupCount))
 		}
 
 		// Incomplete operation warning

@@ -194,7 +194,7 @@ func runExtractList(
 					if v.VersionString.Valid {
 						verStr = v.VersionString.String
 					}
-					sha := v.ArchiveSha256[:16] + "..."
+					sha := style.ShortSha(v.ArchiveSha256)
 					line := fmt.Sprintf("      %s  %s", verStr, style.Subtle.Render(sha))
 
 					// nexus info
@@ -342,7 +342,7 @@ func runExtract(
 					if v.VersionString.Valid {
 						fmt.Println(style.Subtle.Render("  " + v.VersionString.String))
 					} else {
-						fmt.Println(style.Subtle.Render("  (no version) " + v.ArchiveSha256[:16] + "..."))
+						fmt.Println(style.Subtle.Render("  (no version) " + style.ShortSha(v.ArchiveSha256)))
 					}
 				}
 				return fmt.Errorf("mod file version not found")
@@ -358,7 +358,7 @@ func runExtract(
 				if v.VersionString.Valid {
 					fmt.Println(style.Subtle.Render("  " + v.VersionString.String))
 				} else {
-					fmt.Println(style.Subtle.Render("  (no version) " + v.ArchiveSha256[:16] + "..."))
+					fmt.Println(style.Subtle.Render("  (no version) " + style.ShortSha(v.ArchiveSha256)))
 				}
 			}
 			return fmt.Errorf("ambiguous version selection")

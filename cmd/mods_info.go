@@ -334,6 +334,9 @@ func renderModInfo(
 	inventories map[int64]versionInventory,
 	showInventory bool,
 ) string {
+	kv := style.KV{Indent: 2, Width: 16}
+	kvIndented := style.KV{Indent: 6, Width: 16}
+
 	var b strings.Builder
 
 	// header card
@@ -350,7 +353,7 @@ func renderModInfo(
 		headerContent += "\n" + style.Subtle.Render(internal.FormatNotesLines(mp.Notes.String))
 	}
 	headerContent += "\n" + style.Subtle.Render(fmt.Sprintf(
-		"added: %s", formatAge(mustParseTime(mp.CreatedAt)),
+		"added: %s", style.Age(mustParseTime(mp.CreatedAt)),
 	))
 	b.WriteString(style.Card.Render(headerContent))
 	b.WriteString("\n")
@@ -358,26 +361,26 @@ func renderModInfo(
 	// nexus section
 	if mp.SourceKind == "nexus" && mp.NexusGameDomain.Valid && mp.NexusModID.Valid {
 		b.WriteString(style.Section.Render("Nexus") + "\n")
-		writeKV16(&b, "mod page:", fmt.Sprintf(
+		kv.Write(&b, "mod page:", fmt.Sprintf(
 			"https://www.nexusmods.com/%s/mods/%d",
 			mp.NexusGameDomain.String, mp.NexusModID.Int64,
 		))
 		if nexusModInfo != nil {
 			if nexusModInfo.Author.Valid {
-				writeKV16(&b, "author:", nexusModInfo.Author.String)
+				kv.Write(&b, "author:", nexusModInfo.Author.String)
 			}
 			if nexusModInfo.Summary.Valid {
-				writeKV16(&b, "summary:", nexusModInfo.Summary.String)
+				kv.Write(&b, "summary:", nexusModInfo.Summary.String)
 			}
 			fetchedAt, err := time.Parse(time.RFC3339, nexusModInfo.FetchedAt)
 			if err == nil {
-				writeKV16(&b, "info fetched:", style.Subtle.Render(formatAge(fetchedAt)))
+				kv.Write(&b, "info fetched:", style.Subtle.Render(style.Age(fetchedAt)))
 			}
 			if !nexusModInfo.IsAvailable.Valid || nexusModInfo.IsAvailable.Int64 == 0 {
-				writeKV16(&b, "status:", style.Warning.Render("⚠ mod unavailable on Nexus"))
+				kv.Write(&b, "status:", style.Warning.Render("⚠ mod unavailable on Nexus"))
 			}
 		} else {
-			writeKV16(&b, "cached info:", style.Subtle.Render("(run 'mods nexus check-updates' to fetch)"))
+			kv.Write(&b, "cached info:", style.Subtle.Render("(run 'mods nexus check-updates' to fetch)"))
 		}
 	}
 
@@ -416,22 +419,22 @@ func renderModInfo(
 			if g.isPrimary {
 				fileHeader += "  " + style.PrimaryTag.Render("(primary)")
 			}
-			writeKV16(&b, fmt.Sprintf("  [file %d]", g.fileID), fileHeader)
+			kv.Write(&b, fmt.Sprintf("  [file %d]", g.fileID), fileHeader)
 
 			for _, v := range g.versions {
 				b.WriteString(fmt.Sprintf("    version %d", v.ModFileVersionID) + "\n")
 
 				if v.VersionString.Valid {
-					writeKVIndented16(&b, "  version:", v.VersionString.String)
+					kvIndented.Write(&b, "  version:", v.VersionString.String)
 				} else {
-					writeKVIndented16(&b, "  version:", style.Subtle.Render("(none)"))
+					kvIndented.Write(&b, "  version:", style.Subtle.Render("(none)"))
 				}
 
-				writeKVIndented16(&b, "  archive:", truncateSha(v.ArchiveSha256))
-				writeKVIndented16(&b, "  size:", formatBytes(v.SizeBytes))
+				kvIndented.Write(&b, "  archive:", style.ShortSha(v.ArchiveSha256))
+				kvIndented.Write(&b, "  size:", style.Bytes(v.SizeBytes))
 
 				if v.OriginalName.Valid {
-					writeKVIndented16(&b, "  filename:", style.Subtle.Render(v.OriginalName.String))
+					kvIndented.Write(&b, "  filename:", style.Subtle.Render(v.OriginalName.String))
 				}
 
 				// nexus file link state
@@ -439,39 +442,39 @@ func renderModInfo(
 					if info, ok := nexusFileInfos[v.ModFileVersionID]; ok {
 						_, isSuperseded := superseded[v.NexusFileID.Int64]
 						if isSuperseded && info.UpdateAlreadyImported {
-							writeKVIndented16(&b, "  nexus version:",
+							kvIndented.Write(&b, "  nexus version:",
 								style.Subtle.Render(fmt.Sprintf("%s (superseded)", info.Version)))
 						} else if isSuperseded || info.HasUpdate {
-							writeKVIndented16(&b, "  nexus version:",
+							kvIndented.Write(&b, "  nexus version:",
 								style.UpdateAvailable.Render(fmt.Sprintf("%s ↑ update available → %s",
 									info.Version, info.LatestVersion)))
 						} else {
-							writeKVIndented16(&b, "  nexus version:",
+							kvIndented.Write(&b, "  nexus version:",
 								fmt.Sprintf("%s ✓ %s",
 									info.Version,
-									style.Subtle.Render(fmt.Sprintf("(last fetched %s)", formatAge(info.FetchedAt))),
+									style.Subtle.Render(fmt.Sprintf("(last fetched %s)", style.Age(info.FetchedAt))),
 								))
 						}
 					} else {
-						writeKVIndented16(&b, "  nexus version:",
+						kvIndented.Write(&b, "  nexus version:",
 							style.Subtle.Render("(run 'mods nexus check-updates' to fetch)"))
 					}
 				} else if mp.SourceKind == "nexus" {
-					writeKVIndented16(&b, "  nexus link:",
+					kvIndented.Write(&b, "  nexus link:",
 						style.Warning.Render("⚠ unlinked (run 'mods nexus link' to resolve)"))
 				}
 
 				// profile membership
 				memberships := versionProfiles[v.ModFileVersionID]
 				if len(memberships) == 0 {
-					writeKVIndented16(&b, "  profiles:", style.Subtle.Render("(not in any profile)"))
+					kvIndented.Write(&b, "  profiles:", style.Subtle.Render("(not in any profile)"))
 				} else {
 					for _, m := range memberships {
 						tag := style.Active.Render("enabled")
 						if !m.Enabled {
 							tag = style.Inactive.Render("disabled")
 						}
-						writeKVIndented16(&b, "  profiles:",
+						kvIndented.Write(&b, "  profiles:",
 							fmt.Sprintf("%s [priority %d] %s",
 								m.ProfileName, m.Priority, tag,
 							))
@@ -481,9 +484,9 @@ func renderModInfo(
 				if showInventory {
 					inv := inventories[v.ModFileVersionID]
 					if !inv.Scanned {
-						writeKVIndented16(&b, "  inventory:", style.Subtle.Render("(not scanned; run 'mods scan-inventory')"))
+						kvIndented.Write(&b, "  inventory:", style.Subtle.Render("(not scanned; run 'mods scan-inventory')"))
 					} else {
-						writeKVIndented16(&b, "  inventory:", fmt.Sprintf("%d file(s)", len(inv.Entries)))
+						kvIndented.Write(&b, "  inventory:", fmt.Sprintf("%d file(s)", len(inv.Entries)))
 						for _, e := range inv.Entries {
 							path := ""
 							if e.RawPath.Valid {
@@ -491,7 +494,7 @@ func renderModInfo(
 							}
 							size := ""
 							if e.SizeBytes.Valid {
-								size = style.Subtle.Render(fmt.Sprintf("  %s", formatBytes(e.SizeBytes.Int64)))
+								size = style.Subtle.Render(fmt.Sprintf("  %s", style.Bytes(e.SizeBytes.Int64)))
 							}
 							b.WriteString(fmt.Sprintf("      %s%s\n", path, size))
 						}

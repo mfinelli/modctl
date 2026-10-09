@@ -113,7 +113,7 @@ Examples:
 			st, _ := os.Stat(exportOutput)
 			fmt.Println(style.Success.Render(fmt.Sprintf("  ✓ export complete in %.1fs", time.Since(start).Seconds())))
 			if st != nil {
-				fmt.Println(style.Subtle.Render(fmt.Sprintf("  size: %s", formatBytes(st.Size()))))
+				fmt.Println(style.Subtle.Render(fmt.Sprintf("  size: %s", style.Bytes(st.Size()))))
 			}
 			return nil
 		}
@@ -144,7 +144,7 @@ Examples:
 		st, _ := os.Stat(exportOutput)
 		fmt.Println(style.Success.Render(fmt.Sprintf("  ✓ export complete in %.1fs", time.Since(start).Seconds())))
 		if st != nil {
-			fmt.Println(style.Subtle.Render(fmt.Sprintf("  size: %s", formatBytes(st.Size()))))
+			fmt.Println(style.Subtle.Render(fmt.Sprintf("  size: %s", style.Bytes(st.Size()))))
 		}
 
 		return nil

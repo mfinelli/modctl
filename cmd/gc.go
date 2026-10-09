@@ -163,7 +163,7 @@ Use --dry-run to preview what would be removed without making any changes.`,
 					}
 					fmt.Printf("  %s\n",
 						style.Success.Render(fmt.Sprintf("%s %d unreferenced blob(s) (%s)",
-							action, res.removed, formatBytes(res.removedBytes))))
+							action, res.removed, style.Bytes(res.removedBytes))))
 				}
 				if res.orphans > 0 {
 					action := "removed"
@@ -172,7 +172,7 @@ Use --dry-run to preview what would be removed without making any changes.`,
 					}
 					fmt.Printf("  %s\n",
 						style.Success.Render(fmt.Sprintf("%s %d orphan file(s) (%s)",
-							action, res.orphans, formatBytes(res.orphanBytes))))
+							action, res.orphans, style.Bytes(res.orphanBytes))))
 				}
 				if res.missingCleaned > 0 {
 					action := "cleaned"
@@ -202,10 +202,10 @@ Use --dry-run to preview what would be removed without making any changes.`,
 			freed := totalRemovedBytes + totalOrphanBytes
 			if gcDryRun {
 				fmt.Printf("  would free %s across %d blob(s)\n",
-					formatBytes(freed), totalRemoved+totalOrphans)
+					style.Bytes(freed), totalRemoved+totalOrphans)
 			} else {
 				fmt.Printf("  freed %s across %d blob(s)\n",
-					formatBytes(freed), totalRemoved+totalOrphans)
+					style.Bytes(freed), totalRemoved+totalOrphans)
 			}
 			if totalMissingCleaned > 0 {
 				fmt.Printf("  %s\n",
@@ -280,7 +280,7 @@ func runGC(
 			if err == nil && createdAt.After(cutoff) {
 				fmt.Printf("  %s %s %s\n",
 					style.Subtle.Render("~"),
-					b.Sha256[:16]+"...",
+					style.ShortSha(b.Sha256),
 					style.Subtle.Render("(skipped, too new)"))
 				continue
 			}
@@ -297,7 +297,7 @@ func runGC(
 				res.missing++
 				fmt.Printf("  %s %s %s\n",
 					style.Warning.Render("?"),
-					b.Sha256[:16]+"...",
+					style.ShortSha(b.Sha256),
 					style.Warning.Render("(db row exists but file missing from disk)"))
 				if opts.cleanMissing {
 					if !opts.dryRun {
@@ -321,7 +321,7 @@ func runGC(
 			return res, fmt.Errorf("stat %s: %w", path, statErr)
 		}
 
-		name := b.Sha256[:16] + "..."
+		name := style.ShortSha(b.Sha256)
 		if b.OriginalName.Valid {
 			name = fmt.Sprintf("%s %s", b.OriginalName.String, style.Subtle.Render("("+b.Sha256[:16]+"...)"))
 		}
@@ -330,7 +330,7 @@ func runGC(
 			fmt.Printf("  %s %s %s\n",
 				style.DryRun.Render("-"),
 				name,
-				style.Subtle.Render(formatBytes(st.Size())))
+				style.Subtle.Render(style.Bytes(st.Size())))
 		} else {
 			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 				return res, fmt.Errorf("remove blob file %s: %w", path, err)
@@ -349,7 +349,7 @@ func runGC(
 			fmt.Printf("  %s %s %s\n",
 				style.Removed.Render("-"),
 				name,
-				style.Subtle.Render(formatBytes(st.Size())))
+				style.Subtle.Render(style.Bytes(st.Size())))
 		}
 
 		res.removed++
@@ -373,15 +373,15 @@ func runGC(
 			if !cutoff.IsZero() && o.modTime.After(cutoff) {
 				fmt.Printf("  %s %s %s\n",
 					style.Subtle.Render("~"),
-					o.sha256[:16]+"...",
+					style.ShortSha(o.sha256),
 					style.Subtle.Render("(orphan skipped, too new)"))
 				continue
 			}
 
 			fmt.Printf("  %s %s %s %s\n",
 				style.Warning.Render("!"),
-				o.sha256[:16]+"...",
-				style.Subtle.Render(formatBytes(o.size)),
+				style.ShortSha(o.sha256),
+				style.Subtle.Render(style.Bytes(o.size)),
 				style.Warning.Render("(orphan: no db row)"))
 
 			if opts.dryRun {

@@ -40,6 +40,8 @@ default value.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		kv := style.KV{Indent: 2, Width: 16}
+
 		configPath := viper.ConfigFileUsed()
 		if configPath == "" {
 			configPath = filepath.Join(xdg.ConfigHome, "modctl", "config.toml")
@@ -62,7 +64,7 @@ default value.`,
 				origin = style.Subtle.Render("(set)")
 			}
 
-			fmt.Printf("  %s %s  %s\n", style.Label.Width(16).Render(key+":"), value, origin)
+			kv.Print(key+":", value+"  "+origin)
 		}
 
 		return nil

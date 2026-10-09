@@ -47,6 +47,8 @@ Run 'profiles overrides status' for full staleness detail.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		kvIndented := style.KV{Indent: 6, Width: 16}
+
 		ctx := cmd.Context()
 
 		if err := internal.EnsureDBExists(); err != nil {
@@ -129,12 +131,12 @@ Run 'profiles overrides status' for full staleness detail.`,
 			}
 
 			fmt.Printf("  %s%s\n", o.Relpath, statusTag)
-			fmt.Printf("      %s %s\n", style.Label.Width(16).Render("type:"), formatOverrideType(o.OverrideType))
+			kvIndented.Print("type:", formatOverrideType(o.OverrideType))
 			if o.BlobSha256.Valid {
-				fmt.Printf("      %s %s\n", style.Label.Width(16).Render("blob:"), truncateSha(o.BlobSha256.String))
+				kvIndented.Print("blob:", style.ShortSha(o.BlobSha256.String))
 			}
 			if o.Notes.Valid && strings.TrimSpace(o.Notes.String) != "" {
-				fmt.Printf("      %s %s\n", style.Label.Width(16).Render("notes:"), o.Notes.String)
+				kvIndented.Print("notes:", o.Notes.String)
 			}
 			fmt.Println()
 		}

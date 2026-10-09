@@ -215,6 +215,9 @@ func renderProfileStatus(
 	staleOverrides []dbq.GetStalenessHeuristicForProfileRow,
 	compact bool,
 ) string {
+	kv := style.KV{Indent: 2, Width: 16}
+	kvIndented := style.KV{Indent: 6, Width: 16}
+
 	var b strings.Builder
 
 	// header card
@@ -248,14 +251,14 @@ func renderProfileStatus(
 				appliedState.AppliedAt.String, pendingText))
 		} else {
 			b.WriteString(style.Section.Render("Apply State") + "\n")
-			writeKV16(&b, "Applied at:", appliedState.AppliedAt.String)
+			kv.Write(&b, "Applied at:", appliedState.AppliedAt.String)
 			if appliedState.AppliedOperationID.Valid {
-				writeKV16(&b, "Operation:", fmt.Sprintf("#%d", appliedState.AppliedOperationID.Int64))
+				kv.Write(&b, "Operation:", fmt.Sprintf("#%d", appliedState.AppliedOperationID.Int64))
 			}
 			if hasPendingChanges {
-				writeKV16(&b, "Pending changes:", style.Warning.Render("yes ⚠"))
+				kv.Write(&b, "Pending changes:", style.Warning.Render("yes ⚠"))
 			} else {
-				writeKV16(&b, "Pending changes:", style.Subtle.Render("none"))
+				kv.Write(&b, "Pending changes:", style.Subtle.Render("none"))
 			}
 		}
 	}
@@ -305,47 +308,47 @@ func renderProfileStatus(
 			b.WriteString(modLine + "\n")
 
 			// nested KV fields
-			writeKVIndented16(&b, "file:", item.FileLabel)
+			kvIndented.Write(&b, "file:", item.FileLabel)
 
 			if item.VersionString.Valid {
-				writeKVIndented16(&b, "version:", item.VersionString.String)
+				kvIndented.Write(&b, "version:", item.VersionString.String)
 			} else {
-				writeKVIndented16(&b, "version:", style.Subtle.Render("(none)"))
+				kvIndented.Write(&b, "version:", style.Subtle.Render("(none)"))
 			}
 
 			if item.NexusFileID.Valid {
 				if info, ok := nexusInfo[item.ModFileVersionID]; ok {
 					if info.HasUpdate {
-						writeKVIndented16(&b, "nexus version:",
+						kvIndented.Write(&b, "nexus version:",
 							style.UpdateAvailable.Render(fmt.Sprintf("%s ↑ update available", info.LatestVersion)))
 					} else {
-						writeKVIndented16(&b, "nexus version:",
+						kvIndented.Write(&b, "nexus version:",
 							fmt.Sprintf("%s ✓ %s",
 								info.CachedVersion,
-								style.Subtle.Render(fmt.Sprintf("(last fetched %s)", formatAge(info.FetchedAt))),
+								style.Subtle.Render(fmt.Sprintf("(last fetched %s)", style.Age(info.FetchedAt))),
 							))
 					}
 				} else {
-					writeKVIndented16(&b, "nexus version:",
+					kvIndented.Write(&b, "nexus version:",
 						style.Subtle.Render("(run 'mods nexus check-updates' to fetch)"))
 				}
 			}
 
-			writeKVIndented16(&b, "archive:", truncateSha(item.ArchiveSha256))
-			writeKVIndented16(&b, "size:", formatBytes(item.SizeBytes))
+			kvIndented.Write(&b, "archive:", style.ShortSha(item.ArchiveSha256))
+			kvIndented.Write(&b, "size:", style.Bytes(item.SizeBytes))
 
 			if item.ItemNotes.Valid && strings.TrimSpace(item.ItemNotes.String) != "" {
-				writeKVIndented16(&b, "notes:", item.ItemNotes.String)
+				kvIndented.Write(&b, "notes:", item.ItemNotes.String)
 			}
 
 			if item.RemapRuleCount > 0 {
-				writeKVIndented16(&b, "remap rules:",
+				kvIndented.Write(&b, "remap rules:",
 					style.Subtle.Render(fmt.Sprintf("%d active (run 'profiles remap list %d' to view)",
 						item.RemapRuleCount, item.ModFileVersionID)))
 			}
 
 			if item.TargetName != "game_dir" {
-				writeKVIndented16(&b, "target:", item.TargetName)
+				kvIndented.Write(&b, "target:", item.TargetName)
 			}
 
 			b.WriteString("\n")
@@ -544,60 +547,4 @@ func buildNexusInfo(
 	}
 
 	return result
-}
-
-// truncateSha returns the first 16 hex characters of a sha256 followed by "..."
-func truncateSha(sha string) string {
-	if len(sha) <= 16 {
-		return sha
-	}
-	return sha[:16] + "..."
-}
-
-// formatBytes renders a byte count as a human-readable size string
-func formatBytes(b int64) string {
-	const unit = 1024
-	if b < unit {
-		return fmt.Sprintf("%d B", b)
-	}
-	div, exp := int64(unit), 0
-	for n := b / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
-}
-
-func formatAge(t time.Time) string {
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		if int(d.Minutes()) == 1 {
-			return "1 minute ago"
-		} else {
-			return fmt.Sprintf("%d minutes ago", int(d.Minutes()))
-		}
-	case d < 24*time.Hour:
-		if int(d.Hours()) == 1 {
-			return "1 hour ago"
-		} else {
-			return fmt.Sprintf("%d hours ago", int(d.Hours()))
-		}
-	default:
-		if int(d.Hours()/24) == 1 {
-			return "1 day ago"
-		} else {
-			return fmt.Sprintf("%d days ago", int(d.Hours()/24))
-		}
-	}
-}
-
-func writeKV16(b *strings.Builder, label, value string) {
-	b.WriteString("  " + style.Label.Width(16).Render(label) + " " + value + "\n")
-}
-
-func writeKVIndented16(b *strings.Builder, label, value string) {
-	b.WriteString("      " + style.Label.Width(16).Render(label) + " " + value + "\n")
 }

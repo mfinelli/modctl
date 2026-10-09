@@ -103,6 +103,8 @@ func init() {
 }
 
 func renderIncompatibilityList(pairs []dbq.ListModIncompatibilitiesRow) string {
+	kvIndented := style.KV{Indent: 6, Width: 12}
+
 	var b strings.Builder
 
 	b.WriteString(style.Section.Render(fmt.Sprintf("Incompatibilities (%d)", len(pairs))) + "\n")
@@ -116,9 +118,9 @@ func renderIncompatibilityList(pairs []dbq.ListModIncompatibilitiesRow) string {
 		b.WriteString(fmt.Sprintf("  %s\n",
 			style.Warning.Render(fmt.Sprintf("⚠  %s × %s",
 				pair.ModPageNameA, pair.ModPageNameB))))
-		writeKVIndented(&b, "ids:", fmt.Sprintf("%d, %d", pair.ModPageIDA, pair.ModPageIDB))
+		kvIndented.Write(&b, "ids:", fmt.Sprintf("%d, %d", pair.ModPageIDA, pair.ModPageIDB))
 		if pair.Reason.Valid && strings.TrimSpace(pair.Reason.String) != "" {
-			writeKVIndented(&b, "reason:", pair.Reason.String)
+			kvIndented.Write(&b, "reason:", pair.Reason.String)
 		}
 		b.WriteString("\n")
 	}

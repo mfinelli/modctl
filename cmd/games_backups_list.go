@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/charmbracelet/lipgloss/table"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
@@ -101,16 +100,13 @@ not install. They are restored automatically on unapply.`,
 			rows = append(rows, []string{
 				fmt.Sprintf(" %s ", b.TargetName),
 				fmt.Sprintf(" %s ", b.Relpath),
-				fmt.Sprintf(" %s ", formatBytes(b.SizeBytes)),
+				fmt.Sprintf(" %s ", style.Bytes(b.SizeBytes)),
 				fmt.Sprintf(" %s ", b.CreatedAt),
 				fmt.Sprintf(" %s ", opInfo),
 			})
 		}
 
-		t := table.New().
-			Headers(" Target ", " Path ", " Size ", " Backed Up At ", " Operation ").
-			Rows(rows...)
-		fmt.Println(t)
+		fmt.Println(style.Table([]string{" Target ", " Path ", " Size ", " Backed Up At ", " Operation "}, rows))
 		return nil
 	},
 }

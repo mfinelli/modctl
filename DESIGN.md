@@ -1430,6 +1430,12 @@ and state (`Added`, `Removed`, `Changed`, `Restored`, `Unchanged`, `Active`,
 yet adds one rather than using a palette color directly, so that restyling a
 function is a one-line change in `roles.go`.
 
+The package also holds how output is laid out and formatted, so that every
+command does it the same way and it can be tested in one place: `KV` for
+aligned label/value lines (one `KV` per group of lines, sized to the longest
+label), `Table` for tables, and `Bytes`, `Age`, `Duration` and `ShortSha` for
+sizes, times and hashes.
+
 ### command-specifc information
 
 #### `profiles delete`

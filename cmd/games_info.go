@@ -104,6 +104,10 @@ func init() {
 
 func renderGameInfo(gi dbq.GameInstall, targets []dbq.Target, profiles []dbq.Profile, isCurrentContext bool) string {
 	// Header card
+	kv := style.KV{Indent: 2, Width: 12}
+	kvInactive := style.KV{Indent: 6, Width: 12, Dim: true}
+	kvIndented := style.KV{Indent: 6, Width: 12}
+
 	fullSel := internal.FullSelector(gi.StoreID, gi.StoreGameID, gi.InstanceID)
 	shortSel := internal.ShortSelector(gi.StoreID, gi.StoreGameID, gi.InstanceID)
 	selText := fullSel
@@ -133,20 +137,20 @@ func renderGameInfo(gi dbq.GameInstall, targets []dbq.Target, profiles []dbq.Pro
 
 	// Install section
 	b.WriteString(style.Section.Render("Install") + "\n")
-	writeKV(&b, "ID:", fmt.Sprintf("%d", gi.ID))
-	writeKV(&b, "Store:", gi.StoreID)
-	writeKV(&b, "Store ID:", gi.StoreGameID)
-	writeKV(&b, "Instance:", gi.InstanceID)
-	writeKV(&b, "Path:", gi.InstallRoot)
+	kv.Write(&b, "ID:", fmt.Sprintf("%d", gi.ID))
+	kv.Write(&b, "Store:", gi.StoreID)
+	kv.Write(&b, "Store ID:", gi.StoreGameID)
+	kv.Write(&b, "Instance:", gi.InstanceID)
+	kv.Write(&b, "Path:", gi.InstallRoot)
 
 	present := "yes"
 	if gi.IsPresent == 0 {
 		present = "no"
 	}
-	writeKV(&b, "Present:", present)
+	kv.Write(&b, "Present:", present)
 
 	if gi.LastSeenAt.Valid {
-		writeKV(&b, "Last seen:", gi.LastSeenAt.String)
+		kv.Write(&b, "Last seen:", gi.LastSeenAt.String)
 	}
 
 	// Notes
@@ -162,10 +166,10 @@ func renderGameInfo(gi dbq.GameInstall, targets []dbq.Target, profiles []dbq.Pro
 	} else {
 		for _, t := range targets {
 			b.WriteString("  • " + t.Name + "\n")
-			writeKVIndented(&b, "path:", t.RootPath)
-			writeKVIndented(&b, "origin:", t.Origin)
+			kvIndented.Write(&b, "path:", t.RootPath)
+			kvIndented.Write(&b, "origin:", t.Origin)
 			if !internal.TargetEnabled(t) {
-				writeKVIndented(&b, "state:", "disabled")
+				kvIndented.Write(&b, "state:", "disabled")
 			}
 		}
 	}
@@ -192,7 +196,7 @@ func renderGameInfo(gi dbq.GameInstall, targets []dbq.Target, profiles []dbq.Pro
 			b.WriteString(style.Inactive.Render(line) + "\n")
 
 			if p.Description.Valid && strings.TrimSpace(p.Description.String) != "" {
-				writeKVIndentedInactive(&b, "description:", p.Description.String)
+				kvInactive.Write(&b, "description:", p.Description.String)
 			}
 
 			b.WriteString("\n")
@@ -200,17 +204,4 @@ func renderGameInfo(gi dbq.GameInstall, targets []dbq.Target, profiles []dbq.Pro
 	}
 
 	return strings.TrimRight(b.String(), "\n")
-}
-
-func writeKV(b *strings.Builder, label, value string) {
-	b.WriteString("  " + style.Label.Width(12).Render(label) + " " + value + "\n")
-}
-
-func writeKVIndented(b *strings.Builder, label, value string) {
-	b.WriteString("      " + style.Label.Width(12).Render(label) + " " + value + "\n")
-}
-
-func writeKVIndentedInactive(b *strings.Builder, label, value string) {
-	line := "      " + style.Label.Width(12).Render(label) + " " + value + "\n"
-	b.WriteString(style.Inactive.Render(line))
 }

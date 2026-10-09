@@ -16,12 +16,14 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-// Package style holds every terminal style modctl prints with, so that no
-// command defines its own. It has two layers:
+// Package style holds how modctl looks in a terminal, so that no command
+// formats its own output:
 //
-//   - the palette (palette.go): named ANSI colors, each of which is a Style;
-//   - the roles (roles.go): styles named for what they are used for, defined in
-//     terms of the palette.
+//   - the styles, in two layers: the palette (palette.go) of named ANSI colors,
+//     and the roles (roles.go), styles named for what they are used for and
+//     defined in terms of the palette;
+//   - aligned label/value lines (kv.go) and tables (table.go);
+//   - formatting of sizes, times and hashes (format.go).
 //
 // Commands should use a role. If a function has no role yet, add one rather
 // than reaching for a palette color, so that restyling a function is a

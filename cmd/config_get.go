@@ -42,6 +42,8 @@ Valid keys:
 	SilenceUsage: true,
 	ValidArgs:    knownConfigKeys,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		kv := style.KV{Indent: 2, Width: 16}
+
 		key := args[0]
 		if !slices.Contains(knownConfigKeys, key) {
 			return fmt.Errorf("unknown config key %q\n  valid keys: %s", key, strings.Join(knownConfigKeys, ", "))
@@ -53,7 +55,7 @@ Valid keys:
 			origin = style.Subtle.Render("(set)")
 		}
 
-		fmt.Printf("  %s %s  %s\n", style.Label.Width(16).Render(key+":"), value, origin)
+		kv.Print(key+":", value+"  "+origin)
 		return nil
 	},
 }

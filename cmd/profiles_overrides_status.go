@@ -49,6 +49,8 @@ Pass a path argument to show detail for a single override only.`,
 	Args:         cobra.MaximumNArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		kvIndented := style.KV{Indent: 6, Width: 20}
+
 		ctx := cmd.Context()
 
 		if err := internal.EnsureDBExists(); err != nil {
@@ -122,49 +124,45 @@ Pass a path argument to show detail for a single override only.`,
 			fmt.Println()
 			fmt.Printf("  %s\n", style.Bold.Render(r.Relpath))
 
-			fmt.Printf("      %s %s\n", style.Label.Width(20).Render("type:"), formatOverrideType(r.OverrideType))
+			kvIndented.Print("type:", formatOverrideType(r.OverrideType))
 
 			// staleness state with explanation
 			stateStr, explanation := formatStalenessState(r.StalenessState)
-			fmt.Printf("      %s %s\n", style.Label.Width(20).Render("status:"), stateStr)
+			kvIndented.Print("status:", stateStr)
 			if explanation != "" {
-				fmt.Printf("      %s %s\n", style.Label.Width(20).Render(""), style.Subtle.Render(explanation))
+				kvIndented.Print("", style.Subtle.Render(explanation))
 			}
 
 			// source anchor
 			if r.SourceArchiveSha256.Valid {
-				fmt.Printf("      %s %s\n", style.Label.Width(20).Render("source archive:"),
-					truncateSha(r.SourceArchiveSha256.String))
+				kvIndented.Print("source archive:", style.ShortSha(r.SourceArchiveSha256.String))
 			}
 			if r.SourceRawPath.Valid {
-				fmt.Printf("      %s %s\n", style.Label.Width(20).Render("source path:"),
-					r.SourceRawPath.String)
+				kvIndented.Print("source path:", r.SourceRawPath.String)
 			}
 
 			// current base
 			if r.CurrentArchiveSha256 != "" {
 				same := r.SourceArchiveSha256.Valid &&
 					r.CurrentArchiveSha256 == r.SourceArchiveSha256.String
-				currentStr := truncateSha(r.CurrentArchiveSha256)
+				currentStr := style.ShortSha(r.CurrentArchiveSha256)
 				if same {
 					currentStr += "  " + style.Subtle.Render("(unchanged)")
 				} else if r.SourceArchiveSha256.Valid {
 					currentStr += "  " + style.Warning.Render("(changed)")
 				}
-				fmt.Printf("      %s %s\n", style.Label.Width(20).Render("current base:"), currentStr)
+				kvIndented.Print("current base:", currentStr)
 			} else if r.SourceArchiveSha256.Valid {
-				fmt.Printf("      %s %s\n", style.Label.Width(20).Render("current base:"),
-					style.Warning.Render("(none — base mod removed from profile)"))
+				kvIndented.Print("current base:", style.Warning.Render("(none — base mod removed from profile)"))
 			}
 
 			if r.BlobSha256.Valid {
-				fmt.Printf("      %s %s\n", style.Label.Width(20).Render("blob:"),
-					truncateSha(r.BlobSha256.String))
+				kvIndented.Print("blob:", style.ShortSha(r.BlobSha256.String))
 			}
 			if r.Notes.Valid && strings.TrimSpace(r.Notes.String) != "" {
-				fmt.Printf("      %s %s\n", style.Label.Width(20).Render("notes:"), r.Notes.String)
+				kvIndented.Print("notes:", r.Notes.String)
 			}
-			fmt.Printf("      %s %s\n", style.Label.Width(20).Render("updated:"), r.UpdatedAt)
+			kvIndented.Print("updated:", r.UpdatedAt)
 		}
 
 		// summary line

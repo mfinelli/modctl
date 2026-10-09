@@ -89,6 +89,8 @@ func renderOperationDetail(
 	op dbq.GetOperationByIDRow,
 	changes []dbq.OperationChange,
 ) string {
+	kv := style.KV{Indent: 2, Width: 16}
+
 	var b strings.Builder
 
 	// Header
@@ -99,24 +101,24 @@ func renderOperationDetail(
 	b.WriteString(style.Bold.Render(fmt.Sprintf("Operation #%d — %s %s", op.ID, op.OpType, gameName)))
 	b.WriteString("\n\n")
 
-	writeKV16(&b, "Status:", op.Status)
-	writeKV16(&b, "Started:", op.StartedAt)
+	kv.Write(&b, "Status:", op.Status)
+	kv.Write(&b, "Started:", op.StartedAt)
 	if op.FinishedAt.Valid {
 		t1, err1 := time.Parse("2006-01-02T15:04:05.000Z", op.StartedAt)
 		t2, err2 := time.Parse("2006-01-02T15:04:05.000Z", op.FinishedAt.String)
 		if err1 == nil && err2 == nil {
-			writeKV16(&b, "Finished:", fmt.Sprintf("%s  %s",
+			kv.Write(&b, "Finished:", fmt.Sprintf("%s  %s",
 				op.FinishedAt.String,
 				style.Subtle.Render(fmt.Sprintf("(%.1fs)", t2.Sub(t1).Seconds()))))
 		} else {
-			writeKV16(&b, "Finished:", op.FinishedAt.String)
+			kv.Write(&b, "Finished:", op.FinishedAt.String)
 		}
 	}
 	if op.ProfileName.Valid {
-		writeKV16(&b, "Profile:", op.ProfileName.String)
+		kv.Write(&b, "Profile:", op.ProfileName.String)
 	}
 	if op.Message.Valid && strings.TrimSpace(op.Message.String) != "" {
-		writeKV16(&b, "Message:", style.Warning.Render(op.Message.String))
+		kv.Write(&b, "Message:", style.Warning.Render(op.Message.String))
 	}
 
 	b.WriteString("\n")
@@ -154,9 +156,9 @@ func renderOperationDetail(
 		if c.OldContentSha256.Valid {
 			b.WriteString(fmt.Sprintf("      %s %s → ",
 				style.Subtle.Render("hash:"),
-				truncateSha(c.OldContentSha256.String)))
+				style.ShortSha(c.OldContentSha256.String)))
 			if c.NewContentSha256.Valid {
-				b.WriteString(truncateSha(c.NewContentSha256.String))
+				b.WriteString(style.ShortSha(c.NewContentSha256.String))
 			} else {
 				b.WriteString(style.Subtle.Render("(removed)"))
 			}
@@ -164,26 +166,26 @@ func renderOperationDetail(
 		} else if c.NewContentSha256.Valid {
 			b.WriteString(fmt.Sprintf("      %s %s\n",
 				style.Subtle.Render("hash:"),
-				truncateSha(c.NewContentSha256.String)))
+				style.ShortSha(c.NewContentSha256.String)))
 		}
 
 		// Sizes
 		if c.OldSizeBytes.Valid && c.NewSizeBytes.Valid {
 			b.WriteString(fmt.Sprintf("      %s %s → %s\n",
 				style.Subtle.Render("size:"),
-				formatBytes(c.OldSizeBytes.Int64),
-				formatBytes(c.NewSizeBytes.Int64)))
+				style.Bytes(c.OldSizeBytes.Int64),
+				style.Bytes(c.NewSizeBytes.Int64)))
 		} else if c.NewSizeBytes.Valid {
 			b.WriteString(fmt.Sprintf("      %s %s\n",
 				style.Subtle.Render("size:"),
-				formatBytes(c.NewSizeBytes.Int64)))
+				style.Bytes(c.NewSizeBytes.Int64)))
 		}
 
 		// Backup reference
 		if c.BackupBlobSha256.Valid {
 			b.WriteString(fmt.Sprintf("      %s %s\n",
 				style.Subtle.Render("backup:"),
-				truncateSha(c.BackupBlobSha256.String)))
+				style.ShortSha(c.BackupBlobSha256.String)))
 		}
 
 		// Override reference

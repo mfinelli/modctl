@@ -40,6 +40,8 @@ not count against your API request quota.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		kv := style.KV{Indent: 2, Width: 16}
+
 		apiKey := viper.GetString("nexus.apikey")
 		if apiKey == "" {
 			fmt.Println(style.Warning.Render("  ⚠ not authenticated"))
@@ -68,7 +70,7 @@ not count against your API request quota.`,
 		fmt.Println()
 
 		var b strings.Builder
-		b.WriteString("  " + style.Label.Width(16).Render("username:") + " " + info.Name + "\n")
+		kv.Write(&b, "username:", info.Name)
 
 		// Rate limit state was updated as a side effect of ValidateUser
 		state, err := nexusclient.LoadRateLimitState()
@@ -81,21 +83,17 @@ not count against your API request quota.`,
 
 		hourly, daily := state.EffectiveRemaining()
 
-		b.WriteString("  " + style.Label.Width(16).Render("daily quota:") + " " +
-			fmt.Sprintf("%s / %d requests remaining",
-				formatQuota(daily, state.DailyLimit),
-				state.DailyLimit,
-			) + "\n")
-		b.WriteString("  " + style.Label.Width(16).Render("") + "   " +
-			style.Subtle.Render(fmt.Sprintf("resets in %s", formatDuration(time.Until(state.DailyReset)))) + "\n")
+		kv.Write(&b, "daily quota:", fmt.Sprintf("%s / %d requests remaining",
+			formatQuota(daily, state.DailyLimit),
+			state.DailyLimit,
+		))
+		kv.Write(&b, "", "  "+style.Subtle.Render(fmt.Sprintf("resets in %s", style.Duration(time.Until(state.DailyReset)))))
 
-		b.WriteString("  " + style.Label.Width(16).Render("hourly quota:") + " " +
-			fmt.Sprintf("%s / %d requests remaining",
-				formatQuota(hourly, state.HourlyLimit),
-				state.HourlyLimit,
-			) + "\n")
-		b.WriteString("  " + style.Label.Width(16).Render("") + "   " +
-			style.Subtle.Render(fmt.Sprintf("resets in %s", formatDuration(time.Until(state.HourlyReset)))) + "\n")
+		kv.Write(&b, "hourly quota:", fmt.Sprintf("%s / %d requests remaining",
+			formatQuota(hourly, state.HourlyLimit),
+			state.HourlyLimit,
+		))
+		kv.Write(&b, "", "  "+style.Subtle.Render(fmt.Sprintf("resets in %s", style.Duration(time.Until(state.HourlyReset)))))
 
 		fmt.Print(b.String())
 		fmt.Println()
@@ -118,30 +116,5 @@ func formatQuota(remaining, limit int) string {
 		return style.Warning.Render(s)
 	default:
 		return s
-	}
-}
-
-// formatDuration renders a duration as a human-readable string, e.g.
-// "23h 4m", "47m", "30s". Negative durations (reset already passed) return
-// "now".
-func formatDuration(d time.Duration) string {
-	if d <= 0 {
-		return "now"
-	}
-	d = d.Round(time.Second)
-	h := int(d.Hours())
-	m := int(d.Minutes()) % 60
-	s := int(d.Seconds()) % 60
-	switch {
-	case h > 0 && m > 0:
-		return fmt.Sprintf("%dh %dm", h, m)
-	case h > 0:
-		return fmt.Sprintf("%dh", h)
-	case m > 0 && s > 0:
-		return fmt.Sprintf("%dm %ds", m, s)
-	case m > 0:
-		return fmt.Sprintf("%dm", m)
-	default:
-		return fmt.Sprintf("%ds", s)
 	}
 }
