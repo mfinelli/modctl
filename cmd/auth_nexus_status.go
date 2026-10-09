@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/internal/nexusclient"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -40,17 +40,10 @@ not count against your API request quota.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: extract
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("7")).Width(16)
-		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-		errStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("1"))
-		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-
 		apiKey := viper.GetString("nexus.apikey")
 		if apiKey == "" {
-			fmt.Println(warnStyle.Render("  ⚠ not authenticated"))
-			fmt.Println(subtleStyle.Render("    run `modctl auth nexus login` to authenticate"))
+			fmt.Println(style.Warning.Render("  ⚠ not authenticated"))
+			fmt.Println(style.Subtle.Render("    run `modctl auth nexus login` to authenticate"))
 			fmt.Println()
 			return nil
 		}
@@ -64,18 +57,18 @@ not count against your API request quota.`,
 
 		info, err := client.ValidateUser()
 		if err != nil {
-			fmt.Println(errStyle.Render("  ✗ API key is invalid or has been revoked"))
-			fmt.Println(subtleStyle.Render("    run `modctl auth nexus login` to re-authenticate"))
+			fmt.Println(style.Failure.Render("  ✗ API key is invalid or has been revoked"))
+			fmt.Println(style.Subtle.Render("    run `modctl auth nexus login` to re-authenticate"))
 			fmt.Println()
 			// Not returning the raw error - it's not useful to the user here
 			return fmt.Errorf("nexus API key validation failed")
 		}
 
-		fmt.Println(okStyle.Render("  ✓ authenticated with Nexus Mods"))
+		fmt.Println(style.Success.Render("  ✓ authenticated with Nexus Mods"))
 		fmt.Println()
 
 		var b strings.Builder
-		b.WriteString("  " + labelStyle.Render("username:") + " " + info.Name + "\n")
+		b.WriteString("  " + style.Label.Width(16).Render("username:") + " " + info.Name + "\n")
 
 		// Rate limit state was updated as a side effect of ValidateUser
 		state, err := nexusclient.LoadRateLimitState()
@@ -88,21 +81,21 @@ not count against your API request quota.`,
 
 		hourly, daily := state.EffectiveRemaining()
 
-		b.WriteString("  " + labelStyle.Render("daily quota:") + " " +
+		b.WriteString("  " + style.Label.Width(16).Render("daily quota:") + " " +
 			fmt.Sprintf("%s / %d requests remaining",
 				formatQuota(daily, state.DailyLimit),
 				state.DailyLimit,
 			) + "\n")
-		b.WriteString("  " + labelStyle.Render("") + "   " +
-			subtleStyle.Render(fmt.Sprintf("resets in %s", formatDuration(time.Until(state.DailyReset)))) + "\n")
+		b.WriteString("  " + style.Label.Width(16).Render("") + "   " +
+			style.Subtle.Render(fmt.Sprintf("resets in %s", formatDuration(time.Until(state.DailyReset)))) + "\n")
 
-		b.WriteString("  " + labelStyle.Render("hourly quota:") + " " +
+		b.WriteString("  " + style.Label.Width(16).Render("hourly quota:") + " " +
 			fmt.Sprintf("%s / %d requests remaining",
 				formatQuota(hourly, state.HourlyLimit),
 				state.HourlyLimit,
 			) + "\n")
-		b.WriteString("  " + labelStyle.Render("") + "   " +
-			subtleStyle.Render(fmt.Sprintf("resets in %s", formatDuration(time.Until(state.HourlyReset)))) + "\n")
+		b.WriteString("  " + style.Label.Width(16).Render("") + "   " +
+			style.Subtle.Render(fmt.Sprintf("resets in %s", formatDuration(time.Until(state.HourlyReset)))) + "\n")
 
 		fmt.Print(b.String())
 		fmt.Println()
@@ -120,9 +113,9 @@ func formatQuota(remaining, limit int) string {
 	s := fmt.Sprintf("%d", remaining)
 	switch {
 	case remaining == 0:
-		return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("1")).Render(s)
+		return style.Failure.Render(s)
 	case limit > 0 && remaining*100/limit < 20:
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render(s)
+		return style.Warning.Render(s)
 	default:
 		return s
 	}

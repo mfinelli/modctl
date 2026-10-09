@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
@@ -35,6 +34,7 @@ import (
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/nexusclient/dbc"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
 )
@@ -215,38 +215,6 @@ func renderProfileStatus(
 	staleOverrides []dbq.GetStalenessHeuristicForProfileRow,
 	compact bool,
 ) string {
-	// styles TODO extract somewhere...
-	cardBorder := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		Padding(0, 1)
-	titleStyle := lipgloss.NewStyle().
-		Bold(true)
-	selectorStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("8"))
-	sectionTitleStyle := lipgloss.NewStyle().
-		Bold(true).
-		MarginTop(1)
-	activeTagStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("10"))
-	disabledTagStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("8"))
-	subtleStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("245"))
-	infoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
-	warnStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("3"))
-	warningBanner := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("11")).
-		Border(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("11")).
-		Padding(0, 1)
-	nexusUpdateStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("11")).
-		Bold(true)
-	activeDot := lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render("●")
-	inactiveDot := lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render("○")
-
 	var b strings.Builder
 
 	// header card
@@ -256,55 +224,55 @@ func renderProfileStatus(
 	if shortSel != fullSel {
 		selText = fmt.Sprintf("%s (short: %s)", fullSel, shortSel)
 	}
-	headerContent := titleStyle.Render(profile.Name)
+	headerContent := style.Title.Render(profile.Name)
 	if profile.IsActive != 0 {
-		headerContent += "   " + activeTagStyle.Render("(active)")
+		headerContent += "   " + style.ActiveTag.Render("(active)")
 	}
-	headerContent += "\n" + selectorStyle.Render(selText)
+	headerContent += "\n" + style.Dim.Render(selText)
 	if profile.Description.Valid && strings.TrimSpace(profile.Description.String) != "" {
-		headerContent += "\n" + subtleStyle.Render(profile.Description.String)
+		headerContent += "\n" + style.Subtle.Render(profile.Description.String)
 	}
-	b.WriteString(cardBorder.Render(headerContent))
+	b.WriteString(style.Card.Render(headerContent))
 	b.WriteString("\n")
 
 	// apply state (omitted if profile has never been applied)
 	if appliedState.AppliedProfileID.Valid &&
 		appliedState.AppliedProfileID.Int64 == profile.ID {
 		if compact {
-			pendingText := subtleStyle.Render("none")
+			pendingText := style.Subtle.Render("none")
 			if hasPendingChanges {
-				pendingText = warnStyle.Render("yes ⚠")
+				pendingText = style.Warning.Render("yes ⚠")
 			}
-			b.WriteString(sectionTitleStyle.Render("Apply State") + "\n")
+			b.WriteString(style.Section.Render("Apply State") + "\n")
 			b.WriteString(fmt.Sprintf("  Applied · %s · pending changes: %s\n",
 				appliedState.AppliedAt.String, pendingText))
 		} else {
-			b.WriteString(sectionTitleStyle.Render("Apply State") + "\n")
+			b.WriteString(style.Section.Render("Apply State") + "\n")
 			writeKV16(&b, "Applied at:", appliedState.AppliedAt.String)
 			if appliedState.AppliedOperationID.Valid {
 				writeKV16(&b, "Operation:", fmt.Sprintf("#%d", appliedState.AppliedOperationID.Int64))
 			}
 			if hasPendingChanges {
-				writeKV16(&b, "Pending changes:", warnStyle.Render("yes ⚠"))
+				writeKV16(&b, "Pending changes:", style.Warning.Render("yes ⚠"))
 			} else {
-				writeKV16(&b, "Pending changes:", subtleStyle.Render("none"))
+				writeKV16(&b, "Pending changes:", style.Subtle.Render("none"))
 			}
 		}
 	}
 
 	// mods section
-	b.WriteString(sectionTitleStyle.Render(fmt.Sprintf("Mods (%d)", len(items))) + "\n")
+	b.WriteString(style.Section.Render(fmt.Sprintf("Mods (%d)", len(items))) + "\n")
 
 	if len(items) == 0 {
-		b.WriteString(subtleStyle.Render("  (none)") + "\n")
+		b.WriteString(style.Subtle.Render("  (none)") + "\n")
 	} else if compact {
 		for _, item := range items {
-			dot := inactiveDot
+			dot := style.InactiveDot()
 			if util.SqliteIntToBool(item.Enabled) {
-				dot = activeDot
+				dot = style.ActiveDot()
 			}
 
-			versionStr := subtleStyle.Render("(no version)")
+			versionStr := style.Subtle.Render("(no version)")
 			if item.VersionString.Valid {
 				versionStr = item.VersionString.String
 			}
@@ -313,26 +281,26 @@ func renderProfileStatus(
 				dot, item.Priority, item.ModPageName, item.FileLabel, versionStr)
 
 			if info, ok := nexusInfo[item.ModFileVersionID]; ok && info.HasUpdate {
-				line += "  " + nexusUpdateStyle.Render("↑")
+				line += "  " + style.UpdateAvailable.Render("↑")
 			}
 
 			if !util.SqliteIntToBool(item.Enabled) {
-				line += "   " + disabledTagStyle.Render("(disabled)")
+				line += "   " + style.Inactive.Render("(disabled)")
 			}
 
 			b.WriteString(line + "\n")
 		}
 	} else {
 		for _, item := range items {
-			dot := inactiveDot
+			dot := style.InactiveDot()
 			if util.SqliteIntToBool(item.Enabled) {
-				dot = activeDot
+				dot = style.ActiveDot()
 			}
 
 			// mod header line: ● [1] Mod Name
 			modLine := fmt.Sprintf("  %s [%d] %s", dot, item.Priority, item.ModPageName)
 			if !util.SqliteIntToBool(item.Enabled) {
-				modLine += "   " + disabledTagStyle.Render("(disabled)")
+				modLine += "   " + style.Inactive.Render("(disabled)")
 			}
 			b.WriteString(modLine + "\n")
 
@@ -342,24 +310,24 @@ func renderProfileStatus(
 			if item.VersionString.Valid {
 				writeKVIndented16(&b, "version:", item.VersionString.String)
 			} else {
-				writeKVIndented16(&b, "version:", subtleStyle.Render("(none)"))
+				writeKVIndented16(&b, "version:", style.Subtle.Render("(none)"))
 			}
 
 			if item.NexusFileID.Valid {
 				if info, ok := nexusInfo[item.ModFileVersionID]; ok {
 					if info.HasUpdate {
 						writeKVIndented16(&b, "nexus version:",
-							nexusUpdateStyle.Render(fmt.Sprintf("%s ↑ update available", info.LatestVersion)))
+							style.UpdateAvailable.Render(fmt.Sprintf("%s ↑ update available", info.LatestVersion)))
 					} else {
 						writeKVIndented16(&b, "nexus version:",
 							fmt.Sprintf("%s ✓ %s",
 								info.CachedVersion,
-								subtleStyle.Render(fmt.Sprintf("(last fetched %s)", formatAge(info.FetchedAt))),
+								style.Subtle.Render(fmt.Sprintf("(last fetched %s)", formatAge(info.FetchedAt))),
 							))
 					}
 				} else {
 					writeKVIndented16(&b, "nexus version:",
-						subtleStyle.Render("(run 'mods nexus check-updates' to fetch)"))
+						style.Subtle.Render("(run 'mods nexus check-updates' to fetch)"))
 				}
 			}
 
@@ -372,7 +340,7 @@ func renderProfileStatus(
 
 			if item.RemapRuleCount > 0 {
 				writeKVIndented16(&b, "remap rules:",
-					subtleStyle.Render(fmt.Sprintf("%d active (run 'profiles remap list %d' to view)",
+					style.Subtle.Render(fmt.Sprintf("%d active (run 'profiles remap list %d' to view)",
 						item.RemapRuleCount, item.ModFileVersionID)))
 			}
 
@@ -408,9 +376,9 @@ func renderProfileStatus(
 	}
 
 	if len(infos) > 0 {
-		b.WriteString(sectionTitleStyle.Render("Info") + "\n")
+		b.WriteString(style.Section.Render("Info") + "\n")
 		for _, info := range infos {
-			b.WriteString(infoStyle.Render(info) + "\n")
+			b.WriteString(style.Info.Render(info) + "\n")
 		}
 		b.WriteString("\n")
 	}
@@ -474,9 +442,9 @@ func renderProfileStatus(
 	}
 
 	if len(warnings) > 0 {
-		b.WriteString(sectionTitleStyle.Render("Warnings") + "\n")
+		b.WriteString(style.Section.Render("Warnings") + "\n")
 		for _, w := range warnings {
-			b.WriteString(warningBanner.Render(warnStyle.Render(w)) + "\n")
+			b.WriteString(style.Banner.Render(style.Warning.Render(w)) + "\n")
 		}
 	}
 
@@ -627,17 +595,9 @@ func formatAge(t time.Time) string {
 }
 
 func writeKV16(b *strings.Builder, label, value string) {
-	labelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("7")).
-		Width(16)
-
-	b.WriteString("  " + labelStyle.Render(label) + " " + value + "\n")
+	b.WriteString("  " + style.Label.Width(16).Render(label) + " " + value + "\n")
 }
 
 func writeKVIndented16(b *strings.Builder, label, value string) {
-	labelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("7")).
-		Width(16)
-
-	b.WriteString("      " + labelStyle.Render(label) + " " + value + "\n")
+	b.WriteString("      " + style.Label.Width(16).Render(label) + " " + value + "\n")
 }

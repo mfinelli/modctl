@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 
 	"github.com/adrg/xdg"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -43,13 +43,8 @@ visit your Nexus Mods account settings at:
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: extract
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-
 		if viper.GetString("nexus.apikey") == "" {
-			fmt.Println(warnStyle.Render("  ⚠ no Nexus Mods API key is configured"))
+			fmt.Println(style.Warning.Render("  ⚠ no Nexus Mods API key is configured"))
 			fmt.Println()
 			return nil
 		}
@@ -84,9 +79,9 @@ visit your Nexus Mods account settings at:
 			return fmt.Errorf("write config file: %w", err)
 		}
 
-		fmt.Println(okStyle.Render("  ✓ Nexus Mods API key removed"))
-		fmt.Println(subtleStyle.Render("    Note: the key is still active on Nexus Mods, to revoke it visit:"))
-		fmt.Println(subtleStyle.Render("    https://www.nexusmods.com/users/myaccount?tab=api"))
+		fmt.Println(style.Success.Render("  ✓ Nexus Mods API key removed"))
+		fmt.Println(style.Subtle.Render("    Note: the key is still active on Nexus Mods, to revoke it visit:"))
+		fmt.Println(style.Subtle.Render("    https://www.nexusmods.com/users/myaccount?tab=api"))
 		fmt.Println()
 		return nil
 	},

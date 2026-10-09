@@ -22,13 +22,13 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -47,8 +47,6 @@ not install. They are restored automatically on unapply.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-
 		ctx := cmd.Context()
 
 		if err := internal.EnsureDBExists(); err != nil {
@@ -90,7 +88,7 @@ not install. They are restored automatically on unapply.`,
 		}
 
 		if len(backups) == 0 {
-			fmt.Println(subtleStyle.Render("  no backups found"))
+			fmt.Println(style.Subtle.Render("  no backups found"))
 			return nil
 		}
 

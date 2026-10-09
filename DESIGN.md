@@ -1410,6 +1410,26 @@ Key behavior:
 - apply performs reconciliation
 - always support --dry-run where destructive
 
+### Terminal output styling
+
+All terminal styling lives in `internal/style`; no command defines its own
+styles (a test fails if `lipgloss.NewStyle()` appears anywhere else). The
+package has two layers:
+
+- the **palette**: the ANSI colors modctl uses, with the bright variants named
+  separately (`Green` and `BrightGreen`, and so on);
+- the **roles**: styles named for what they are used for, defined in terms of the
+  palette. Commands use roles.
+
+The roles follow how the output is used. Lines that report how something went
+(`Success`, `Failure`, `Warning`, `Info`) use the plain colors. Per-item markers
+and state (`Added`, `Removed`, `Changed`, `Restored`, `Unchanged`, `Active`,
+`Inactive`, `Good`, `Bad`, `Pending`) use the bright colors. Text roles
+(`Subtle`, `Dim`, `Label`, `Header`, `Section`, `Bold`) and the containers
+(`Card`, `Banner`) round it out. A command that needs a style that has no role
+yet adds one rather than using a palette color directly, so that restyling a
+function is a one-line change in `roles.go`.
+
 ### command-specifc information
 
 #### `profiles delete`

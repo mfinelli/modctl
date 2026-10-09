@@ -32,8 +32,8 @@ import (
 
 	"github.com/adrg/xdg"
 	"github.com/andygrunwald/vdf"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
+	"github.com/mfinelli/modctl/internal/style"
 	"go.finelli.dev/util"
 )
 
@@ -54,22 +54,12 @@ type RefreshResult struct {
 	Warnings []string
 }
 
-type RefreshStyles struct {
-	Bold   lipgloss.Style
-	Subtle lipgloss.Style
-	Warn   lipgloss.Style
-	Green  lipgloss.Style
-	Red    lipgloss.Style
-	Yellow lipgloss.Style
-	Cyan   lipgloss.Style
-}
-
 type steamInstall struct {
 	params       dbq.UpsertGameInstallParams
 	steamappsDir string // e.g. ~/.local/share/Steam/steamapps
 }
 
-func ScanStores(ctx context.Context, db *sql.DB, styles RefreshStyles) (RefreshResult, error) {
+func ScanStores(ctx context.Context, db *sql.DB) (RefreshResult, error) {
 	q := dbq.New(db)
 	stores, err := q.ListEnabledStores(ctx)
 	if err != nil {
@@ -80,7 +70,7 @@ func ScanStores(ctx context.Context, db *sql.DB, styles RefreshStyles) (RefreshR
 	for _, store := range stores {
 		switch store.Implementation {
 		case "steam":
-			result, err := refreshSteam(ctx, db, q, styles)
+			result, err := refreshSteam(ctx, db, q)
 			if err != nil {
 				return RefreshResult{}, err
 			}
@@ -92,19 +82,19 @@ func ScanStores(ctx context.Context, db *sql.DB, styles RefreshStyles) (RefreshR
 			combined.Skipped = append(combined.Skipped, result.Skipped...)
 			combined.Warnings = append(combined.Warnings, result.Warnings...)
 		default:
-			fmt.Println(styles.Warn.Render(fmt.Sprintf("  ⚠ store implementation %q is not supported", store.Implementation)))
+			fmt.Println(style.Warning.Render(fmt.Sprintf("  ⚠ store implementation %q is not supported", store.Implementation)))
 		}
 	}
 
 	return combined, nil
 }
 
-func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries, styles RefreshStyles) (RefreshResult, error) {
+func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries) (RefreshResult, error) {
 	var result RefreshResult
 
 	libs, didScan, warns, err := discoverSteamLibraries()
 	for _, w := range warns {
-		fmt.Println(styles.Warn.Render(fmt.Sprintf("  ⚠ %s", w)))
+		fmt.Println(style.Warning.Render(fmt.Sprintf("  ⚠ %s", w)))
 	}
 	if err != nil {
 		return result, fmt.Errorf("error scanning for steam libraries: %w", err)
@@ -119,7 +109,7 @@ func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries, styles Refres
 	result.Skipped = append(result.Skipped, skips...)
 	result.Warnings = append(result.Warnings, warns...)
 	for _, w := range warns {
-		fmt.Println(styles.Warn.Render(fmt.Sprintf("  ⚠ %s", w)))
+		fmt.Println(style.Warning.Render(fmt.Sprintf("  ⚠ %s", w)))
 	}
 	if err != nil {
 		return result, fmt.Errorf("error enumerating steam installs: %w", err)
@@ -156,8 +146,8 @@ func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries, styles Refres
 		if v.isPresent {
 			if _, found := upsertSet[upsertKey(k)]; !found {
 				result.Missing = append(result.Missing, v.displayName)
-				fmt.Println(styles.Red.Render(fmt.Sprintf("  - %s", v.displayName)) +
-					styles.Subtle.Render("  (no longer present)"))
+				fmt.Println(style.Removed.Render(fmt.Sprintf("  - %s", v.displayName)) +
+					style.Subtle.Render("  (no longer present)"))
 			}
 		}
 	}
@@ -196,15 +186,15 @@ func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries, styles Refres
 		k := existingKey{di.params.StoreGameID, di.params.InstanceID}
 		if prev, known := existingMap[k]; !known {
 			result.New = append(result.New, di.params.DisplayName)
-			fmt.Println(styles.Green.Render(fmt.Sprintf("  + %s", di.params.DisplayName)) +
-				styles.Subtle.Render("  (new)"))
+			fmt.Println(style.Added.Render(fmt.Sprintf("  + %s", di.params.DisplayName)) +
+				style.Subtle.Render("  (new)"))
 		} else if !prev.isPresent {
 			result.Returned = append(result.Returned, di.params.DisplayName)
-			fmt.Println(styles.Cyan.Render(fmt.Sprintf("  ↩ %s", di.params.DisplayName)) +
-				styles.Subtle.Render("  (returned)"))
+			fmt.Println(style.Restored.Render(fmt.Sprintf("  ↩ %s", di.params.DisplayName)) +
+				style.Subtle.Render("  (returned)"))
 		} else {
 			result.Updated = append(result.Updated, di.params.DisplayName)
-			fmt.Println(styles.Subtle.Render(fmt.Sprintf("  = %s", di.params.DisplayName)))
+			fmt.Println(style.Subtle.Render(fmt.Sprintf("  = %s", di.params.DisplayName)))
 		}
 	}
 

@@ -23,12 +23,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -65,10 +65,6 @@ items are removed automatically via cascade.`,
 	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO extract
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-
 		ctx := cmd.Context()
 
 		if err := internal.EnsureDBExists(); err != nil {
@@ -155,7 +151,7 @@ items are removed automatically via cascade.`,
 
 			if len(profiles) > 0 {
 				for _, p := range profiles {
-					fmt.Println(warnStyle.Render(fmt.Sprintf(
+					fmt.Println(style.Warning.Render(fmt.Sprintf(
 						"  ⚠ removing from profile %q (priority %d)", p.ProfileName, p.Priority)))
 				}
 			}
@@ -164,7 +160,7 @@ items are removed automatically via cascade.`,
 			if err := q.DeleteModFileVersion(ctx, mfv.ID); err != nil {
 				return fmt.Errorf("delete mod file version: %w", err)
 			}
-			fmt.Println(subtleStyle.Render(fmt.Sprintf(
+			fmt.Println(style.Subtle.Render(fmt.Sprintf(
 				"  removed version %d (%s / %s)", mfv.ID, ver.ModPageName, ver.FileLabel)))
 
 			// Cascade up: remove empty parent file
@@ -176,7 +172,7 @@ items are removed automatically via cascade.`,
 				if err := q.DeleteModFile(ctx, ver.ModFileID); err != nil {
 					return fmt.Errorf("delete empty mod file: %w", err)
 				}
-				fmt.Println(subtleStyle.Render(fmt.Sprintf(
+				fmt.Println(style.Subtle.Render(fmt.Sprintf(
 					"  removed empty file %q", ver.FileLabel)))
 
 				// Cascade up: remove empty parent page
@@ -188,13 +184,13 @@ items are removed automatically via cascade.`,
 					if err := q.DeleteModPage(ctx, ver.ModPageID); err != nil {
 						return fmt.Errorf("delete empty mod page: %w", err)
 					}
-					fmt.Println(subtleStyle.Render(fmt.Sprintf(
+					fmt.Println(style.Subtle.Render(fmt.Sprintf(
 						"  removed empty mod page %q", ver.ModPageName)))
 				}
 			}
 
 			fmt.Println("Removed mod file version " + strconv.FormatInt(mfv.ID, 10) +
-				subtleStyle.Render("  (run 'modctl gc' to reclaim disk space)"))
+				style.Subtle.Render("  (run 'modctl gc' to reclaim disk space)"))
 			return nil
 		}
 
@@ -216,7 +212,7 @@ items are removed automatically via cascade.`,
 
 		if len(profiles) > 0 {
 			for _, p := range profiles {
-				fmt.Println(warnStyle.Render(fmt.Sprintf(
+				fmt.Println(style.Warning.Render(fmt.Sprintf(
 					"  ⚠ removing mod from profile %q", p.ProfileName)))
 			}
 		}
@@ -227,7 +223,7 @@ items are removed automatically via cascade.`,
 		}
 
 		fmt.Printf("Removed mod page %q (id=%d)", page.Name, page.ID)
-		fmt.Println(subtleStyle.Render("  (run 'modctl gc' to reclaim disk space)"))
+		fmt.Println(style.Subtle.Render("  (run 'modctl gc' to reclaim disk space)"))
 
 		return nil
 	},

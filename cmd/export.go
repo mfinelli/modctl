@@ -24,13 +24,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/exporter"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -63,11 +63,6 @@ Examples:
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: extract styles
-		boldStyle := lipgloss.NewStyle().Bold(true)
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-
 		ctx := cmd.Context()
 
 		if err := internal.EnsureDBExists(); err != nil {
@@ -106,8 +101,8 @@ Examples:
 			}
 			opts.OutputPath = exportOutput
 
-			fmt.Println(boldStyle.Render("Exporting (full)"))
-			fmt.Println(subtleStyle.Render("  output: " + exportOutput))
+			fmt.Println(style.Bold.Render("Exporting (full)"))
+			fmt.Println(style.Subtle.Render("  output: " + exportOutput))
 			fmt.Println()
 
 			start := time.Now()
@@ -116,9 +111,9 @@ Examples:
 			}
 
 			st, _ := os.Stat(exportOutput)
-			fmt.Println(okStyle.Render(fmt.Sprintf("  ✓ export complete in %.1fs", time.Since(start).Seconds())))
+			fmt.Println(style.Success.Render(fmt.Sprintf("  ✓ export complete in %.1fs", time.Since(start).Seconds())))
 			if st != nil {
-				fmt.Println(subtleStyle.Render(fmt.Sprintf("  size: %s", formatBytes(st.Size()))))
+				fmt.Println(style.Subtle.Render(fmt.Sprintf("  size: %s", formatBytes(st.Size()))))
 			}
 			return nil
 		}
@@ -134,10 +129,10 @@ Examples:
 		}
 		opts.OutputPath = exportOutput
 
-		fmt.Println(boldStyle.Render(fmt.Sprintf("Exporting %s", gi.DisplayName)))
-		fmt.Println(subtleStyle.Render("  output: " + exportOutput))
+		fmt.Println(style.Bold.Render(fmt.Sprintf("Exporting %s", gi.DisplayName)))
+		fmt.Println(style.Subtle.Render("  output: " + exportOutput))
 		if exportSkipInventory {
-			fmt.Println(subtleStyle.Render("  inventory: skipped"))
+			fmt.Println(style.Subtle.Render("  inventory: skipped"))
 		}
 		fmt.Println()
 
@@ -147,9 +142,9 @@ Examples:
 		}
 
 		st, _ := os.Stat(exportOutput)
-		fmt.Println(okStyle.Render(fmt.Sprintf("  ✓ export complete in %.1fs", time.Since(start).Seconds())))
+		fmt.Println(style.Success.Render(fmt.Sprintf("  ✓ export complete in %.1fs", time.Since(start).Seconds())))
 		if st != nil {
-			fmt.Println(subtleStyle.Render(fmt.Sprintf("  size: %s", formatBytes(st.Size()))))
+			fmt.Println(style.Subtle.Render(fmt.Sprintf("  size: %s", formatBytes(st.Size()))))
 		}
 
 		return nil

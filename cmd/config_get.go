@@ -23,7 +23,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -42,25 +42,18 @@ Valid keys:
 	SilenceUsage: true,
 	ValidArgs:    knownConfigKeys,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: extract
-		labelStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("7")).
-			Width(16)
-		subtleStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("245"))
-
 		key := args[0]
 		if !slices.Contains(knownConfigKeys, key) {
 			return fmt.Errorf("unknown config key %q\n  valid keys: %s", key, strings.Join(knownConfigKeys, ", "))
 		}
 
 		value, fromFile := resolveConfigKey(key)
-		origin := subtleStyle.Render("(default)")
+		origin := style.Subtle.Render("(default)")
 		if fromFile {
-			origin = subtleStyle.Render("(set)")
+			origin = style.Subtle.Render("(set)")
 		}
 
-		fmt.Printf("  %s %s  %s\n", labelStyle.Render(key+":"), value, origin)
+		fmt.Printf("  %s %s  %s\n", style.Label.Width(16).Render(key+":"), value, origin)
 		return nil
 	},
 }

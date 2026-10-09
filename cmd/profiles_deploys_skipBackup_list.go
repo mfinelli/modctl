@@ -22,12 +22,12 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -49,9 +49,6 @@ var profilesDeploysSkipBackupListCmd = &cobra.Command{
 	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		boldStyle := lipgloss.NewStyle().Bold(true)
-
 		ctx := cmd.Context()
 
 		err := internal.EnsureDBExists()
@@ -107,11 +104,11 @@ var profilesDeploysSkipBackupListCmd = &cobra.Command{
 		}
 
 		if len(patterns) == 0 {
-			fmt.Println(subtleStyle.Render(fmt.Sprintf("  no skip-backup patterns for version %d in profile %q", mfv.ID, p.Name)))
+			fmt.Println(style.Subtle.Render(fmt.Sprintf("  no skip-backup patterns for version %d in profile %q", mfv.ID, p.Name)))
 			return nil
 		}
 
-		fmt.Println(boldStyle.Render(fmt.Sprintf("Skip-backup patterns for version %d in profile %q:", mfv.ID, p.Name)))
+		fmt.Println(style.Bold.Render(fmt.Sprintf("Skip-backup patterns for version %d in profile %q:", mfv.ID, p.Name)))
 		for _, row := range patterns {
 			fmt.Printf("  %s\n", row.Pattern)
 		}

@@ -26,9 +26,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -89,16 +89,6 @@ func renderOperationDetail(
 	op dbq.GetOperationByIDRow,
 	changes []dbq.OperationChange,
 ) string {
-	// TODO extract
-	boldStyle := lipgloss.NewStyle().Bold(true)
-	subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-	greenStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
-	redStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
-	yellowStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
-	cyanStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("14"))
-	sectionTitleStyle := lipgloss.NewStyle().Bold(true).MarginTop(1)
-
 	var b strings.Builder
 
 	// Header
@@ -106,7 +96,7 @@ func renderOperationDetail(
 	if op.GameName.Valid {
 		gameName = op.GameName.String
 	}
-	b.WriteString(boldStyle.Render(fmt.Sprintf("Operation #%d — %s %s", op.ID, op.OpType, gameName)))
+	b.WriteString(style.Bold.Render(fmt.Sprintf("Operation #%d — %s %s", op.ID, op.OpType, gameName)))
 	b.WriteString("\n\n")
 
 	writeKV16(&b, "Status:", op.Status)
@@ -117,7 +107,7 @@ func renderOperationDetail(
 		if err1 == nil && err2 == nil {
 			writeKV16(&b, "Finished:", fmt.Sprintf("%s  %s",
 				op.FinishedAt.String,
-				subtleStyle.Render(fmt.Sprintf("(%.1fs)", t2.Sub(t1).Seconds()))))
+				style.Subtle.Render(fmt.Sprintf("(%.1fs)", t2.Sub(t1).Seconds()))))
 		} else {
 			writeKV16(&b, "Finished:", op.FinishedAt.String)
 		}
@@ -126,17 +116,17 @@ func renderOperationDetail(
 		writeKV16(&b, "Profile:", op.ProfileName.String)
 	}
 	if op.Message.Valid && strings.TrimSpace(op.Message.String) != "" {
-		writeKV16(&b, "Message:", warnStyle.Render(op.Message.String))
+		writeKV16(&b, "Message:", style.Warning.Render(op.Message.String))
 	}
 
 	b.WriteString("\n")
 
 	// Changes
-	b.WriteString(sectionTitleStyle.Render(fmt.Sprintf("Changes (%d)", len(changes))))
+	b.WriteString(style.Section.Render(fmt.Sprintf("Changes (%d)", len(changes))))
 	b.WriteString("\n\n")
 
 	if len(changes) == 0 {
-		b.WriteString(subtleStyle.Render("  (none recorded)") + "\n")
+		b.WriteString(style.Subtle.Render("  (none recorded)") + "\n")
 		return strings.TrimRight(b.String(), "\n")
 	}
 
@@ -145,17 +135,17 @@ func renderOperationDetail(
 		var symbol string
 		switch c.Action {
 		case "write":
-			symbol = greenStyle.Render("+")
+			symbol = style.Added.Render("+")
 		case "overwrite":
-			symbol = yellowStyle.Render("~")
+			symbol = style.Changed.Render("~")
 		case "remove":
-			symbol = redStyle.Render("-")
+			symbol = style.Removed.Render("-")
 		case "restore_backup":
-			symbol = cyanStyle.Render("↩")
+			symbol = style.Restored.Render("↩")
 		case "noop":
-			symbol = subtleStyle.Render("=")
+			symbol = style.Subtle.Render("=")
 		default:
-			symbol = subtleStyle.Render("?")
+			symbol = style.Subtle.Render("?")
 		}
 
 		b.WriteString(fmt.Sprintf("  %s %s\n", symbol, c.Relpath))
@@ -163,50 +153,50 @@ func renderOperationDetail(
 		// Content hashes
 		if c.OldContentSha256.Valid {
 			b.WriteString(fmt.Sprintf("      %s %s → ",
-				subtleStyle.Render("hash:"),
+				style.Subtle.Render("hash:"),
 				truncateSha(c.OldContentSha256.String)))
 			if c.NewContentSha256.Valid {
 				b.WriteString(truncateSha(c.NewContentSha256.String))
 			} else {
-				b.WriteString(subtleStyle.Render("(removed)"))
+				b.WriteString(style.Subtle.Render("(removed)"))
 			}
 			b.WriteString("\n")
 		} else if c.NewContentSha256.Valid {
 			b.WriteString(fmt.Sprintf("      %s %s\n",
-				subtleStyle.Render("hash:"),
+				style.Subtle.Render("hash:"),
 				truncateSha(c.NewContentSha256.String)))
 		}
 
 		// Sizes
 		if c.OldSizeBytes.Valid && c.NewSizeBytes.Valid {
 			b.WriteString(fmt.Sprintf("      %s %s → %s\n",
-				subtleStyle.Render("size:"),
+				style.Subtle.Render("size:"),
 				formatBytes(c.OldSizeBytes.Int64),
 				formatBytes(c.NewSizeBytes.Int64)))
 		} else if c.NewSizeBytes.Valid {
 			b.WriteString(fmt.Sprintf("      %s %s\n",
-				subtleStyle.Render("size:"),
+				style.Subtle.Render("size:"),
 				formatBytes(c.NewSizeBytes.Int64)))
 		}
 
 		// Backup reference
 		if c.BackupBlobSha256.Valid {
 			b.WriteString(fmt.Sprintf("      %s %s\n",
-				subtleStyle.Render("backup:"),
+				style.Subtle.Render("backup:"),
 				truncateSha(c.BackupBlobSha256.String)))
 		}
 
 		// Override reference
 		if c.OwnerOverrideID.Valid {
 			b.WriteString(fmt.Sprintf("      %s %s\n",
-				subtleStyle.Render("override:"),
-				subtleStyle.Render(fmt.Sprintf("(id %d)", c.OwnerOverrideID.Int64))))
+				style.Subtle.Render("override:"),
+				style.Subtle.Render(fmt.Sprintf("(id %d)", c.OwnerOverrideID.Int64))))
 		}
 
 		// Notes
 		if c.Notes.Valid && strings.TrimSpace(c.Notes.String) != "" {
 			b.WriteString(fmt.Sprintf("      %s %s\n",
-				subtleStyle.Render("notes:"),
+				style.Subtle.Render("notes:"),
 				c.Notes.String))
 		}
 	}

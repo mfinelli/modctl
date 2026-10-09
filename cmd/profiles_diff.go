@@ -25,12 +25,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
 )
@@ -280,18 +280,10 @@ func renderProfileDiff(
 	gameName string,
 	noUnchanged bool,
 ) string {
-	// TODO extract these somewhere
-	boldStyle := lipgloss.NewStyle().Bold(true)
-	subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	greenStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
-	redStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
-	yellowStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
-	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
-
 	var b strings.Builder
 
-	b.WriteString(boldStyle.Render(fmt.Sprintf("Diff: %q → %q", nameA, nameB)))
-	b.WriteString(subtleStyle.Render(fmt.Sprintf("  (%s)", gameName)))
+	b.WriteString(style.Bold.Render(fmt.Sprintf("Diff: %q → %q", nameA, nameB)))
+	b.WriteString(style.Subtle.Render(fmt.Sprintf("  (%s)", gameName)))
 	b.WriteString("\n\n")
 
 	var countAdded, countRemoved, countChanged, countUnchanged int
@@ -303,31 +295,31 @@ func renderProfileDiff(
 		if item.VersionString.Valid && item.VersionString.String != "" {
 			modLabel += " " + item.VersionString.String
 		}
-		modLabel += subtleStyle.Render(fmt.Sprintf(" / %s", item.FileLabel))
+		modLabel += style.Subtle.Render(fmt.Sprintf(" / %s", item.FileLabel))
 
 		switch kind {
 		case diffAdded:
 			b.WriteString(fmt.Sprintf("  %s %-55s %s\n",
-				greenStyle.Render("+"),
+				style.Added.Render("+"),
 				modLabel,
-				subtleStyle.Render("(added)")))
+				style.Subtle.Render("(added)")))
 			countAdded++
 
 		case diffRemoved:
 			b.WriteString(fmt.Sprintf("  %s %-55s %s\n",
-				redStyle.Render("-"),
+				style.Removed.Render("-"),
 				modLabel,
-				subtleStyle.Render("(removed)")))
+				style.Subtle.Render("(removed)")))
 			countRemoved++
 
 		case diffChanged:
 			b.WriteString(fmt.Sprintf("  %s %s\n",
-				yellowStyle.Render("~"),
+				style.Changed.Render("~"),
 				modLabel))
 			// Show what changed.
 			if item.PriorityA != item.PriorityB {
 				b.WriteString(fmt.Sprintf("      %s priority %d → %d\n",
-					subtleStyle.Render("·"),
+					style.Subtle.Render("·"),
 					item.PriorityA, item.PriorityB))
 			}
 			if item.EnabledA != item.EnabledB {
@@ -338,16 +330,16 @@ func renderProfileDiff(
 					toStr = "disabled"
 				}
 				b.WriteString(fmt.Sprintf("      %s %s → %s\n",
-					subtleStyle.Render("·"),
+					style.Subtle.Render("·"),
 					fromStr, toStr))
 			}
 			if item.RemapConfigIDA.Valid != item.RemapConfigIDB.Valid {
 				if item.RemapConfigIDA.Valid {
 					b.WriteString(fmt.Sprintf("      %s remap rules removed\n",
-						subtleStyle.Render("·")))
+						style.Subtle.Render("·")))
 				} else {
 					b.WriteString(fmt.Sprintf("      %s remap rules added\n",
-						subtleStyle.Render("·")))
+						style.Subtle.Render("·")))
 				}
 			}
 			countChanged++
@@ -355,9 +347,9 @@ func renderProfileDiff(
 		case diffUnchanged:
 			if !noUnchanged {
 				b.WriteString(fmt.Sprintf("  %s %-55s %s\n",
-					dimStyle.Render("="),
+					style.Unchanged.Render("="),
 					modLabel,
-					subtleStyle.Render("(unchanged)")))
+					style.Subtle.Render("(unchanged)")))
 			}
 			countUnchanged++
 		}
@@ -368,20 +360,20 @@ func renderProfileDiff(
 	// Summary line
 	parts := []string{}
 	if countAdded > 0 {
-		parts = append(parts, greenStyle.Render(fmt.Sprintf("%d added", countAdded)))
+		parts = append(parts, style.Added.Render(fmt.Sprintf("%d added", countAdded)))
 	}
 	if countRemoved > 0 {
-		parts = append(parts, redStyle.Render(fmt.Sprintf("%d removed", countRemoved)))
+		parts = append(parts, style.Removed.Render(fmt.Sprintf("%d removed", countRemoved)))
 	}
 	if countChanged > 0 {
-		parts = append(parts, yellowStyle.Render(fmt.Sprintf("%d changed", countChanged)))
+		parts = append(parts, style.Changed.Render(fmt.Sprintf("%d changed", countChanged)))
 	}
 	if countUnchanged > 0 && !noUnchanged {
-		parts = append(parts, dimStyle.Render(fmt.Sprintf("%d unchanged", countUnchanged)))
+		parts = append(parts, style.Unchanged.Render(fmt.Sprintf("%d unchanged", countUnchanged)))
 	}
 
 	if len(parts) == 0 {
-		b.WriteString(subtleStyle.Render("  profiles are identical"))
+		b.WriteString(style.Subtle.Render("  profiles are identical"))
 	} else {
 		b.WriteString("  " + strings.Join(parts, ", "))
 	}

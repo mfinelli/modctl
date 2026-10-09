@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
@@ -35,6 +34,7 @@ import (
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/nexusclient/dbc"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
 )
@@ -334,53 +334,30 @@ func renderModInfo(
 	inventories map[int64]versionInventory,
 	showInventory bool,
 ) string {
-	// TODO: extract styles
-	cardBorder := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		Padding(0, 1)
-	titleStyle := lipgloss.NewStyle().
-		Bold(true)
-	sectionTitleStyle := lipgloss.NewStyle().
-		Bold(true).
-		MarginTop(1)
-	subtleStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("245"))
-	warnStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("3"))
-	nexusUpdateStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("11")).
-		Bold(true)
-	activeTagStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("10"))
-	disabledTagStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("8"))
-	primaryTagStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("6"))
-
 	var b strings.Builder
 
 	// header card
-	headerContent := titleStyle.Render(mp.Name)
-	headerContent += "\n" + subtleStyle.Render(fmt.Sprintf("mod_page_id: %d", mp.ID))
-	headerContent += "\n" + subtleStyle.Render(fmt.Sprintf("source: %s", mp.SourceKind))
+	headerContent := style.Title.Render(mp.Name)
+	headerContent += "\n" + style.Subtle.Render(fmt.Sprintf("mod_page_id: %d", mp.ID))
+	headerContent += "\n" + style.Subtle.Render(fmt.Sprintf("source: %s", mp.SourceKind))
 	if mp.SourceUrl.Valid {
-		headerContent += "\n" + subtleStyle.Render(fmt.Sprintf("url: %s", mp.SourceUrl.String))
+		headerContent += "\n" + style.Subtle.Render(fmt.Sprintf("url: %s", mp.SourceUrl.String))
 	}
 	if mp.SourceRef.Valid {
-		headerContent += "\n" + subtleStyle.Render(fmt.Sprintf("ref: %s", mp.SourceRef.String))
+		headerContent += "\n" + style.Subtle.Render(fmt.Sprintf("ref: %s", mp.SourceRef.String))
 	}
 	if mp.Notes.Valid && strings.TrimSpace(mp.Notes.String) != "" {
-		headerContent += "\n" + subtleStyle.Render(internal.FormatNotesLines(mp.Notes.String))
+		headerContent += "\n" + style.Subtle.Render(internal.FormatNotesLines(mp.Notes.String))
 	}
-	headerContent += "\n" + subtleStyle.Render(fmt.Sprintf(
+	headerContent += "\n" + style.Subtle.Render(fmt.Sprintf(
 		"added: %s", formatAge(mustParseTime(mp.CreatedAt)),
 	))
-	b.WriteString(cardBorder.Render(headerContent))
+	b.WriteString(style.Card.Render(headerContent))
 	b.WriteString("\n")
 
 	// nexus section
 	if mp.SourceKind == "nexus" && mp.NexusGameDomain.Valid && mp.NexusModID.Valid {
-		b.WriteString(sectionTitleStyle.Render("Nexus") + "\n")
+		b.WriteString(style.Section.Render("Nexus") + "\n")
 		writeKV16(&b, "mod page:", fmt.Sprintf(
 			"https://www.nexusmods.com/%s/mods/%d",
 			mp.NexusGameDomain.String, mp.NexusModID.Int64,
@@ -394,21 +371,21 @@ func renderModInfo(
 			}
 			fetchedAt, err := time.Parse(time.RFC3339, nexusModInfo.FetchedAt)
 			if err == nil {
-				writeKV16(&b, "info fetched:", subtleStyle.Render(formatAge(fetchedAt)))
+				writeKV16(&b, "info fetched:", style.Subtle.Render(formatAge(fetchedAt)))
 			}
 			if !nexusModInfo.IsAvailable.Valid || nexusModInfo.IsAvailable.Int64 == 0 {
-				writeKV16(&b, "status:", warnStyle.Render("⚠ mod unavailable on Nexus"))
+				writeKV16(&b, "status:", style.Warning.Render("⚠ mod unavailable on Nexus"))
 			}
 		} else {
-			writeKV16(&b, "cached info:", subtleStyle.Render("(run 'mods nexus check-updates' to fetch)"))
+			writeKV16(&b, "cached info:", style.Subtle.Render("(run 'mods nexus check-updates' to fetch)"))
 		}
 	}
 
 	// files section - group by mod_file
-	b.WriteString(sectionTitleStyle.Render("Files") + "\n")
+	b.WriteString(style.Section.Render("Files") + "\n")
 
 	if len(fileVersions) == 0 {
-		b.WriteString(subtleStyle.Render("  (none)") + "\n")
+		b.WriteString(style.Subtle.Render("  (none)") + "\n")
 	} else {
 		// group rows by mod_file_id
 		type modFileGroup struct {
@@ -437,7 +414,7 @@ func renderModInfo(
 			// file header line
 			fileHeader := fmt.Sprintf("  %s", g.label)
 			if g.isPrimary {
-				fileHeader += "  " + primaryTagStyle.Render("(primary)")
+				fileHeader += "  " + style.PrimaryTag.Render("(primary)")
 			}
 			writeKV16(&b, fmt.Sprintf("  [file %d]", g.fileID), fileHeader)
 
@@ -447,14 +424,14 @@ func renderModInfo(
 				if v.VersionString.Valid {
 					writeKVIndented16(&b, "  version:", v.VersionString.String)
 				} else {
-					writeKVIndented16(&b, "  version:", subtleStyle.Render("(none)"))
+					writeKVIndented16(&b, "  version:", style.Subtle.Render("(none)"))
 				}
 
 				writeKVIndented16(&b, "  archive:", truncateSha(v.ArchiveSha256))
 				writeKVIndented16(&b, "  size:", formatBytes(v.SizeBytes))
 
 				if v.OriginalName.Valid {
-					writeKVIndented16(&b, "  filename:", subtleStyle.Render(v.OriginalName.String))
+					writeKVIndented16(&b, "  filename:", style.Subtle.Render(v.OriginalName.String))
 				}
 
 				// nexus file link state
@@ -463,36 +440,36 @@ func renderModInfo(
 						_, isSuperseded := superseded[v.NexusFileID.Int64]
 						if isSuperseded && info.UpdateAlreadyImported {
 							writeKVIndented16(&b, "  nexus version:",
-								subtleStyle.Render(fmt.Sprintf("%s (superseded)", info.Version)))
+								style.Subtle.Render(fmt.Sprintf("%s (superseded)", info.Version)))
 						} else if isSuperseded || info.HasUpdate {
 							writeKVIndented16(&b, "  nexus version:",
-								nexusUpdateStyle.Render(fmt.Sprintf("%s ↑ update available → %s",
+								style.UpdateAvailable.Render(fmt.Sprintf("%s ↑ update available → %s",
 									info.Version, info.LatestVersion)))
 						} else {
 							writeKVIndented16(&b, "  nexus version:",
 								fmt.Sprintf("%s ✓ %s",
 									info.Version,
-									subtleStyle.Render(fmt.Sprintf("(last fetched %s)", formatAge(info.FetchedAt))),
+									style.Subtle.Render(fmt.Sprintf("(last fetched %s)", formatAge(info.FetchedAt))),
 								))
 						}
 					} else {
 						writeKVIndented16(&b, "  nexus version:",
-							subtleStyle.Render("(run 'mods nexus check-updates' to fetch)"))
+							style.Subtle.Render("(run 'mods nexus check-updates' to fetch)"))
 					}
 				} else if mp.SourceKind == "nexus" {
 					writeKVIndented16(&b, "  nexus link:",
-						warnStyle.Render("⚠ unlinked (run 'mods nexus link' to resolve)"))
+						style.Warning.Render("⚠ unlinked (run 'mods nexus link' to resolve)"))
 				}
 
 				// profile membership
 				memberships := versionProfiles[v.ModFileVersionID]
 				if len(memberships) == 0 {
-					writeKVIndented16(&b, "  profiles:", subtleStyle.Render("(not in any profile)"))
+					writeKVIndented16(&b, "  profiles:", style.Subtle.Render("(not in any profile)"))
 				} else {
 					for _, m := range memberships {
-						tag := activeTagStyle.Render("enabled")
+						tag := style.Active.Render("enabled")
 						if !m.Enabled {
-							tag = disabledTagStyle.Render("disabled")
+							tag = style.Inactive.Render("disabled")
 						}
 						writeKVIndented16(&b, "  profiles:",
 							fmt.Sprintf("%s [priority %d] %s",
@@ -504,7 +481,7 @@ func renderModInfo(
 				if showInventory {
 					inv := inventories[v.ModFileVersionID]
 					if !inv.Scanned {
-						writeKVIndented16(&b, "  inventory:", subtleStyle.Render("(not scanned; run 'mods scan-inventory')"))
+						writeKVIndented16(&b, "  inventory:", style.Subtle.Render("(not scanned; run 'mods scan-inventory')"))
 					} else {
 						writeKVIndented16(&b, "  inventory:", fmt.Sprintf("%d file(s)", len(inv.Entries)))
 						for _, e := range inv.Entries {
@@ -514,16 +491,16 @@ func renderModInfo(
 							}
 							size := ""
 							if e.SizeBytes.Valid {
-								size = subtleStyle.Render(fmt.Sprintf("  %s", formatBytes(e.SizeBytes.Int64)))
+								size = style.Subtle.Render(fmt.Sprintf("  %s", formatBytes(e.SizeBytes.Int64)))
 							}
 							b.WriteString(fmt.Sprintf("      %s%s\n", path, size))
 						}
 						if len(inv.ParseErrors) > 0 {
-							b.WriteString(warnStyle.Render(fmt.Sprintf(
+							b.WriteString(style.Warning.Render(fmt.Sprintf(
 								"      ⚠ %d parse error(s):\n", len(inv.ParseErrors),
 							)))
 							for _, pe := range inv.ParseErrors {
-								b.WriteString(warnStyle.Render(fmt.Sprintf(
+								b.WriteString(style.Warning.Render(fmt.Sprintf(
 									"        position %d: %s\n", pe.Position, pe.ParseError.String,
 								)))
 							}
