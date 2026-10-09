@@ -27,9 +27,10 @@ import (
 )
 
 // CopyDeployRules copies skip-backup and write-once patterns from one profile
-// item to another. If the destination already has patterns of either kind they
-// are replaced. If the source has no patterns for a given kind that kind is a
-// no-op. It returns the number of patterns copied for each kind.
+// item to another, in one transaction. If the destination already has patterns
+// of a kind that the source also has, they are replaced. If the source has no
+// patterns for a given kind that kind is a no-op and the destination keeps what
+// it has. It returns the number of patterns copied for each kind.
 func CopyDeployRules(ctx context.Context, db *sql.DB, q *dbq.Queries, srcItemID, dstItemID int64) (skipBackup, writeOnce int, err error) {
 	skipBackupPatterns, err := q.ListSkipBackupPatterns(ctx, srcItemID)
 	if err != nil {
@@ -52,29 +53,35 @@ func CopyDeployRules(ctx context.Context, db *sql.DB, q *dbq.Queries, srcItemID,
 	defer tx.Rollback()
 	qtx := q.WithTx(tx)
 
-	// Replace destination skip-backup patterns
-	if err := qtx.DeleteAllSkipBackupPatterns(ctx, dstItemID); err != nil {
-		return 0, 0, fmt.Errorf("clear dst skip-backup patterns: %w", err)
-	}
-	for _, p := range skipBackupPatterns {
-		if err := qtx.AddSkipBackupPattern(ctx, dbq.AddSkipBackupPatternParams{
-			ProfileItemID: dstItemID,
-			Pattern:       p.Pattern,
-		}); err != nil {
-			return 0, 0, fmt.Errorf("copy skip-backup pattern %q: %w", p.Pattern, err)
+	// Replace destination skip-backup patterns, but only if there is
+	// something to replace them with: a kind the source has none of is left
+	// alone, as it is by CopySkipBackupPatterns.
+	if len(skipBackupPatterns) > 0 {
+		if err := qtx.DeleteAllSkipBackupPatterns(ctx, dstItemID); err != nil {
+			return 0, 0, fmt.Errorf("clear dst skip-backup patterns: %w", err)
+		}
+		for _, p := range skipBackupPatterns {
+			if err := qtx.AddSkipBackupPattern(ctx, dbq.AddSkipBackupPatternParams{
+				ProfileItemID: dstItemID,
+				Pattern:       p.Pattern,
+			}); err != nil {
+				return 0, 0, fmt.Errorf("copy skip-backup pattern %q: %w", p.Pattern, err)
+			}
 		}
 	}
 
-	// Replace destination write-once patterns
-	if err := qtx.DeleteAllWriteOncePatterns(ctx, dstItemID); err != nil {
-		return 0, 0, fmt.Errorf("clear dst write-once patterns: %w", err)
-	}
-	for _, p := range writeOncePatterns {
-		if err := qtx.AddWriteOncePattern(ctx, dbq.AddWriteOncePatternParams{
-			ProfileItemID: dstItemID,
-			Pattern:       p.Pattern,
-		}); err != nil {
-			return 0, 0, fmt.Errorf("copy write-once pattern %q: %w", p.Pattern, err)
+	// Replace destination write-once patterns, on the same terms
+	if len(writeOncePatterns) > 0 {
+		if err := qtx.DeleteAllWriteOncePatterns(ctx, dstItemID); err != nil {
+			return 0, 0, fmt.Errorf("clear dst write-once patterns: %w", err)
+		}
+		for _, p := range writeOncePatterns {
+			if err := qtx.AddWriteOncePattern(ctx, dbq.AddWriteOncePatternParams{
+				ProfileItemID: dstItemID,
+				Pattern:       p.Pattern,
+			}); err != nil {
+				return 0, 0, fmt.Errorf("copy write-once pattern %q: %w", p.Pattern, err)
+			}
 		}
 	}
 

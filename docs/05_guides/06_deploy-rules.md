@@ -101,14 +101,20 @@ modctl profiles deploys write-once remove "My Mod" "settings.ini"
 ## Copying rules between mod versions
 
 When you manually swap a mod version between two distinct profile items you
-can copy deployment rules across:
+can copy all of its deployment rules across in one go:
+```bash
+modctl profiles deploys copy "My Mod v1.0" "My Mod v1.1"
+```
+
+To copy only one kind of rule, use the command for that kind:
 ```bash
 modctl profiles deploys skip-backup copy "My Mod v1.0" "My Mod v1.1"
 modctl profiles deploys write-once copy "My Mod v1.0" "My Mod v1.1"
 ```
 
-If the destination already has patterns of that kind they will be replaced.
-If the source has none this is a no-op.
+If the destination already has patterns of a kind that the source also has they
+will be replaced. A kind the source has none of is left as it is on the
+destination.
 
 Note that when you use `modctl profiles upgrade` to upgrade a mod, deployment
 rules are preserved automatically — no copying is needed. The copy commands

@@ -343,6 +343,13 @@ Set the active game:
 	extraction which may be slow for large archives. Binary files are
 	refused unless --force is passed.
 
+*modctl profiles deploys copy* <src-mod> <dst-mod>
+	Copy all deployment rules, both skip-backup and write-once patterns, from
+	one mod version to another in the active profile, in a single
+	transaction. For each kind the source has patterns of, the patterns the
+	destination has of that kind are replaced; a kind the source has none of
+	is left as it is on the destination.
+
 *modctl profiles deploys skip-backup list* <mod>
 	List skip-backup patterns for a mod version in the active profile.
 

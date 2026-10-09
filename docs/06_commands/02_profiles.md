@@ -418,6 +418,20 @@ modctl profiles overrides patch preview settings.ini
 For a full explanation of deployment rules see
 [Deployment rules](../../guides/deploy-rules).
 
+### profiles deploys copy
+
+Copy all deployment rules, both skip-backup and write-once patterns, from one
+mod version to another within the same profile. Both kinds are copied in a
+single transaction. For each kind the source has patterns of, the patterns the
+destination has of that kind are replaced; a kind the source has none of is left
+as it is on the destination. Useful when manually swapping mod versions.
+```bash
+modctl profiles deploys copy "My Mod v1.0" "My Mod v1.1"
+```
+
+To copy only one kind, use `profiles deploys skip-backup copy` or
+`profiles deploys write-once copy`.
+
 ### profiles deploys skip-backup list
 
 List all skip-backup patterns for a mod version in the active profile.

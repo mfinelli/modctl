@@ -277,4 +277,63 @@ func TestDeployRuleCopies(t *testing.T) {
 		assert.Equal(t, 1, skip)
 		assert.Equal(t, 2, once)
 	})
+
+	t.Run("a kind the source has none of is left alone on the destination", func(t *testing.T) {
+		t.Parallel()
+		p := newProfileItems(t)
+
+		// the source only has skip-backup patterns; the destination has
+		// write-once patterns of its own, which must survive the copy
+		addSkip(t, p, p.itemA, "*.ini")
+		addOnce(t, p, p.itemB, "keep-me/*", "me-too.cfg")
+
+		skip, once, err := internal.CopyDeployRules(ctx, p.db, p.q, p.itemA, p.itemB)
+		require.NoError(t, err)
+		assert.Equal(t, 1, skip)
+		assert.Zero(t, once)
+
+		gotOnce, err := p.q.ListWriteOncePatterns(ctx, p.itemB)
+		require.NoError(t, err)
+		assert.Len(t, gotOnce, 2, "the destination's write-once patterns are untouched")
+	})
+
+	t.Run("and the same the other way round", func(t *testing.T) {
+		t.Parallel()
+		p := newProfileItems(t)
+
+		addOnce(t, p, p.itemA, "*.cfg")
+		addSkip(t, p, p.itemB, "keep-me/*")
+
+		skip, once, err := internal.CopyDeployRules(ctx, p.db, p.q, p.itemA, p.itemB)
+		require.NoError(t, err)
+		assert.Zero(t, skip)
+		assert.Equal(t, 1, once)
+
+		gotSkip, err := p.q.ListSkipBackupPatterns(ctx, p.itemB)
+		require.NoError(t, err)
+		assert.Len(t, gotSkip, 1, "the destination's skip-backup patterns are untouched")
+	})
+
+	t.Run("a kind the source has replaces the destination's", func(t *testing.T) {
+		t.Parallel()
+		p := newProfileItems(t)
+
+		addSkip(t, p, p.itemA, "a", "b")
+		addOnce(t, p, p.itemA, "c")
+		addSkip(t, p, p.itemB, "old1", "old2", "old3")
+		addOnce(t, p, p.itemB, "old4")
+
+		skip, once, err := internal.CopyDeployRules(ctx, p.db, p.q, p.itemA, p.itemB)
+		require.NoError(t, err)
+		assert.Equal(t, 2, skip)
+		assert.Equal(t, 1, once)
+
+		gotSkip, err := p.q.ListSkipBackupPatterns(ctx, p.itemB)
+		require.NoError(t, err)
+		require.Len(t, gotSkip, 2)
+		gotOnce, err := p.q.ListWriteOncePatterns(ctx, p.itemB)
+		require.NoError(t, err)
+		require.Len(t, gotOnce, 1)
+		assert.Equal(t, "c", gotOnce[0].Pattern)
+	})
 }

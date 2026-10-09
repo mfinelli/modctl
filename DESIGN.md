@@ -716,14 +716,17 @@ Both rules can be applied to the same path. The resulting behavior is:
 ### Commands
 
 ```
+profiles deploys copy <src_mod_file_version_id> <dst_mod_file_version_id>
 profiles deploys skip-backup add|remove|list|copy <mod_file_version_id> <pattern>
 profiles deploys write-once add|remove|list|copy <mod_file_version_id> <pattern>
 ```
 
 When upgrading a mod version via `profiles upgrade`, all deployment rules are
 preserved automatically since the profile item is updated in place. Manual
-copying via the `copy` subcommand is only needed when moving rules between
-two distinct profile items.
+copying via the `copy` subcommands (`deploys copy` for both kinds in one
+transaction, or `skip-backup copy` / `write-once copy` for one kind) is only
+needed when moving rules between two distinct profile items. In every case a
+kind the source has no patterns of is left alone on the destination.
 
 ## 10. Backup inspection and management
 
@@ -1290,6 +1293,8 @@ create|list|rename|delete|set-active|apply|diff|add|remove|enable|disable|order|
   run.
 - `profiles overrides set|edit|status|unset|list|copy` - manage mod overrides
 - `profiles overrides patch set|unset|remove|list|preview` - manage structured mod overrides
+- `profiles deploys copy` - copy both kinds of deployment rules from one mod
+  version to another in a single transaction.
 - `profiles deploys skip-backup add|remove|list|copy` - manage skip-backup patterns
   for a mod version within a profile. Patterns are evaluated against the final
   remapped destination path. Files matching a skip-backup pattern are never
