@@ -29,8 +29,10 @@ import (
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
+	"github.com/mfinelli/modctl/internal/updatechain"
 	"github.com/spf13/cobra"
 )
 
@@ -50,9 +52,11 @@ archive across all files under that page.
 With --details, the output expands each mod page to show its mod files and their
 versions.
 
-TODO:
-- Show latest version information from the Nexus API for Nexus-linked mods and
-  compare it with imported versions.`,
+For mods that are linked to Nexus Mods the latest version that the local Nexus
+cache knows of is shown as nexus_latest, and marked with an arrow when it is
+newer than what is imported (and not imported itself). With --details every
+version says whether it has been superseded or has an update available. This
+only reads the cache: use ` + "`modctl mods nexus check-updates`" + ` to refresh it.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -118,11 +122,12 @@ TODO:
 			FilesCount    int64
 			VersionsCount int64
 
-			LatestFileLabel  sql.NullString
-			LatestVersionID  sql.NullInt64
-			LatestVersionStr sql.NullString
-			LatestArchiveSHA sql.NullString
-			LatestImportedAt sql.NullString
+			LatestFileLabel   sql.NullString
+			LatestVersionID   sql.NullInt64
+			LatestVersionStr  sql.NullString
+			LatestNexusFileID sql.NullInt64
+			LatestArchiveSHA  sql.NullString
+			LatestImportedAt  sql.NullString
 		}
 
 		pages := make([]pageSummary, 0, len(rows))
@@ -137,11 +142,12 @@ TODO:
 				FilesCount:    r.FilesCount,
 				VersionsCount: r.VersionsCount,
 
-				LatestFileLabel:  r.ModFileLabel,
-				LatestVersionID:  r.ModFileVersionID,
-				LatestVersionStr: r.VersionString,
-				LatestArchiveSHA: r.ArchiveSha256,
-				LatestImportedAt: r.ImportedAt,
+				LatestFileLabel:   r.ModFileLabel,
+				LatestVersionID:   r.ModFileVersionID,
+				LatestVersionStr:  r.VersionString,
+				LatestNexusFileID: r.NexusFileID,
+				LatestArchiveSHA:  r.ArchiveSha256,
+				LatestImportedAt:  r.ImportedAt,
 			})
 		}
 
@@ -171,6 +177,107 @@ TODO:
 				return "—"
 			}
 			return fmt.Sprintf("%d", ni.Int64)
+		}
+
+		// What the Nexus cache knows about the mods that are linked to Nexus.
+		// It is readonly (mods nexus check-updates is used to update),
+		// so a mod that has nothing cached just doesn't get anything
+		// added.
+		var cache *nexusclient.CacheReader
+		chains := make(map[int64]updatechain.Chain)              // by mod page
+		importedNexusFiles := make(map[int64]map[int64]struct{}) // by mod page
+
+		for _, p := range pages {
+			if p.NexusDomain.Valid && p.NexusModID.Valid {
+				c, err := nexusclient.NewCacheReader(ctx, logger)
+				if err != nil {
+					logger.Warn("failed to open nexus cache", "error", err)
+					break
+				}
+				cache = c
+				defer cache.Close()
+				break
+			}
+		}
+
+		if cache != nil {
+			imported, err := q.ListImportedNexusFileIDsByGameInstall(ctx, gi.ID)
+			if err != nil {
+				return fmt.Errorf("list imported nexus files: %w", err)
+			}
+			for _, r := range imported {
+				if importedNexusFiles[r.ModPageID] == nil {
+					importedNexusFiles[r.ModPageID] = make(map[int64]struct{})
+				}
+				importedNexusFiles[r.ModPageID][r.NexusFileID.Int64] = struct{}{}
+			}
+
+			for _, p := range pages {
+				if !p.NexusDomain.Valid || !p.NexusModID.Valid {
+					continue
+				}
+				chain, err := cache.GetUpdateChain(p.NexusDomain.String, p.NexusModID.Int64)
+				if err != nil {
+					logger.Warn("failed to fetch nexus file update chain",
+						"mod_page_id", p.ModPageID, "error", err)
+					continue
+				}
+				chains[p.ModPageID] = chain
+			}
+		}
+
+		// nexusStatus is where a Nexus file of a mod page stands against the
+		// updates in the cache, with the version of the latest file when the
+		// cache has it ("" when it doesn't). ok is false when there is nothing
+		// to say.
+		type nexusStatus struct {
+			updatechain.Status
+			LatestVersion string
+		}
+		nexusStatusOf := func(p pageSummary, fileID sql.NullInt64) (st nexusStatus, ok bool) {
+			chain, found := chains[p.ModPageID]
+			if !found || !fileID.Valid {
+				return nexusStatus{}, false
+			}
+
+			st.Status = chain.Status(fileID.Int64, importedNexusFiles[p.ModPageID])
+			row, err := cache.GetNexusFileInfo(p.NexusDomain.String, p.NexusModID.Int64, st.Head)
+			switch {
+			case err == nil && row.Version.Valid:
+				st.LatestVersion = row.Version.String
+			case err != nil && !errors.Is(err, sql.ErrNoRows):
+				logger.Warn("failed to fetch nexus file info from cache",
+					"mod_page_id", p.ModPageID, "error", err)
+			}
+
+			return st, true
+		}
+
+		// updateMark is what goes after a line when there is an update to
+		// import (and nothing otherwise)
+		updateMark := func(st nexusStatus) string {
+			text := "↑ update available"
+			if st.LatestVersion != "" {
+				text += " → " + st.LatestVersion
+			}
+			return "  " + style.UpdateAvailable.Render(text)
+		}
+
+		// nexusLatest is what is added to the line of a mod page: the latest
+		// version on Nexus (of the file that its line is about), and the
+		// mark when there is an update to import.
+		nexusLatest := func(p pageSummary) (text, mark string) {
+			st, ok := nexusStatusOf(p, p.LatestNexusFileID)
+			if !ok {
+				return "", ""
+			}
+			if st.LatestVersion != "" {
+				text = fmt.Sprintf("  nexus_latest=%q", st.LatestVersion)
+			}
+			if st.State == updatechain.UpdateAvailable {
+				mark = updateMark(st)
+			}
+			return text, mark
 		}
 
 		if !modsListDetails {
@@ -204,12 +311,16 @@ TODO:
 					line += "  (no imported archives yet)"
 				}
 
+				mark := ""
 				if nexusRef != "" {
 					line += fmt.Sprintf("  nexus=%s", nexusRef)
-					// TODO: add "nexus_latest=..." once Nexus API integration exists
+
+					var text string
+					text, mark = nexusLatest(p)
+					line += text
 				}
 
-				style.Println(style.Subtle.Render(line))
+				style.Println(style.Subtle.Render(line) + mark)
 				style.Println()
 			}
 
@@ -228,11 +339,15 @@ TODO:
 				"  source=%s  files=%d  versions=%d",
 				p.SourceKind, p.FilesCount, p.VersionsCount,
 			)
+			mark := ""
 			if nexusRef != "" {
 				line += fmt.Sprintf("  nexus=%s", nexusRef)
-				// TODO: add "nexus_latest=..." once Nexus API integration exists
+
+				var text string
+				text, mark = nexusLatest(p)
+				line += text
 			}
-			style.Println(style.Subtle.Render(line))
+			style.Println(style.Subtle.Render(line) + mark)
 
 			files, err := q.ListModFilesByPage(ctx, p.ModPageID)
 			if err != nil {
@@ -278,7 +393,19 @@ TODO:
 						vline += fmt.Sprintf("  filename=%q", v.OriginalName.String)
 					}
 
-					style.Println(style.Subtle.Render(vline))
+					// an update is only worth a mention when it is not
+					// imported already, which is what superseded is
+					mark := ""
+					if st, ok := nexusStatusOf(p, v.NexusFileID); ok {
+						switch st.State {
+						case updatechain.Superseded:
+							vline += "  (superseded)"
+						case updatechain.UpdateAvailable:
+							mark = updateMark(st)
+						}
+					}
+
+					style.Println(style.Subtle.Render(vline) + mark)
 				}
 			}
 

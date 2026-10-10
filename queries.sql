@@ -249,11 +249,24 @@ SELECT
   mod_file_label,
   mod_file_version_id,
   version_string,
+  nexus_file_id,
   archive_sha256,
   imported_at
 FROM joined
 WHERE rn = 1
 ORDER BY mod_name COLLATE NOCASE, mod_page_id;
+
+-- name: ListImportedNexusFileIDsByGameInstall :many
+-- The Nexus file id of every imported version that has one, with the mod page
+-- it is for.
+SELECT
+  mf.mod_page_id AS mod_page_id,
+  mfv.nexus_file_id AS nexus_file_id
+FROM mod_file_versions mfv
+JOIN mod_files mf ON mf.id = mfv.mod_file_id
+JOIN mod_pages mp ON mp.id = mf.mod_page_id
+WHERE mp.game_install_id = ?
+  AND mfv.nexus_file_id IS NOT NULL;
 
 -- name: ListModFilesByPage :many
 SELECT id, mod_page_id, label, is_primary, source_url, created_at, updated_at

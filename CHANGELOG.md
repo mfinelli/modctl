@@ -43,6 +43,8 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 - `extract`, `import` and `games backups restore` now write their files
   atomically: a failure or Ctrl-C no longer leaves a partly written file
   behind, and an existing file is only replaced once the copy is complete.
+- `mods list` now shows the latest version of Nexus-linked mods from the local
+  Nexus cache, and marks the ones that have an update to import.
 
 ## v0.7.1 - 2026-10-03
 
