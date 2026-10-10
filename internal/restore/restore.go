@@ -21,9 +21,7 @@ package restore
 import (
 	"archive/tar"
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -40,6 +38,7 @@ import (
 	"github.com/mfinelli/modctl/internal/archivescanner"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/exporter"
+	"github.com/mfinelli/modctl/internal/fsutil"
 )
 
 const supportedFormatVersion = 1
@@ -120,7 +119,7 @@ func OpenAndValidate(ctx context.Context, bundlePath string) (*Bundle, error) {
 
 	// Verify database integrity
 	dbPath := filepath.Join(tmpDir, exporter.DatabaseFilename)
-	dbSha, err := hashFile(dbPath)
+	dbSha, err := fsutil.HashFile(dbPath)
 	if err != nil {
 		os.RemoveAll(tmpDir)
 		return nil, fmt.Errorf("hash bundle database: %w", err)
@@ -134,7 +133,7 @@ func OpenAndValidate(ctx context.Context, bundlePath string) (*Bundle, error) {
 	// Verify nexus cache integrity if present in bundle
 	cachePath := filepath.Join(tmpDir, "nexus_cache.db")
 	if manifest.NexusCacheSha256 != "" {
-		cacheSha, err := hashFile(cachePath)
+		cacheSha, err := fsutil.HashFile(cachePath)
 		if err != nil {
 			os.RemoveAll(tmpDir)
 			return nil, fmt.Errorf("hash bundle nexus cache: %w", err)
@@ -172,20 +171,6 @@ func currentSchemaVersion(ctx context.Context, db *sql.DB) (int64, error) {
 		return 0, fmt.Errorf("get schema version: %w", err)
 	}
 	return current, nil
-}
-
-// TODO: we must have 4 copies of this now... just extract it already
-func hashFile(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 func copyFile(src, dst string) error {
@@ -363,7 +348,7 @@ func importBlobs(ctx context.Context, bundle *Bundle, bs blobstore.Store) (archi
 			}
 
 			// Verify blob integrity before ingesting
-			actualSha, err := hashFile(path)
+			actualSha, err := fsutil.HashFile(path)
 			if err != nil {
 				return fmt.Errorf("hash blob %s: %w", expectedSha, err)
 			}

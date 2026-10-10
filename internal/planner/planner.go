@@ -29,6 +29,7 @@ import (
 	"path/filepath"
 
 	"github.com/mfinelli/modctl/dbq"
+	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/remap"
 )
 
@@ -393,7 +394,7 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 				op.Kind = PlanOpOverwrite
 			} else if hasOverride && !skipRecheck {
 				// Full-file override noop check
-				onDiskHash, err := hashFile(absPath)
+				onDiskHash, err := fsutil.HashFile(absPath)
 				if err != nil {
 					plan.Warnings = append(plan.Warnings,
 						fmt.Sprintf("recheck: could not hash %q: %v", pf.DestPath, err))
@@ -416,7 +417,7 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 				// act on it.
 				op.Kind = PlanOpNoop
 				if !skipRecheck {
-					onDiskHash, err := hashFile(absPath)
+					onDiskHash, err := fsutil.HashFile(absPath)
 					if err != nil {
 						plan.Warnings = append(plan.Warnings,
 							fmt.Sprintf("recheck: could not hash %q: %v", pf.DestPath, err))
@@ -428,7 +429,7 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 				}
 			} else if !skipRecheck {
 				// Normal mod-owned file recheck
-				onDiskHash, err := hashFile(absPath)
+				onDiskHash, err := fsutil.HashFile(absPath)
 				if err != nil {
 					plan.Warnings = append(plan.Warnings,
 						fmt.Sprintf("recheck: could not hash %q: %v", pf.DestPath, err))

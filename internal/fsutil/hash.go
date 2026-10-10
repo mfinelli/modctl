@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package planner
+package fsutil
 
 import (
 	"crypto/sha256"
@@ -26,9 +26,9 @@ import (
 	"os"
 )
 
-// hashFile computes the sha256 digest of the file at path and returns it as
+// HashFile computes the sha256 digest of the file at path and returns it as
 // a lowercase hex string.
-func hashFile(path string) (string, error) {
+func HashFile(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", fmt.Errorf("open file for hashing: %w", err)

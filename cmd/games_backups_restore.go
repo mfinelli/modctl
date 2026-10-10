@@ -30,6 +30,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -142,7 +143,7 @@ the command warns and requires --force to proceed.`,
 		if err == nil {
 			// File is tool-owned - check for drift
 			if _, exists := diskStat(absPath); exists {
-				onDiskHash, hashErr := hashFile(absPath)
+				onDiskHash, hashErr := fsutil.HashFile(absPath)
 				if hashErr == nil && onDiskHash != installedFile.ContentSha256 {
 					if !gamesBackupsRestoreForce {
 						return fmt.Errorf(

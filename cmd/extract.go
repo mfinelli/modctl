@@ -20,8 +20,6 @@ package cmd
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -30,6 +28,7 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/archivescanner"
+	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/restore"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -399,7 +398,7 @@ func extractBlob(
 	blobPath := filepath.Join(bundle.BundleDir, "archives", fan, sha)
 
 	// verify blob hash before extracting
-	actual, err := hashFile(blobPath)
+	actual, err := fsutil.HashFile(blobPath)
 	if err != nil {
 		return fmt.Errorf("hash blob %s: %w", style.ShortSha(sha), err)
 	}
@@ -514,21 +513,6 @@ func archiveFormatToExt(format, compression string) string {
 	default:
 		return ".tar.gz" // we wrap unknowns in tar.gz on import
 	}
-}
-
-// TODO: is this the ...sixth copy ?!
-// hashFile hashes a file and returns the hex sha256.
-func hashFile(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // TODO: this is at least the second version

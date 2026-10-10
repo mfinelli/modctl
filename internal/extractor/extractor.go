@@ -34,6 +34,7 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/patchapply"
 	"github.com/mfinelli/modctl/internal/planner"
 )
@@ -288,7 +289,7 @@ func (e Extractor) RemoveFile(
 	var oldSha sql.NullString
 	var oldSize sql.NullInt64
 	if info, err := os.Stat(absDestPath); err == nil {
-		if sha, err := hashFile(absDestPath); err == nil {
+		if sha, err := fsutil.HashFile(absDestPath); err == nil {
 			oldSha = sql.NullString{String: sha, Valid: true}
 			oldSize = sql.NullInt64{Int64: info.Size(), Valid: true}
 		}
@@ -683,22 +684,4 @@ func copyFile(ctx context.Context, src, dst string) error {
 	}
 
 	return nil
-}
-
-// hashFile computes the sha256 digest of the file at path and returns it as
-// a lowercase hex string.
-// TODO this is also in the planner -- extract to internal
-func hashFile(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", fmt.Errorf("open file for hashing: %w", err)
-	}
-	defer f.Close()
-
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", fmt.Errorf("hash file contents: %w", err)
-	}
-
-	return hex.EncodeToString(h.Sum(nil)), nil
 }

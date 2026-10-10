@@ -31,6 +31,7 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/nexusclient/dbc"
 )
@@ -324,7 +325,7 @@ func buildGameScopedDB(
 		return "", "", 0, 0, 0, fmt.Errorf("close scoped db: %w", err)
 	}
 
-	sha, err := hashFile(tmpPath)
+	sha, err := fsutil.HashFile(tmpPath)
 	if err != nil {
 		os.Remove(tmpPath)
 		return "", "", 0, 0, 0, fmt.Errorf("hash scoped db: %w", err)
@@ -672,7 +673,7 @@ func buildGameScopedCacheDB(
 		return "", "", fmt.Errorf("close scoped cache db: %w", err)
 	}
 
-	sha, err := hashFile(tmpPath)
+	sha, err := fsutil.HashFile(tmpPath)
 	if err != nil {
 		os.Remove(tmpPath)
 		return "", "", fmt.Errorf("hash scoped cache db: %w", err)

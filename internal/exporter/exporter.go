@@ -129,21 +129,6 @@ func currentSchemaVersion(ctx context.Context, db *sql.DB) (int64, error) {
 	return current, nil
 }
 
-// TODO: we already have two other copies of this export it somewhere...
-func hashFile(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
-}
-
 func writeManifest(tw *tar.Writer, m Manifest) error {
 	data, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
