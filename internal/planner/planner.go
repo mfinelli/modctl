@@ -490,6 +490,20 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 			op.Kind = PlanOpWrite
 		}
 
+		// A symlink that is written to is replaced by the file, and what it
+		// points to is left alone: unapply doesn't bring it back (see
+		// symlinkWarning)
+		if op.Kind != PlanOpNoop {
+			link, isLink, err := fsutil.SymlinkTarget(absPath)
+			if err != nil {
+				return Plan{}, fmt.Errorf("lstat %q: %w", pf.DestPath, err)
+			}
+			if isLink {
+				plan.Warnings = append(plan.Warnings,
+					symlinkWarning(pf.DestPath, link, existsOnDisk, op.NeedsBackup))
+			}
+		}
+
 		plan.Ops = append(plan.Ops, op)
 	}
 
@@ -654,4 +668,31 @@ func recheckHash(ctx context.Context, absPath, destPath string) (sha, warning st
 	}
 
 	return "", fmt.Sprintf("recheck: could not hash %q: %v", destPath, err), nil
+}
+
+// symlinkWarning says what is going to happen to a symlink at destPath that a
+// file is to be written to. link is where it points, as written in the
+// symlink. pointsAtSomething is whether that is there, and backedUp whether
+// what it points at is going to be backed up.
+//
+// Files are written by renaming a new one into place, so the symlink is
+// replaced by a regular file, and what it points to is not changed (nothing is
+// ever written through a symlink). What is backed up is the content of what it
+// points at, which unapply puts back as a regular file, so the symlink doesn't
+// come back.
+func symlinkWarning(destPath, link string, pointsAtSomething, backedUp bool) string {
+	switch {
+	case !pointsAtSomething:
+		return fmt.Sprintf(
+			"symlink: %q points to %q, which doesn't exist: it will be replaced by a regular file, and unapply won't bring the symlink back",
+			destPath, link)
+	case backedUp:
+		return fmt.Sprintf(
+			"symlink: %q points to %q: it will be replaced by a regular file (what it points to is left alone), and unapply will put back a regular file with its content and not the symlink",
+			destPath, link)
+	default:
+		return fmt.Sprintf(
+			"symlink: %q points to %q: it will be replaced by a regular file (what it points to is left alone), and unapply won't bring the symlink back",
+			destPath, link)
+	}
 }

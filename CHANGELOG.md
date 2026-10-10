@@ -18,6 +18,9 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
   finishes the change to the `default` library in v0.8.0. If your installs
   were already affected by it they are not put back: they are kept as they are
   now.
+- `apply` now warns when a file that a mod installs is a symlink in the game
+  directory. The symlink is replaced by a regular file (what it points to is
+  not changed), and `unapply` can't bring the symlink back.
 
 ## v0.8.0 - 2026-10-10
 

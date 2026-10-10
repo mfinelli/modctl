@@ -607,6 +607,16 @@ Apply detects four filesystem states for each planned path:
 3. Not tool-owned but present on disk -> back up then write
 4. Not tool-owned and not present on disk -> clean write
 
+Whether a path is "present" is decided by following symlinks, so a symlink that
+points to nothing is not present. Files are written by renaming a new one into
+place, so a symlink at a planned path is replaced by a regular file and what it
+points to is never written to; a backup (state 3) holds the content of what it
+points to, which unapply puts back as a regular file. The symlink itself is not
+backed up and does not come back, which the plan warns about for every
+symlink that is written over (it is rare enough in practice that that is all
+that is done about it for now). A symlink in a directory of the path is
+followed.
+
 ### Future conflict resolution types
 
 For each destination path (or pattern), allow policy:

@@ -39,6 +39,17 @@ external modifications, you can skip these hash checks:
 modctl apply --no-recheck
 ```
 
+### Symlinks
+
+Files are written by moving a new one into place, so nothing is ever written
+through a symlink: if a file that a mod installs is a symlink in the game
+directory, the symlink is replaced by a regular file and what it pointed to is
+left alone. The plan warns about each one, because `unapply` can't bring a
+symlink back: if what it pointed to was backed up it puts back a regular file
+with that content, and if it pointed to nothing there is nothing to put back.
+A symlink in a directory that contains the files (as opposed to a file that is
+a symlink) is followed, and the files end up where it points.
+
 ### Output format
 
 By default apply uses a progress indicator. To print each file operation on
