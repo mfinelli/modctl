@@ -31,6 +31,7 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/restore"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -314,7 +315,7 @@ func checkBundleBlobs(ctx context.Context, bundle *restore.Bundle, bq *dbq.Queri
 				return nil
 			}
 			h := sha256.New()
-			_, cerr := blobstore.CopyWithContext(ctx, h, f, buf)
+			_, cerr := fsutil.CopyWithContext(ctx, h, f, buf)
 			f.Close()
 			if cerr != nil {
 				issues = append(issues, fmt.Sprintf("hash blob %s: %s", style.ShortSha(name), cerr))

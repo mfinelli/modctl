@@ -290,7 +290,7 @@ func extractBundle(ctx context.Context, bundlePath, destDir string) error {
 			if err != nil {
 				return fmt.Errorf("create %s: %w", destPath, err)
 			}
-			if _, err := blobstore.CopyWithContext(ctx, out, tr, buf); err != nil {
+			if _, err := fsutil.CopyWithContext(ctx, out, tr, buf); err != nil {
 				out.Close()
 				return fmt.Errorf("extract %s: %w", destPath, err)
 			}

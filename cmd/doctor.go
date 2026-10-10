@@ -35,6 +35,7 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -678,7 +679,7 @@ func rehashBlobs(
 		}
 
 		h := sha256.New()
-		_, cerr := blobstore.CopyWithContext(ctx, h, f, buf)
+		_, cerr := fsutil.CopyWithContext(ctx, h, f, buf)
 		_ = f.Close()
 		if cerr != nil {
 			style.Print("\n")
@@ -838,7 +839,7 @@ func checkInstalledFiles(ctx context.Context) error {
 			}
 
 			h := sha256.New()
-			_, cerr := blobstore.CopyWithContext(ctx, h, file, buf)
+			_, cerr := fsutil.CopyWithContext(ctx, h, file, buf)
 			_ = file.Close()
 			if cerr != nil {
 				return fmt.Errorf("hash %s: %w", fullPath, cerr)

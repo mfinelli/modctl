@@ -669,7 +669,7 @@ func copyFile(ctx context.Context, src, dst string) error {
 	}()
 
 	buf := make([]byte, 1024*1024)
-	if _, err := blobstore.CopyWithContext(ctx, tmp, srcFile, buf); err != nil {
+	if _, err := fsutil.CopyWithContext(ctx, tmp, srcFile, buf); err != nil {
 		return fmt.Errorf("copy: %w", err)
 	}
 

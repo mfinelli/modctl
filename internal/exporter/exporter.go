@@ -33,6 +33,7 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/fsutil"
 )
 
 const ExportFormatVersion = 1
@@ -194,7 +195,7 @@ func writeBlobToTar(ctx context.Context, tw *tar.Writer, bs blobstore.Store, kin
 	}
 
 	buf := make([]byte, 1024*1024)
-	_, err = blobstore.CopyWithContext(ctx, tw, f, buf)
+	_, err = fsutil.CopyWithContext(ctx, tw, f, buf)
 	return false, err
 }
 
@@ -287,7 +288,7 @@ func verifyBlobs(
 		}
 
 		h := sha256.New()
-		_, cerr := blobstore.CopyWithContext(ctx, h, f, buf)
+		_, cerr := fsutil.CopyWithContext(ctx, h, f, buf)
 		f.Close()
 		if cerr != nil {
 			return fail(i+1, fmt.Errorf("hash blob %s: %w", b.sha256, cerr))

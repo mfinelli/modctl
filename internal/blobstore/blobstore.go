@@ -28,6 +28,8 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+
+	"github.com/mfinelli/modctl/internal/fsutil"
 )
 
 type Kind string
@@ -114,7 +116,7 @@ func (s Store) IngestFile(ctx context.Context, kind Kind, srcPath string) (Inges
 	w := io.MultiWriter(tmp, h)
 
 	buf := make([]byte, 1024*1024) // 1MiB buffer; fine for big archives
-	n, err := CopyWithContext(ctx, w, src, buf)
+	n, err := fsutil.CopyWithContext(ctx, w, src, buf)
 	if err != nil {
 		return res, fmt.Errorf("copy: %w", err)
 	}
@@ -174,62 +176,6 @@ func (s Store) IngestFile(ctx context.Context, kind Kind, srcPath string) (Inges
 	_ = fsyncDir(finalDir)
 
 	return IngestResult{SHA256Hex: shaHex, SizeBytes: n, Existed: false}, nil
-}
-
-// CopyWithContext copies bytes from src to dst using the provided buffer,
-// periodically checking ctx for cancellation.
-//
-// It behaves similarly to io.CopyBuffer, but allows the caller to cancel
-// long-running copy operations (e.g., very large archives) via context.
-//
-// The function:
-//   - Reads into the provided reusable buffer (no allocations inside the loop)
-//   - Writes each chunk fully before proceeding
-//   - Returns the total number of bytes successfully written
-//   - Stops early if ctx is canceled
-//
-// This is useful when ingesting large blobs where we want the CLI to remain
-// interruptible (Ctrl+C, timeouts, etc.) without relying on OS-level signals
-// to interrupt a blocking read.
-func CopyWithContext(ctx context.Context, dst io.Writer, src io.Reader, buf []byte) (int64, error) {
-	var total int64
-
-	for {
-		// Allow cancellation between read iterations.
-		// We intentionally check before reading to avoid unnecessary work.
-		select {
-		case <-ctx.Done():
-			return total, ctx.Err()
-		default:
-		}
-
-		// Read up to len(buf) bytes.
-		nr, er := src.Read(buf)
-		if nr > 0 {
-			// Write exactly what was read.
-			nw, ew := dst.Write(buf[:nr])
-			if nw > 0 {
-				total += int64(nw)
-			}
-			if ew != nil {
-				return total, ew
-			}
-			// Defensive check: partial writes should not happen for
-			// well-behaved writers; treat as error.
-			if nw != nr {
-				return total, io.ErrShortWrite
-			}
-		}
-
-		// Handle read result
-		if er != nil {
-			if errors.Is(er, io.EOF) {
-				// Normal termination
-				return total, nil
-			}
-			return total, er
-		}
-	}
 }
 
 // fsyncDir calls fsync(2) on a directory to ensure that metadata changes
