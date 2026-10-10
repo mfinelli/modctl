@@ -20,7 +20,9 @@ package extractor
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"testing"
@@ -108,5 +110,86 @@ func TestRemoveFromDisk(t *testing.T) {
 		assert.Contains(t, err.Error(), "remove")
 		assert.Contains(t, err.Error(), destPath)
 		assert.DirExists(t, dir)
+	})
+}
+
+// shaHex is the sha256 of content, as hex.
+func shaHex(content string) string {
+	sum := sha256.Sum256([]byte(content))
+	return hex.EncodeToString(sum[:])
+}
+
+func TestDescribeOnDisk(t *testing.T) {
+	t.Parallel()
+
+	const destPath = "bin/mod.dll"
+
+	t.Run("a file has its hash and size", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.TempDir(), "mod.dll")
+		require.NoError(t, os.WriteFile(path, []byte("hello"), 0o644))
+
+		sha, size, err := describeOnDisk(context.Background(), path, destPath)
+		require.NoError(t, err)
+		assert.Equal(t, sql.NullString{String: helloSha, Valid: true}, sha)
+		assert.Equal(t, sql.NullInt64{Int64: 5, Valid: true}, size)
+	})
+
+	t.Run("an empty file is a file", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.TempDir(), "mod.dll")
+		require.NoError(t, os.WriteFile(path, nil, 0o644))
+
+		sha, size, err := describeOnDisk(context.Background(), path, destPath)
+		require.NoError(t, err)
+		assert.Equal(t, sql.NullString{String: shaHex(""), Valid: true}, sha)
+		assert.Equal(t, sql.NullInt64{Int64: 0, Valid: true}, size)
+	})
+
+	t.Run("a file that is not there has nothing to describe, and that is not an error", func(t *testing.T) {
+		t.Parallel()
+
+		sha, size, err := describeOnDisk(context.Background(), filepath.Join(t.TempDir(), "gone"), destPath)
+		require.NoError(t, err)
+		assert.False(t, sha.Valid)
+		assert.False(t, size.Valid)
+	})
+
+	t.Run("a file that can't be read has nothing to describe either", func(t *testing.T) {
+		t.Parallel()
+
+		// a directory can be looked at but not read, whoever runs the test
+		sha, size, err := describeOnDisk(context.Background(), t.TempDir(), destPath)
+		require.NoError(t, err)
+		assert.False(t, sha.Valid)
+		assert.False(t, size.Valid, "a size without a hash would say less than nothing")
+	})
+
+	t.Run("being told to stop is an error that says where", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.TempDir(), "mod.dll")
+		require.NoError(t, os.WriteFile(path, []byte("hello"), 0o644))
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		sha, size, err := describeOnDisk(ctx, path, destPath)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.Contains(t, err.Error(), destPath)
+		assert.False(t, sha.Valid)
+		assert.False(t, size.Valid)
+	})
+
+	t.Run("a file that is not there is not looked for when told to stop", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		_, _, err := describeOnDisk(ctx, filepath.Join(t.TempDir(), "gone"), destPath)
+		assert.NoError(t, err, "there is nothing to hash, so nothing was cut short")
 	})
 }

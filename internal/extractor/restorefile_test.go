@@ -127,7 +127,72 @@ func TestRestoreFile(t *testing.T) {
 		// what is on disk now: the content of the backup, and its size
 		assert.Equal(t, sql.NullString{String: sha, Valid: true}, changes[0].NewContentSha256)
 		assert.Equal(t, sql.NullInt64{Int64: int64(len("the original")), Valid: true}, changes[0].NewSizeBytes)
+		// and what it replaced
+		assert.Equal(t, sql.NullString{String: shaHex("modded"), Valid: true}, changes[0].OldContentSha256)
+		assert.Equal(t, sql.NullInt64{Int64: int64(len("modded")), Valid: true}, changes[0].OldSizeBytes)
 		assert.False(t, changes[0].ModFileVersionID.Valid)
+	})
+
+	t.Run("what was replaced is what was on disk, even if it had been changed since it was installed", func(t *testing.T) {
+		t.Parallel()
+
+		f := newFileOpFixture(t)
+		// installed as "modded", and changed by hand after that
+		f.record(t, "bin/game.dll", 6, shaHex("modded"))
+		abs := filepath.Join(f.root, "bin", "game.dll")
+		require.NoError(t, os.MkdirAll(filepath.Dir(abs), 0o755))
+		require.NoError(t, os.WriteFile(abs, []byte("changed by hand"), 0o644))
+		sha := f.backedUp(t, "bin/game.dll", "the original")
+
+		_, err := f.restore(ctx, "bin/game.dll", sha, f.operationID)
+		require.NoError(t, err)
+
+		changes := f.changes(t, f.operationID)
+		require.Len(t, changes, 1)
+		assert.Equal(t, sql.NullString{String: shaHex("changed by hand"), Valid: true}, changes[0].OldContentSha256)
+		assert.Equal(t, sql.NullInt64{Int64: int64(len("changed by hand")), Valid: true}, changes[0].OldSizeBytes)
+		assert.Equal(t, "the original", readFile(t, abs))
+	})
+
+	t.Run("a file that is gone is restored, with nothing to say of what it replaced", func(t *testing.T) {
+		t.Parallel()
+
+		f := newFileOpFixture(t)
+		f.record(t, "bin/game.dll", 6, helloSha)
+		sha := f.backedUp(t, "bin/game.dll", "the original")
+
+		_, err := f.restore(ctx, "bin/game.dll", sha, f.operationID)
+		require.NoError(t, err)
+
+		assert.Equal(t, "the original", readFile(t, filepath.Join(f.root, "bin", "game.dll")))
+		changes := f.changes(t, f.operationID)
+		require.Len(t, changes, 1)
+		assert.False(t, changes[0].OldContentSha256.Valid)
+		assert.False(t, changes[0].OldSizeBytes.Valid)
+		assert.True(t, changes[0].NewContentSha256.Valid)
+	})
+
+	t.Run("a file that can't be read is still restored", func(t *testing.T) {
+		t.Parallel()
+
+		if os.Geteuid() == 0 {
+			t.Skip("root can read a file whatever its permissions")
+		}
+
+		f := newFileOpFixture(t)
+		f.install(t, "bin/game.dll", "modded", helloSha)
+		abs := filepath.Join(f.root, "bin", "game.dll")
+		require.NoError(t, os.Chmod(abs, 0o000))
+		sha := f.backedUp(t, "bin/game.dll", "the original")
+
+		_, err := f.restore(ctx, "bin/game.dll", sha, f.operationID)
+		require.NoError(t, err)
+
+		assert.Equal(t, "the original", readFile(t, abs))
+		changes := f.changes(t, f.operationID)
+		require.Len(t, changes, 1)
+		assert.False(t, changes[0].OldContentSha256.Valid)
+		assert.False(t, changes[0].OldSizeBytes.Valid)
 	})
 
 	t.Run("the blob stays in the store", func(t *testing.T) {

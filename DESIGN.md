@@ -566,6 +566,14 @@ in `operation_changes.old_content_sha256` for auditing. Hash verification
 before deletion (to detect external modifications) is not performed by
 default - use `apply --recheck` to detect drift before applying.
 
+The same goes for restore ops: the hash and size of the file that the backup
+replaces are what is on disk at that point (not what was installed, which may
+have changed since) and are recorded as `old_content_sha256` and
+`old_size_bytes`, so that a file that was modified after it was installed shows
+in `operations show` as a change of content. Recording them is best-effort: a
+file that can't be read is still replaced, and being interrupted while it is
+read leaves it untouched.
+
 Never blindly delete:
 
 - Only delete a file if its hash matches what the tool installed (unless

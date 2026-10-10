@@ -359,6 +359,15 @@ func (e Extractor) RestoreFile(
 		return RestoreFileResult{}, fmt.Errorf("stat backup blob for %q: %w", op.DestPath, err)
 	}
 
+	// What is there now is about to be replaced, so its hash and size are
+	// recorded as they are (which is not necessarily what was installed: the
+	// file may have been changed since). This is the one thing that can be
+	// interrupted before anything is touched.
+	oldSha, oldSize, err := describeOnDisk(ctx, absDestPath, op.DestPath)
+	if err != nil {
+		return RestoreFileResult{}, err
+	}
+
 	// Ensure destination directory exists
 	if err := os.MkdirAll(filepath.Dir(absDestPath), 0o755); err != nil {
 		return RestoreFileResult{}, fmt.Errorf("mkdir for %q: %w", op.DestPath, err)
@@ -401,8 +410,8 @@ func (e Extractor) RestoreFile(
 		TargetID:         targetID,
 		Relpath:          op.DestPath,
 		Action:           "restore_backup",
-		OldContentSha256: sql.NullString{},
-		OldSizeBytes:     sql.NullInt64{},
+		OldContentSha256: oldSha,
+		OldSizeBytes:     oldSize,
 		NewContentSha256: sql.NullString{String: op.BackupSha256, Valid: true},
 		NewSizeBytes:     sql.NullInt64{Int64: backupInfo.Size(), Valid: true},
 		ModFileVersionID: sql.NullInt64{},
@@ -648,26 +657,40 @@ func copyAndHash(ctx context.Context, src, dst string) (string, int64, error) {
 	return hex.EncodeToString(h.Sum(nil)), written, nil
 }
 
-// removeFromDisk deletes the file at absDestPath for RemoveFile, and returns
-// the hash and size it had so that they can be recorded in operation_changes
-// (old_content_sha256). Recording them is best-effort: a file that can't be
-// hashed is still removed, and one that is already gone is not an error (the
-// caller still has to clean up the database), in which case the hash and size
-// come back not valid. Being told to stop is the exception: the file is left
-// where it is. destPath is the path relative to the target, for messages.
-func removeFromDisk(ctx context.Context, absDestPath, destPath string) (oldSha sql.NullString, oldSize sql.NullInt64, err error) {
+// describeOnDisk returns the hash and size of the file at absDestPath as it is
+// on disk now, so that they can be recorded in operation_changes
+// (old_content_sha256 and old_size_bytes) for a file that is about to be
+// removed or replaced. Recording them is best-effort: a file that can't be
+// hashed, or that isn't there, comes back as not valid and that is not an
+// error. Being told to stop is the exception: the error says so, and what is
+// about to be done has to be left undone. destPath is the path relative to the
+// target, for messages.
+func describeOnDisk(ctx context.Context, absDestPath, destPath string) (sha sql.NullString, size sql.NullInt64, err error) {
 	info, err := os.Stat(absDestPath)
 	if err != nil {
 		return sql.NullString{}, sql.NullInt64{}, nil
 	}
 
-	sha, err := fsutil.HashFile(ctx, absDestPath)
-	if err == nil {
-		oldSha = sql.NullString{String: sha, Valid: true}
-		oldSize = sql.NullInt64{Int64: info.Size(), Valid: true}
-	} else if ctx.Err() != nil {
-		// we were told to stop: don't go on to delete the file
-		return sql.NullString{}, sql.NullInt64{}, fmt.Errorf("hash %q: %w", destPath, ctx.Err())
+	hash, err := fsutil.HashFile(ctx, absDestPath)
+	if err != nil {
+		if ctx.Err() != nil {
+			return sql.NullString{}, sql.NullInt64{}, fmt.Errorf("hash %q: %w", destPath, ctx.Err())
+		}
+		return sql.NullString{}, sql.NullInt64{}, nil
+	}
+
+	return sql.NullString{String: hash, Valid: true}, sql.NullInt64{Int64: info.Size(), Valid: true}, nil
+}
+
+// removeFromDisk deletes the file at absDestPath for RemoveFile, and returns
+// the hash and size it had (see describeOnDisk) so that they can be recorded.
+// A file that can't be hashed is still removed, and one that is already gone
+// is not an error (the caller still has to clean up the database). Being told
+// to stop is the exception: the file is left where it is.
+func removeFromDisk(ctx context.Context, absDestPath, destPath string) (oldSha sql.NullString, oldSize sql.NullInt64, err error) {
+	oldSha, oldSize, err = describeOnDisk(ctx, absDestPath, destPath)
+	if err != nil {
+		return sql.NullString{}, sql.NullInt64{}, err
 	}
 
 	if err := os.Remove(absDestPath); err != nil && !os.IsNotExist(err) {
