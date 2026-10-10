@@ -24,11 +24,19 @@ import (
 	"strings"
 )
 
+// NormalizeStoreID normalizes a store id the way store ids are stored and
+// compared: trimmed and lowercased. Store ids are meant to be stable
+// identifiers like "steam", so we normalize them to avoid surprising
+// mismatches.
+func NormalizeStoreID(s string) string {
+	return strings.ToLower(strings.TrimSpace(s))
+}
+
 // FullSelector always includes the instance (even if it's "default").
 //
 // Example: steam:1091500#default
 func FullSelector(storeID, storeGameID, instanceID string) string {
-	storeID = strings.ToLower(strings.TrimSpace(storeID))
+	storeID = NormalizeStoreID(storeID)
 	storeGameID = strings.TrimSpace(storeGameID)
 	instanceID = strings.TrimSpace(instanceID)
 
@@ -44,7 +52,7 @@ func FullSelector(storeID, storeGameID, instanceID string) string {
 // Example: steam:1091500
 // Example: steam:1091500#library_2
 func ShortSelector(storeID, storeGameID, instanceID string) string {
-	storeID = strings.ToLower(strings.TrimSpace(storeID))
+	storeID = NormalizeStoreID(storeID)
 	storeGameID = strings.TrimSpace(storeGameID)
 	instanceID = strings.TrimSpace(instanceID)
 
@@ -75,7 +83,7 @@ func ParseSelector(s string) (storeID, storeGameID, instanceID string, err error
 		)
 	}
 
-	storeID = strings.ToLower(strings.TrimSpace(s[:colon]))
+	storeID = NormalizeStoreID(s[:colon])
 	rest := strings.TrimSpace(s[colon+1:])
 
 	if storeID == "" || rest == "" {

@@ -24,6 +24,35 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestNormalizeStoreID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"already normal", "steam", "steam"},
+		{"lowercases", "StEaM", "steam"},
+		{"all upper case", "GOG", "gog"},
+		{"trims spaces", "  steam  ", "steam"},
+		{"trims tabs and newlines", "\t steam\n", "steam"},
+		{"trims and lowercases together", " Heroic ", "heroic"},
+		{"keeps whitespace inside", "my store", "my store"},
+		{"empty", "", ""},
+		{"only whitespace", " \t ", ""},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tc.want, NormalizeStoreID(tc.in))
+		})
+	}
+}
+
 func TestFullSelector(t *testing.T) {
 	t.Parallel()
 

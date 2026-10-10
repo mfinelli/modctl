@@ -22,7 +22,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
@@ -69,7 +68,7 @@ The store must already be configured.`,
 			return fmt.Errorf("error migrating database: %w", err)
 		}
 
-		storeID := normalizeStoreID(args[0])
+		storeID := internal.NormalizeStoreID(args[0])
 		q := dbq.New(db)
 		store, err := q.GetStoreById(ctx, storeID)
 		if err != nil {
@@ -102,11 +101,4 @@ The store must already be configured.`,
 
 func init() {
 	storesCmd.AddCommand(storesSetActiveCmd)
-}
-
-func normalizeStoreID(s string) string {
-	// store ids are meant to be stable identifiers like "steam"
-	// normalize to lowercase to avoid surprising mismatches
-	// TODO pull this somewhere that we can reuse it
-	return strings.ToLower(strings.TrimSpace(s))
 }
