@@ -27,6 +27,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -103,7 +104,16 @@ recreating rules in a different order.`,
 			return err
 		}
 
-		return internal.ClearRemapConfig(ctx, db, q, itemID, p.Name, mfv.ID)
+		cleared, err := internal.ClearRemapConfig(ctx, db, q, itemID)
+		if err != nil {
+			return err
+		}
+		if !cleared {
+			style.Printf("Version %d in profile %q has no remap rules\n", mfv.ID, p.Name)
+			return nil
+		}
+		style.Printf("Cleared remap rules for version %d in profile %q\n", mfv.ID, p.Name)
+		return nil
 	},
 }
 

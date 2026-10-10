@@ -27,6 +27,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -110,7 +111,7 @@ are replaced.`,
 		}
 
 		if len(srcOverrides) == 0 {
-			fmt.Printf("source profile %q has no overrides\n", src.Name)
+			style.Printf("source profile %q has no overrides\n", src.Name)
 			return nil
 		}
 
@@ -131,9 +132,9 @@ are replaced.`,
 				}
 			}
 			if len(conflicts) > 0 {
-				fmt.Printf("destination profile %q already has overrides at:\n", dst.Name)
+				style.Printf("destination profile %q already has overrides at:\n", dst.Name)
 				for _, c := range conflicts {
-					fmt.Printf("  %s\n", c)
+					style.Printf("  %s\n", c)
 				}
 				return fmt.Errorf("pass --force to replace conflicting overrides")
 			}
@@ -164,7 +165,7 @@ are replaced.`,
 			return fmt.Errorf("commit: %w", err)
 		}
 
-		fmt.Printf("copied %d override(s) from profile %q to %q\n",
+		style.Printf("copied %d override(s) from profile %q to %q\n",
 			len(srcOverrides), src.Name, dst.Name)
 
 		return nil

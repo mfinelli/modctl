@@ -21,8 +21,8 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -39,18 +39,6 @@ It is safe to run multiple times.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO extract...
-		boldStyle := lipgloss.NewStyle().Bold(true)
-		styles := internal.RefreshStyles{
-			Bold:   boldStyle,
-			Subtle: lipgloss.NewStyle().Foreground(lipgloss.Color("245")),
-			Warn:   lipgloss.NewStyle().Foreground(lipgloss.Color("3")),
-			Green:  lipgloss.NewStyle().Foreground(lipgloss.Color("10")),
-			Red:    lipgloss.NewStyle().Foreground(lipgloss.Color("9")),
-			Yellow: lipgloss.NewStyle().Foreground(lipgloss.Color("11")),
-			Cyan:   lipgloss.NewStyle().Foreground(lipgloss.Color("14")),
-		}
-
 		ctx := cmd.Context()
 
 		err := internal.EnsureDBExists()
@@ -69,35 +57,61 @@ It is safe to run multiple times.`,
 			return fmt.Errorf("error migrating database: %w", err)
 		}
 
-		fmt.Println(boldStyle.Render("Scanning stores..."))
-		fmt.Println()
+		style.Println(style.Bold.Render("Scanning stores..."))
+		style.Println()
 
-		result, err := internal.ScanStores(ctx, db, styles)
+		result, err := internal.ScanStores(ctx, db)
+
+		// warnings are worth showing even if the scan then failed
+		for _, w := range result.Warnings {
+			style.Println(style.Warning.Render(fmt.Sprintf("  ⚠ %s", w)))
+		}
 		if err != nil {
 			return err
 		}
 
+		for _, c := range result.Changes {
+			style.Println(refreshChangeLine(c))
+		}
+
 		// Summary
-		fmt.Println()
-		fmt.Println(boldStyle.Render("Done."))
+		style.Println()
+		style.Println(style.Bold.Render("Done."))
 		total := len(result.New) + len(result.Updated) + len(result.Returned)
-		fmt.Printf("  %d game(s) found", total)
+		style.Printf("  %d game(s) found", total)
 		if len(result.New) > 0 {
-			fmt.Printf(", %d new", len(result.New))
+			style.Printf(", %d new", len(result.New))
 		}
 		if len(result.Returned) > 0 {
-			fmt.Printf(", %d returned", len(result.Returned))
+			style.Printf(", %d returned", len(result.Returned))
 		}
 		if len(result.Missing) > 0 {
-			fmt.Printf(", %d missing", len(result.Missing))
+			style.Printf(", %d missing", len(result.Missing))
 		}
 		if len(result.Skipped) > 0 {
-			fmt.Printf(", %d skipped", len(result.Skipped))
+			style.Printf(", %d skipped", len(result.Skipped))
 		}
-		fmt.Println()
+		style.Println()
 
 		return nil
 	},
+}
+
+// refreshChangeLine renders what a refresh found out about one install.
+func refreshChangeLine(c internal.RefreshChange) string {
+	switch c.Kind {
+	case internal.RefreshMissing:
+		return style.Removed.Render(fmt.Sprintf("  - %s", c.Name)) +
+			style.Subtle.Render("  (no longer present)")
+	case internal.RefreshNew:
+		return style.Added.Render(fmt.Sprintf("  + %s", c.Name)) +
+			style.Subtle.Render("  (new)")
+	case internal.RefreshReturned:
+		return style.Restored.Render(fmt.Sprintf("  ↩ %s", c.Name)) +
+			style.Subtle.Render("  (returned)")
+	default:
+		return style.Subtle.Render(fmt.Sprintf("  = %s", c.Name))
+	}
 }
 
 func init() {

@@ -24,13 +24,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/exporter"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -63,11 +63,6 @@ Examples:
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: extract styles
-		boldStyle := lipgloss.NewStyle().Bold(true)
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-
 		ctx := cmd.Context()
 
 		if err := internal.EnsureDBExists(); err != nil {
@@ -95,6 +90,7 @@ Examples:
 			SkipInventory: exportSkipInventory,
 			NoVerify:      exportNoVerify,
 			CacheDBPath:   filepath.Join(viper.GetString("cache_dir"), "nexus_cache.db"),
+			Progress:      printExportProgress,
 		}
 
 		date := time.Now().Format("20060102")
@@ -106,19 +102,21 @@ Examples:
 			}
 			opts.OutputPath = exportOutput
 
-			fmt.Println(boldStyle.Render("Exporting (full)"))
-			fmt.Println(subtleStyle.Render("  output: " + exportOutput))
-			fmt.Println()
+			style.Println(style.Bold.Render("Exporting (full)"))
+			style.Println(style.Subtle.Render("  output: " + exportOutput))
+			style.Println()
 
 			start := time.Now()
-			if err := exporter.Full(ctx, db, q, bs, opts); err != nil {
+			result, err := exporter.Full(ctx, db, q, bs, opts)
+			if err != nil {
 				return fmt.Errorf("export: %w", err)
 			}
+			warnSkippedBlobs(result)
 
 			st, _ := os.Stat(exportOutput)
-			fmt.Println(okStyle.Render(fmt.Sprintf("  ✓ export complete in %.1fs", time.Since(start).Seconds())))
+			style.Println(style.Success.Render(fmt.Sprintf("  ✓ export complete in %.1fs", time.Since(start).Seconds())))
 			if st != nil {
-				fmt.Println(subtleStyle.Render(fmt.Sprintf("  size: %s", formatBytes(st.Size()))))
+				style.Println(style.Subtle.Render(fmt.Sprintf("  size: %s", style.Bytes(st.Size()))))
 			}
 			return nil
 		}
@@ -134,26 +132,52 @@ Examples:
 		}
 		opts.OutputPath = exportOutput
 
-		fmt.Println(boldStyle.Render(fmt.Sprintf("Exporting %s", gi.DisplayName)))
-		fmt.Println(subtleStyle.Render("  output: " + exportOutput))
+		style.Println(style.Bold.Render(fmt.Sprintf("Exporting %s", gi.DisplayName)))
+		style.Println(style.Subtle.Render("  output: " + exportOutput))
 		if exportSkipInventory {
-			fmt.Println(subtleStyle.Render("  inventory: skipped"))
+			style.Println(style.Subtle.Render("  inventory: skipped"))
 		}
-		fmt.Println()
+		style.Println()
 
 		start := time.Now()
-		if err := exporter.Game(ctx, db, q, bs, gi, opts); err != nil {
+		result, err := exporter.Game(ctx, db, q, bs, gi, opts)
+		if err != nil {
 			return fmt.Errorf("export: %w", err)
 		}
+		warnSkippedBlobs(result)
 
 		st, _ := os.Stat(exportOutput)
-		fmt.Println(okStyle.Render(fmt.Sprintf("  ✓ export complete in %.1fs", time.Since(start).Seconds())))
+		style.Println(style.Success.Render(fmt.Sprintf("  ✓ export complete in %.1fs", time.Since(start).Seconds())))
 		if st != nil {
-			fmt.Println(subtleStyle.Render(fmt.Sprintf("  size: %s", formatBytes(st.Size()))))
+			style.Println(style.Subtle.Render(fmt.Sprintf("  size: %s", style.Bytes(st.Size()))))
 		}
 
 		return nil
 	},
+}
+
+// printExportProgress shows blob verification as a single updating line.
+func printExportProgress(p exporter.Progress) {
+	switch p.Kind {
+	case exporter.VerifyStarted:
+		style.Printf("  verifying blobs (0/%d)", p.Total)
+	case exporter.VerifyBlob:
+		style.Printf("\r  verifying blobs (%d/%d)", p.Done, p.Total)
+	case exporter.VerifyFinished:
+		style.Printf("\r%-60s\r", "")
+		style.Printf("  verified %d blob(s)\n", p.Total)
+	case exporter.VerifyFailed:
+		// end the progress line so the error starts on a line of its own
+		style.Print("\n")
+	}
+}
+
+// warnSkippedBlobs tells the user about blobs that were left out of an export
+// because they were missing from disk.
+func warnSkippedBlobs(r exporter.Result) {
+	for _, sha := range r.SkippedBlobs {
+		style.Fprintf(os.Stderr, "warning: blob %s missing from disk, skipped in export\n", style.ShortSha(sha))
+	}
 }
 
 func init() {

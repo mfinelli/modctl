@@ -1410,6 +1410,55 @@ Key behavior:
 - apply performs reconciliation
 - always support --dry-run where destructive
 
+### Terminal output styling
+
+All terminal styling lives in `internal/style` (which is the only package that
+imports lipgloss); no command defines its own styles. The package has two
+layers:
+
+- the **palette**: the ANSI colors modctl uses, with the bright variants named
+  separately (`Green` and `BrightGreen`, and so on);
+- the **roles**: styles named for what they are used for, defined in terms of the
+  palette. Commands use roles.
+
+The roles follow how the output is used. Lines that report how something went
+(`Success`, `Failure`, `Warning`, `Info`) use the plain colors. Per-item markers
+and state (`Added`, `Removed`, `Changed`, `Restored`, `Unchanged`, `Active`,
+`Inactive`, `Good`, `Bad`, `Pending`) use the bright colors. Text roles
+(`Subtle`, `Dim`, `Label`, `Header`, `Section`, `Bold`) and the containers
+(`Card`, `Banner`) round it out. A command that needs a style that has no role
+yet adds one rather than using a palette color directly, so that restyling a
+function is a one-line change in `roles.go`.
+
+The package also holds how output is laid out and formatted, so that every
+command does it the same way and it can be tested in one place: `KV` for
+aligned label/value lines (one `KV` per group of lines, sized to the longest
+label), `Table` for tables, and `Bytes`, `Age`, `Duration` and `ShortSha` for
+sizes, times and hashes.
+
+Printing goes through `style.Print`, `Printf` and `Println` (and `Fprint*` for
+anything other than standard output), never through `fmt`. Since lipgloss v2 a
+style always renders to a string with its full escape sequences, and it is the
+writer that decides what the output can show: when the destination is not a
+terminal, or `NO_COLOR` is set, the colors are removed, and a terminal with
+fewer colors gets the closest ones it has. Printing a styled string with `fmt`
+skips that and writes the raw sequences into pipes and files. `KV.Print` and
+the other helpers in `style` print this way too.
+
+Two things differ from what lipgloss does by default, to keep the output the
+same as it was with v1: `Table` draws a rounded border (v2 defaults to a square
+one), and `Subtle` asks a 16-color terminal for bright black by name, because
+converting its 256-color gray would give it white.
+
+Code under `internal/` does not print. Anything that is shown to the user is
+rendered by the command in `cmd/`, using `internal/style`. Functions that do
+work return what happened (a changed flag, a count, a list of changes) and the
+command decides how to say it; long-running work reports how it is going through
+a callback (see `exporter.Options.Progress`) rather than writing to the
+terminal. The one exception is code that is handed an `io.Writer` to write to,
+such as the Nexus SSO flow. This keeps that code testable, and means it can drive
+something other than a line-oriented terminal, such as a TUI.
+
 ### command-specifc information
 
 #### `profiles delete`

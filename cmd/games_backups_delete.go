@@ -23,12 +23,12 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -101,8 +101,7 @@ not immediately removed from disk; run 'modctl gc' to reclaim space.`,
 			return fmt.Errorf("resolve target %q: %w", targetName, err)
 		}
 
-		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-		fmt.Println(warnStyle.Render(fmt.Sprintf(
+		style.Println(style.Warning.Render(fmt.Sprintf(
 			"  warning: deleting this backup means modctl cannot restore the original file at %q on unapply",
 			relpath,
 		)))
@@ -119,7 +118,7 @@ not immediately removed from disk; run 'modctl gc' to reclaim space.`,
 			return fmt.Errorf("no backup found for %q in target %q", relpath, targetName)
 		}
 
-		fmt.Printf("Deleted backup for %q (run 'modctl gc' to reclaim disk space)\n", relpath)
+		style.Printf("Deleted backup for %q (run 'modctl gc' to reclaim disk space)\n", relpath)
 		return nil
 	},
 }

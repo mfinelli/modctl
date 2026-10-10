@@ -21,9 +21,9 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/charmbracelet/lipgloss/table"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
 )
@@ -82,11 +82,7 @@ Only enabled stores are scanned during discovery.`,
 			})
 		}
 
-		t := table.New().
-			Headers(" Enabled ", " ID ", " Name ").
-			Rows(rows...)
-
-		fmt.Println(t)
+		style.Println(style.Table([]string{" Enabled ", " ID ", " Name "}, rows))
 
 		return nil
 	},

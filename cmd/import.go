@@ -24,11 +24,11 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/restore"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/mod/semver"
@@ -70,19 +70,12 @@ Use --dry-run to preview what would be imported without making any changes.`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO extract these
-		boldStyle := lipgloss.NewStyle().Bold(true)
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-		infoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
-
 		ctx := cmd.Context()
 
 		bundlePath := args[0]
 
 		// Open and validate bundle before touching the DB
-		fmt.Println(boldStyle.Render("Validating bundle..."))
+		style.Println(style.Bold.Render("Validating bundle..."))
 		bundle, err := restore.OpenAndValidate(ctx, bundlePath)
 		if err != nil {
 			return fmt.Errorf("invalid bundle: %w", err)
@@ -94,23 +87,23 @@ Use --dry-run to preview what would be imported without making any changes.`,
 			return fmt.Errorf("--same-machine is not valid for game-scoped bundles")
 		}
 
-		fmt.Println(subtleStyle.Render(fmt.Sprintf("  format version: %d", bundle.Manifest.ExportFormatVersion)))
-		fmt.Println(subtleStyle.Render(fmt.Sprintf("  export kind:    %s", bundle.Manifest.ExportKind)))
-		fmt.Println(subtleStyle.Render(fmt.Sprintf("  exported at:    %s", bundle.Manifest.ExportedAt.Format("2006-01-02 15:04:05 UTC"))))
-		fmt.Println(subtleStyle.Render(fmt.Sprintf("  modctl version: %s", bundle.Manifest.ModctlVersion)))
-		fmt.Println(subtleStyle.Render(fmt.Sprintf("  schema version: %d", bundle.Manifest.SchemaVersion)))
-		fmt.Println(subtleStyle.Render(fmt.Sprintf("  archives:       %d", bundle.Manifest.Counts.Archives)))
-		fmt.Println(subtleStyle.Render(fmt.Sprintf("  backups:        %d", bundle.Manifest.Counts.Backups)))
-		fmt.Println(subtleStyle.Render(fmt.Sprintf("  overrides:      %d", bundle.Manifest.Counts.Overrides)))
+		style.Println(style.Subtle.Render(fmt.Sprintf("  format version: %d", bundle.Manifest.ExportFormatVersion)))
+		style.Println(style.Subtle.Render(fmt.Sprintf("  export kind:    %s", bundle.Manifest.ExportKind)))
+		style.Println(style.Subtle.Render(fmt.Sprintf("  exported at:    %s", bundle.Manifest.ExportedAt.Format("2006-01-02 15:04:05 UTC"))))
+		style.Println(style.Subtle.Render(fmt.Sprintf("  modctl version: %s", bundle.Manifest.ModctlVersion)))
+		style.Println(style.Subtle.Render(fmt.Sprintf("  schema version: %d", bundle.Manifest.SchemaVersion)))
+		style.Println(style.Subtle.Render(fmt.Sprintf("  archives:       %d", bundle.Manifest.Counts.Archives)))
+		style.Println(style.Subtle.Render(fmt.Sprintf("  backups:        %d", bundle.Manifest.Counts.Backups)))
+		style.Println(style.Subtle.Render(fmt.Sprintf("  overrides:      %d", bundle.Manifest.Counts.Overrides)))
 		if bundle.Manifest.Game != nil {
-			fmt.Println(subtleStyle.Render(fmt.Sprintf("  game:           %s (%s:%s)",
+			style.Println(style.Subtle.Render(fmt.Sprintf("  game:           %s (%s:%s)",
 				bundle.Manifest.Game.DisplayName,
 				bundle.Manifest.Game.StoreID,
 				bundle.Manifest.Game.StoreGameID,
 			)))
 		}
-		fmt.Println(okStyle.Render("  ✓ bundle integrity OK"))
-		fmt.Println()
+		style.Println(style.Success.Render("  ✓ bundle integrity OK"))
+		style.Println()
 
 		if err := internal.EnsureDBExists(); err != nil {
 			return err
@@ -148,16 +141,16 @@ Use --dry-run to preview what would be imported without making any changes.`,
 		currentVer := "v" + rootCmd.Version
 		if semver.IsValid(bundleVer) && semver.IsValid(currentVer) &&
 			semver.Compare(bundleVer, currentVer) > 0 {
-			fmt.Println(warnStyle.Render(fmt.Sprintf(
+			style.Println(style.Warning.Render(fmt.Sprintf(
 				"  ⚠ bundle was created with modctl %s (current: %s) - import may not work correctly",
 				bundle.Manifest.ModctlVersion, rootCmd.Version,
 			)))
-			fmt.Println()
+			style.Println()
 		}
 
 		if importDryRun {
-			fmt.Println(boldStyle.Render("Dry run - no changes will be made"))
-			fmt.Println()
+			style.Println(style.Bold.Render("Dry run - no changes will be made"))
+			style.Println()
 		}
 
 		var result restore.Result
@@ -166,14 +159,14 @@ Use --dry-run to preview what would be imported without making any changes.`,
 		switch bundle.Manifest.ExportKind {
 		case "full":
 			if importGame != "" {
-				fmt.Println(infoStyle.Render(fmt.Sprintf(
+				style.Println(style.Info.Render(fmt.Sprintf(
 					"  ℹ full bundle detected, importing only game %s", importGame,
 				)))
-				fmt.Println()
-				fmt.Println(boldStyle.Render(fmt.Sprintf("Importing game: %s...", importGame)))
+				style.Println()
+				style.Println(style.Bold.Render(fmt.Sprintf("Importing game: %s...", importGame)))
 				result, importErr = restore.Game(ctx, db, q, bs, bundle, opts, rootCmd.Version, logger)
 			} else {
-				fmt.Println(boldStyle.Render("Importing (full)..."))
+				style.Println(style.Bold.Render("Importing (full)..."))
 				result, importErr = restore.Full(
 					ctx, db, q, bs, bundle, opts,
 					viper.GetString("database"),
@@ -190,12 +183,12 @@ Use --dry-run to preview what would be imported without making any changes.`,
 						bundleGame, importGame,
 					)
 				}
-				fmt.Println(warnStyle.Render(fmt.Sprintf(
+				style.Println(style.Warning.Render(fmt.Sprintf(
 					"  ⚠ --game flag is redundant: bundle is already scoped to %s", bundleGame,
 				)))
-				fmt.Println()
+				style.Println()
 			}
-			fmt.Println(boldStyle.Render(fmt.Sprintf("Importing game: %s...",
+			style.Println(style.Bold.Render(fmt.Sprintf("Importing game: %s...",
 				bundle.Manifest.Game.DisplayName)))
 			result, importErr = restore.Game(ctx, db, q, bs, bundle, opts, rootCmd.Version, logger)
 		default:
@@ -209,39 +202,39 @@ Use --dry-run to preview what would be imported without making any changes.`,
 			return fmt.Errorf("import failed: %w", importErr)
 		}
 
-		fmt.Println()
+		style.Println()
 		if importDryRun {
-			fmt.Println(boldStyle.Render("Would import:"))
+			style.Println(style.Bold.Render("Would import:"))
 		} else {
-			fmt.Println(boldStyle.Render("Import complete"))
+			style.Println(style.Bold.Render("Import complete"))
 		}
-		fmt.Printf("  archives:  %d\n", result.Archives)
+		style.Printf("  archives:  %d\n", result.Archives)
 		if result.Backups > 0 {
-			fmt.Printf("  backups:   %d\n", result.Backups)
+			style.Printf("  backups:   %d\n", result.Backups)
 		}
 		if result.Overrides > 0 {
-			fmt.Printf("  overrides: %d\n", result.Overrides)
+			style.Printf("  overrides: %d\n", result.Overrides)
 		}
 		if result.ModPages > 0 {
-			fmt.Printf("  mod pages: %d\n", result.ModPages)
+			style.Printf("  mod pages: %d\n", result.ModPages)
 		}
 		if result.Profiles > 0 {
-			fmt.Printf("  profiles:  %d\n", result.Profiles)
+			style.Printf("  profiles:  %d\n", result.Profiles)
 		}
 		if result.InventoryScanned > 0 {
-			fmt.Println(subtleStyle.Render(fmt.Sprintf(
+			style.Println(style.Subtle.Render(fmt.Sprintf(
 				"  inventoried %d archive(s)", result.InventoryScanned,
 			)))
 		}
 		if result.InventoryFailed > 0 {
-			fmt.Println(warnStyle.Render(fmt.Sprintf(
+			style.Println(style.Warning.Render(fmt.Sprintf(
 				"  ⚠ %d archive(s) failed inventory scan - run 'mods scan-inventory' to retry",
 				result.InventoryFailed,
 			)))
 		}
 		if !importDryRun {
-			fmt.Println()
-			fmt.Println(subtleStyle.Render(
+			style.Println()
+			style.Println(style.Subtle.Render(
 				"  note: no profiles have been applied - run 'modctl profiles set-active' and 'modctl apply' to deploy mods",
 			))
 		}

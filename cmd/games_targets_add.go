@@ -29,6 +29,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -121,7 +122,7 @@ moves later, this target will not be updated automatically.`,
 			return fmt.Errorf("add target: %w", err)
 		}
 
-		fmt.Printf("Added target %q (id=%d) → %s\n", target.Name, target.ID, target.RootPath)
+		style.Printf("Added target %q (id=%d) → %s\n", target.Name, target.ID, target.RootPath)
 		return nil
 	},
 }

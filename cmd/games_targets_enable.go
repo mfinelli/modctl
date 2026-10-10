@@ -28,6 +28,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -94,7 +95,7 @@ var gamesTargetsEnableCmd = &cobra.Command{
 		}
 
 		if internal.TargetEnabled(target) {
-			fmt.Printf("Target %q is already enabled.\n", name)
+			style.Printf("Target %q is already enabled.\n", name)
 			return nil
 		}
 
@@ -105,7 +106,7 @@ var gamesTargetsEnableCmd = &cobra.Command{
 			return fmt.Errorf("enable target: %w", err)
 		}
 
-		fmt.Printf("Enabled target %q.\n", name)
+		style.Printf("Enabled target %q.\n", name)
 		return nil
 	},
 }

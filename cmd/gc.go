@@ -28,11 +28,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-sqlite3"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -74,14 +74,6 @@ Use --dry-run to preview what would be removed without making any changes.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO extract styles
-		boldStyle := lipgloss.NewStyle().Bold(true)
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-		redStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
-		dryStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
-
 		ctx := cmd.Context()
 
 		if err := internal.EnsureDBExists(); err != nil {
@@ -114,15 +106,15 @@ Use --dry-run to preview what would be removed without making any changes.`,
 		q := dbq.New(db)
 
 		if gcDryRun {
-			fmt.Println(boldStyle.Render("Garbage collection (dry run)"))
+			style.Println(style.Bold.Render("Garbage collection (dry run)"))
 		} else {
-			fmt.Println(boldStyle.Render("Garbage collection"))
+			style.Println(style.Bold.Render("Garbage collection"))
 		}
 		if minAge > 0 {
-			fmt.Println(subtleStyle.Render(fmt.Sprintf("  min-age: %s (skipping blobs newer than %s)",
+			style.Println(style.Subtle.Render(fmt.Sprintf("  min-age: %s (skipping blobs newer than %s)",
 				gcMinAge, minAge.String())))
 		}
-		fmt.Println()
+		style.Println()
 
 		var kinds []blobstore.Kind
 		if !gcNoArchives {
@@ -136,7 +128,7 @@ Use --dry-run to preview what would be removed without making any changes.`,
 		}
 
 		if len(kinds) == 0 {
-			fmt.Println(subtleStyle.Render("  nothing to do (--no-archives, --no-backups, and --no-overrides all set)"))
+			style.Println(style.Subtle.Render("  nothing to do (--no-archives, --no-backups, and --no-overrides all set)"))
 			return nil
 		}
 
@@ -147,55 +139,55 @@ Use --dry-run to preview what would be removed without making any changes.`,
 		var totalMissingCleaned int
 
 		for _, kind := range kinds {
-			fmt.Println(boldStyle.Render(fmt.Sprintf("%s blobs", kind)))
+			style.Println(style.Bold.Render(fmt.Sprintf("%s blobs", kind)))
 
 			res, err := runGC(ctx, q, bs, kind, gcOptions{
 				dryRun:       gcDryRun,
 				minAge:       minAge,
 				cleanMissing: gcCleanMissing,
 				skipOrphans:  gcSkipOrphans,
-			}, subtleStyle, okStyle, warnStyle, redStyle, dryStyle)
+			})
 			if err != nil {
 				return fmt.Errorf("gc %s: %w", kind, err)
 			}
 
 			// per-kind summary
-			fmt.Println()
+			style.Println()
 			if res.removed == 0 && res.orphans == 0 && res.missingCleaned == 0 {
-				fmt.Println(subtleStyle.Render("  nothing collected"))
+				style.Println(style.Subtle.Render("  nothing collected"))
 			} else {
 				if res.removed > 0 {
 					action := "removed"
 					if gcDryRun {
 						action = "would remove"
 					}
-					fmt.Printf("  %s\n",
-						okStyle.Render(fmt.Sprintf("%s %d unreferenced blob(s) (%s)",
-							action, res.removed, formatBytes(res.removedBytes))))
+					style.Printf("  %s\n",
+						style.Success.Render(fmt.Sprintf("%s %d unreferenced blob(s) (%s)",
+							action, res.removed, style.Bytes(res.removedBytes))))
 				}
 				if res.orphans > 0 {
 					action := "removed"
 					if gcDryRun {
 						action = "would remove"
 					}
-					fmt.Printf("  %s\n",
-						okStyle.Render(fmt.Sprintf("%s %d orphan file(s) (%s)",
-							action, res.orphans, formatBytes(res.orphanBytes))))
+					style.Printf("  %s\n",
+						style.Success.Render(fmt.Sprintf("%s %d orphan file(s) (%s)",
+							action, res.orphans, style.Bytes(res.orphanBytes))))
 				}
 				if res.missingCleaned > 0 {
 					action := "cleaned"
 					if gcDryRun {
 						action = "would clean"
 					}
-					fmt.Printf("  %s\n",
-						warnStyle.Render(fmt.Sprintf("%s %d missing blob DB row(s)",
+					style.Printf("  %s\n",
+						style.Warning.Render(fmt.Sprintf("%s %d missing blob DB row(s)",
 							action, res.missingCleaned)))
 				}
 			}
 			for _, w := range res.warnings {
-				fmt.Println(warnStyle.Render("  ⚠  " + w))
+				style.Println(style.Warning.Render("  ⚠  " + w))
 			}
-			fmt.Println()
+			style.Println()
 
 			totalRemoved += res.removed
 			totalRemovedBytes += res.removedBytes
@@ -206,18 +198,18 @@ Use --dry-run to preview what would be removed without making any changes.`,
 
 		// overall summary if we processed more than one kind
 		if len(kinds) > 1 {
-			fmt.Println(boldStyle.Render("Total"))
+			style.Println(style.Bold.Render("Total"))
 			freed := totalRemovedBytes + totalOrphanBytes
 			if gcDryRun {
-				fmt.Printf("  would free %s across %d blob(s)\n",
-					formatBytes(freed), totalRemoved+totalOrphans)
+				style.Printf("  would free %s across %d blob(s)\n",
+					style.Bytes(freed), totalRemoved+totalOrphans)
 			} else {
-				fmt.Printf("  freed %s across %d blob(s)\n",
-					formatBytes(freed), totalRemoved+totalOrphans)
+				style.Printf("  freed %s across %d blob(s)\n",
+					style.Bytes(freed), totalRemoved+totalOrphans)
 			}
 			if totalMissingCleaned > 0 {
-				fmt.Printf("  %s\n",
-					warnStyle.Render(fmt.Sprintf("cleaned %d missing DB row(s)", totalMissingCleaned)))
+				style.Printf("  %s\n",
+					style.Warning.Render(fmt.Sprintf("cleaned %d missing DB row(s)", totalMissingCleaned)))
 			}
 		}
 
@@ -267,7 +259,6 @@ func runGC(
 	bs blobstore.Store,
 	kind blobstore.Kind,
 	opts gcOptions,
-	subtleStyle, okStyle, warnStyle, redStyle, dryStyle lipgloss.Style,
 ) (gcResult, error) {
 	var res gcResult
 
@@ -287,10 +278,10 @@ func runGC(
 		if !cutoff.IsZero() {
 			createdAt, err := time.Parse("2006-01-02T15:04:05.000Z", b.CreatedAt)
 			if err == nil && createdAt.After(cutoff) {
-				fmt.Printf("  %s %s %s\n",
-					subtleStyle.Render("~"),
-					b.Sha256[:16]+"...",
-					subtleStyle.Render("(skipped, too new)"))
+				style.Printf("  %s %s %s\n",
+					style.Subtle.Render("~"),
+					style.ShortSha(b.Sha256),
+					style.Subtle.Render("(skipped, too new)"))
 				continue
 			}
 		}
@@ -304,10 +295,10 @@ func runGC(
 		if statErr != nil {
 			if os.IsNotExist(statErr) {
 				res.missing++
-				fmt.Printf("  %s %s %s\n",
-					warnStyle.Render("?"),
-					b.Sha256[:16]+"...",
-					warnStyle.Render("(db row exists but file missing from disk)"))
+				style.Printf("  %s %s %s\n",
+					style.Warning.Render("?"),
+					style.ShortSha(b.Sha256),
+					style.Warning.Render("(db row exists but file missing from disk)"))
 				if opts.cleanMissing {
 					if !opts.dryRun {
 						if err := q.DeleteBlob(ctx, b.Sha256); err != nil {
@@ -321,25 +312,25 @@ func runGC(
 						}
 					}
 					res.missingCleaned++
-					fmt.Printf("  %s %s\n",
-						dryStyle.Render("↳"),
-						subtleStyle.Render("db row removed"))
+					style.Printf("  %s %s\n",
+						style.DryRun.Render("↳"),
+						style.Subtle.Render("db row removed"))
 				}
 				continue
 			}
 			return res, fmt.Errorf("stat %s: %w", path, statErr)
 		}
 
-		name := b.Sha256[:16] + "..."
+		name := style.ShortSha(b.Sha256)
 		if b.OriginalName.Valid {
-			name = fmt.Sprintf("%s %s", b.OriginalName.String, subtleStyle.Render("("+b.Sha256[:16]+"...)"))
+			name = fmt.Sprintf("%s %s", b.OriginalName.String, style.Subtle.Render("("+style.ShortSha(b.Sha256)+")"))
 		}
 
 		if opts.dryRun {
-			fmt.Printf("  %s %s %s\n",
-				dryStyle.Render("-"),
+			style.Printf("  %s %s %s\n",
+				style.DryRun.Render("-"),
 				name,
-				subtleStyle.Render(formatBytes(st.Size())))
+				style.Subtle.Render(style.Bytes(st.Size())))
 		} else {
 			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 				return res, fmt.Errorf("remove blob file %s: %w", path, err)
@@ -355,10 +346,10 @@ func runGC(
 				}
 				return res, fmt.Errorf("delete blob row %s: %w", b.Sha256, err)
 			}
-			fmt.Printf("  %s %s %s\n",
-				redStyle.Render("-"),
+			style.Printf("  %s %s %s\n",
+				style.Removed.Render("-"),
 				name,
-				subtleStyle.Render(formatBytes(st.Size())))
+				style.Subtle.Render(style.Bytes(st.Size())))
 		}
 
 		res.removed++
@@ -380,30 +371,30 @@ func runGC(
 		for _, o := range orphans {
 			// min-age guard using file mtime for orphans (no DB row to check)
 			if !cutoff.IsZero() && o.modTime.After(cutoff) {
-				fmt.Printf("  %s %s %s\n",
-					subtleStyle.Render("~"),
-					o.sha256[:16]+"...",
-					subtleStyle.Render("(orphan skipped, too new)"))
+				style.Printf("  %s %s %s\n",
+					style.Subtle.Render("~"),
+					style.ShortSha(o.sha256),
+					style.Subtle.Render("(orphan skipped, too new)"))
 				continue
 			}
 
-			fmt.Printf("  %s %s %s %s\n",
-				warnStyle.Render("!"),
-				o.sha256[:16]+"...",
-				subtleStyle.Render(formatBytes(o.size)),
-				warnStyle.Render("(orphan: no db row)"))
+			style.Printf("  %s %s %s %s\n",
+				style.Warning.Render("!"),
+				style.ShortSha(o.sha256),
+				style.Subtle.Render(style.Bytes(o.size)),
+				style.Warning.Render("(orphan: no db row)"))
 
 			if opts.dryRun {
-				fmt.Printf("  %s %s\n",
-					dryStyle.Render("↳"),
-					subtleStyle.Render("would remove"))
+				style.Printf("  %s %s\n",
+					style.DryRun.Render("↳"),
+					style.Subtle.Render("would remove"))
 			} else {
 				if err := os.Remove(o.path); err != nil && !os.IsNotExist(err) {
 					return res, fmt.Errorf("remove orphan %s: %w", o.path, err)
 				}
-				fmt.Printf("  %s %s\n",
-					redStyle.Render("↳"),
-					subtleStyle.Render("removed"))
+				style.Printf("  %s %s\n",
+					style.Removed.Render("↳"),
+					style.Subtle.Render("removed"))
 			}
 
 			res.orphans++

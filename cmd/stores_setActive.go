@@ -28,6 +28,7 @@ import (
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
 )
@@ -93,7 +94,7 @@ The store must already be configured.`,
 			return err
 		}
 
-		fmt.Printf("Active store set to %s (%s)\n", store.ID, store.DisplayName)
+		style.Printf("Active store set to %s (%s)\n", store.ID, store.DisplayName)
 
 		return nil
 	},

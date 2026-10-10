@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
@@ -33,6 +32,7 @@ import (
 	"github.com/mfinelli/modctl/internal/nexus"
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.finelli.dev/util"
@@ -158,10 +158,6 @@ func runManualLink(
 	gameInstallID int64,
 	versionID int64,
 ) error {
-	// TODO: extract styles
-	subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-
 	// Fetch current link state and verify game scope in one shot
 	row, err := q.GetModFileVersionLinkState(ctx, dbq.GetModFileVersionLinkStateParams{
 		ID:            versionID,
@@ -198,7 +194,7 @@ func runManualLink(
 			}); err != nil {
 				return fmt.Errorf("updating mod page nexus info: %w", err)
 			}
-			fmt.Println(subtleStyle.Render(fmt.Sprintf("  updated mod page nexus info: %s/mods/%d", gameDomain, modID)))
+			style.Println(style.Subtle.Render(fmt.Sprintf("  updated mod page nexus info: %s/mods/%d", gameDomain, modID)))
 		}
 	} else if gameDomain == "" || modID == 0 {
 		return fmt.Errorf(
@@ -210,7 +206,7 @@ func runManualLink(
 	// --file-id bypasses identification entirely
 	if modsNexusLinkFileID != 0 {
 		if row.NexusFileID.Int64 == modsNexusLinkFileID {
-			fmt.Println(subtleStyle.Render(fmt.Sprintf(
+			style.Println(style.Subtle.Render(fmt.Sprintf(
 				"  mod_file_version %d is already linked to nexus file_id %d (no changes made)",
 				versionID, modsNexusLinkFileID,
 			)))
@@ -222,7 +218,7 @@ func runManualLink(
 		}); err != nil {
 			return fmt.Errorf("updating nexus file id: %w", err)
 		}
-		fmt.Println(subtleStyle.Render(fmt.Sprintf(
+		style.Println(style.Subtle.Render(fmt.Sprintf(
 			"  linked mod_file_version %d to nexus file_id %d",
 			versionID, modsNexusLinkFileID,
 		)))
@@ -243,7 +239,7 @@ func runManualLink(
 		filesResp.Files,
 	)
 	for _, w := range warnings {
-		fmt.Println(warnStyle.Render(fmt.Sprintf("  ⚠ %s", w)))
+		style.Println(style.Warning.Render(fmt.Sprintf("  ⚠ %s", w)))
 	}
 	if err != nil {
 		return fmt.Errorf("identifying nexus file: %w", err)
@@ -257,14 +253,14 @@ func runManualLink(
 
 	// No-op check
 	if row.NexusFileID.Int64 == int64(match.File.FileID) && row.Label == match.File.Name {
-		fmt.Println(subtleStyle.Render(fmt.Sprintf(
+		style.Println(style.Subtle.Render(fmt.Sprintf(
 			"  mod_file_version %d is already correctly linked (no changes made)",
 			versionID,
 		)))
 		return nil
 	}
 
-	fmt.Println(subtleStyle.Render(fmt.Sprintf(
+	style.Println(style.Subtle.Render(fmt.Sprintf(
 		"  identified nexus file: %s v%s (file_id: %d, confidence: %s)",
 		match.File.Name, match.File.Version, match.File.FileID, match.Confidence,
 	)))
@@ -293,7 +289,7 @@ func runManualLink(
 			}); err != nil {
 				return fmt.Errorf("updating mod file label: %w", err)
 			}
-			fmt.Println(subtleStyle.Render(fmt.Sprintf("  updated mod file label: %s", match.File.Name)))
+			style.Println(style.Subtle.Render(fmt.Sprintf("  updated mod file label: %s", match.File.Name)))
 		} else {
 			// Target label already exists on a sibling row: merge
 			tx, err := db.BeginTx(ctx, nil)
@@ -328,7 +324,7 @@ func runManualLink(
 				return fmt.Errorf("commit merge: %w", err)
 			}
 
-			fmt.Println(subtleStyle.Render(fmt.Sprintf(
+			style.Println(style.Subtle.Render(fmt.Sprintf(
 				"  merged mod file %q into existing %q",
 				row.Label, match.File.Name,
 			)))
@@ -344,17 +340,13 @@ func runAutoLink(
 	client *nexusclient.Client,
 	gameInstallID int64,
 ) error {
-	// TODO: extract styles
-	subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-
 	// Warn about versions we'll skip
 	skippable, err := q.GetSkippableModFileVersions(ctx, gameInstallID)
 	if err != nil {
 		return fmt.Errorf("fetching skippable mod file versions: %w", err)
 	}
 	for _, s := range skippable {
-		fmt.Println(warnStyle.Render(fmt.Sprintf(
+		style.Println(style.Warning.Render(fmt.Sprintf(
 			"  ⚠ skipping mod_file_version %d (%s / %s): no nexus mod page info; use `mods nexus link --version-id %d --nexus-url <url>` to resolve",
 			s.VersionID, s.ModPageName, s.Label, s.VersionID,
 		)))
@@ -365,7 +357,7 @@ func runAutoLink(
 		return fmt.Errorf("fetching unlinked mod file versions: %w", err)
 	}
 	if len(candidates) == 0 {
-		fmt.Println(subtleStyle.Render("  all mod file versions are already linked"))
+		style.Println(style.Subtle.Render("  all mod file versions are already linked"))
 		return nil
 	}
 
@@ -389,13 +381,13 @@ func runAutoLink(
 	} else {
 		hourly, daily := state.EffectiveRemaining()
 		if needed > int64(hourly) || needed > int64(daily) {
-			fmt.Printf("  ⚠ this operation requires %d API calls (hourly remaining: %d, daily remaining: %d)\n",
+			style.Printf("  ⚠ this operation requires %d API calls (hourly remaining: %d, daily remaining: %d)\n",
 				needed, hourly, daily)
 			if !nexusLinkForce {
-				fmt.Println(warnStyle.Render("  operation aborted: not enough API quota remaining; pass --force to proceed anyway"))
+				style.Println(style.Warning.Render("  operation aborted: not enough API quota remaining; pass --force to proceed anyway"))
 				return nil
 			}
-			fmt.Println(warnStyle.Render("  proceeding anyway due to --force"))
+			style.Println(style.Warning.Render("  proceeding anyway due to --force"))
 		}
 	}
 
@@ -405,7 +397,7 @@ func runAutoLink(
 	for key, versions := range grouped {
 		filesResp, err := client.GetModFiles(key.domain, key.modID)
 		if err != nil {
-			fmt.Println(warnStyle.Render(fmt.Sprintf(
+			style.Println(style.Warning.Render(fmt.Sprintf(
 				"  ⚠ failed to fetch file list for %s/mods/%d: %s",
 				key.domain, key.modID, err,
 			)))
@@ -422,10 +414,10 @@ func runAutoLink(
 				filesResp.Files,
 			)
 			for _, w := range warnings {
-				fmt.Println(warnStyle.Render(fmt.Sprintf("  ⚠ %s", w)))
+				style.Println(style.Warning.Render(fmt.Sprintf("  ⚠ %s", w)))
 			}
 			if err != nil {
-				fmt.Println(warnStyle.Render(fmt.Sprintf(
+				style.Println(style.Warning.Render(fmt.Sprintf(
 					"  ⚠ error identifying mod_file_version %d (%s / %s): %s",
 					v.VersionID, v.ModPageName, v.Label, err,
 				)))
@@ -433,7 +425,7 @@ func runAutoLink(
 				continue
 			}
 			if match == nil {
-				fmt.Println(warnStyle.Render(fmt.Sprintf(
+				style.Println(style.Warning.Render(fmt.Sprintf(
 					"  ⚠ could not identify nexus file for mod_file_version %d (%s / %s); use `mods nexus link --version-id %d --nexus-url %s` to resolve manually",
 					v.VersionID, v.ModPageName, v.Label, v.VersionID,
 					fmt.Sprintf("https://www.nexusmods.com/%s/mods/%d", key.domain, key.modID),
@@ -446,7 +438,7 @@ func runAutoLink(
 				ID:          v.VersionID,
 				NexusFileID: sql.NullInt64{Int64: int64(match.File.FileID), Valid: true},
 			}); err != nil {
-				fmt.Println(warnStyle.Render(fmt.Sprintf(
+				style.Println(style.Warning.Render(fmt.Sprintf(
 					"  ⚠ failed to update nexus file id for mod_file_version %d: %s",
 					v.VersionID, err,
 				)))
@@ -454,7 +446,7 @@ func runAutoLink(
 				continue
 			}
 
-			fmt.Println(subtleStyle.Render(fmt.Sprintf(
+			style.Println(style.Subtle.Render(fmt.Sprintf(
 				"  linked mod_file_version %d (%s / %s) to nexus file_id %d (confidence: %s)",
 				v.VersionID, v.ModPageName, v.Label, match.File.FileID, match.Confidence,
 			)))
@@ -462,6 +454,6 @@ func runAutoLink(
 		}
 	}
 
-	fmt.Printf("\n  linked: %d  failed/skipped: %d\n", linked, failed+len(skippable))
+	style.Printf("\n  linked: %d  failed/skipped: %d\n", linked, failed+len(skippable))
 	return nil
 }

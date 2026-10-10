@@ -27,6 +27,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
 )
@@ -114,7 +115,16 @@ priority or position in the load order.`,
 			return err
 		}
 
-		return internal.SetProfileItemEnabled(ctx, &p, q, mfv.ID, true)
+		changed, err := internal.SetProfileItemEnabled(ctx, &p, q, mfv.ID, true)
+		if err != nil {
+			return err
+		}
+		if !changed {
+			style.Printf("Version %d is already enabled in profile %q\n", mfv.ID, p.Name)
+			return nil
+		}
+		style.Printf("Enabled version %d in profile %q\n", mfv.ID, p.Name)
+		return nil
 	},
 }
 

@@ -51,6 +51,39 @@ type Options struct {
 	NoVerify bool
 	// CacheDBPath is the full path to the nexus_cache.db
 	CacheDBPath string
+	// Progress, if set, is told how verifying blobs is going. The exporter
+	// itself prints nothing.
+	Progress func(Progress)
+}
+
+// ProgressKind says what a Progress update is about.
+type ProgressKind int
+
+const (
+	// VerifyStarted: blob verification is about to begin; Total is the
+	// number of blobs.
+	VerifyStarted ProgressKind = iota
+	// VerifyBlob: the Done'th blob (counting from 1) is being verified.
+	VerifyBlob
+	// VerifyFinished: every blob was verified.
+	VerifyFinished
+	// VerifyFailed: verification stopped without finishing, because of an
+	// error or because the context was cancelled.
+	VerifyFailed
+)
+
+// Progress is an update on how an export is going.
+type Progress struct {
+	Kind  ProgressKind
+	Done  int
+	Total int
+}
+
+// Result is what an export reports besides the file it wrote.
+type Result struct {
+	// SkippedBlobs are the hashes of blobs that were in the database but
+	// missing from disk, and so were left out of the export.
+	SkippedBlobs []string
 }
 
 const (
@@ -227,78 +260,83 @@ type blobToVerify struct {
 
 // verifyBlobs hashes all blobs of the given kinds against their on-disk files,
 // updates verified_at on success, and returns an error if any hash mismatches.
-// Progress is printed as a single updating line.
+// How it is going is reported through progress, if it is not nil.
 func verifyBlobs(
 	ctx context.Context,
 	q *dbq.Queries,
 	bs blobstore.Store,
 	blobs []blobToVerify,
+	progress func(Progress),
 ) error {
 	total := len(blobs)
 	if total == 0 {
 		return nil
 	}
 
+	report := func(kind ProgressKind, done int) {
+		if progress != nil {
+			progress(Progress{Kind: kind, Done: done, Total: total})
+		}
+	}
+	// fail reports that verification stopped, and passes the error on
+	fail := func(done int, err error) error {
+		report(VerifyFailed, done)
+		return err
+	}
+
 	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	buf := make([]byte, 1024*1024)
 
-	fmt.Printf("  verifying blobs (0/%d)", total)
+	report(VerifyStarted, 0)
 
 	for i, b := range blobs {
 		select {
 		case <-ctx.Done():
-			fmt.Print("\n")
-			return ctx.Err()
+			return fail(i, ctx.Err())
 		default:
 		}
 
-		fmt.Printf("\r  verifying blobs (%d/%d)", i+1, total)
+		report(VerifyBlob, i+1)
 
 		path, err := bs.PathFor(b.kind, b.sha256)
 		if err != nil {
-			fmt.Print("\n")
-			return fmt.Errorf("derive path for %s: %w", b.sha256, err)
+			return fail(i+1, fmt.Errorf("derive path for %s: %w", b.sha256, err))
 		}
 
 		f, err := os.Open(path)
 		if err != nil {
-			fmt.Print("\n")
 			if os.IsNotExist(err) {
-				return fmt.Errorf(
-					"blob %s... is missing from disk; run 'doctor' to check blob integrity",
-					b.sha256[:16],
-				)
+				return fail(i+1, fmt.Errorf(
+					"blob %s is missing from disk; run 'doctor' to check blob integrity",
+					b.sha256,
+				))
 			}
-			return fmt.Errorf("open blob %s: %w", b.sha256[:16], err)
+			return fail(i+1, fmt.Errorf("open blob %s: %w", b.sha256, err))
 		}
 
 		h := sha256.New()
 		_, cerr := blobstore.CopyWithContext(ctx, h, f, buf)
 		f.Close()
 		if cerr != nil {
-			fmt.Print("\n")
-			return fmt.Errorf("hash blob %s: %w", b.sha256[:16], cerr)
+			return fail(i+1, fmt.Errorf("hash blob %s: %w", b.sha256, cerr))
 		}
 
 		actual := hex.EncodeToString(h.Sum(nil))
 		if actual != b.sha256 {
-			fmt.Print("\n")
-			return fmt.Errorf(
+			return fail(i+1, fmt.Errorf(
 				"blob integrity check failed: expected %s got %s - run 'doctor' to investigate",
 				b.sha256, actual,
-			)
+			))
 		}
 
 		if err := q.TouchBlobVerifiedAt(ctx, dbq.TouchBlobVerifiedAtParams{
 			VerifiedAt: sql.NullString{String: now, Valid: true},
 			Sha256:     b.sha256,
 		}); err != nil {
-			fmt.Print("\n")
-			return fmt.Errorf("update verified_at %s: %w", b.sha256[:16], err)
+			return fail(i+1, fmt.Errorf("update verified_at %s: %w", b.sha256, err))
 		}
 	}
 
-	fmt.Printf("\r%-60s\r", "")
-	fmt.Printf("  verified %d blob(s)\n", total)
+	report(VerifyFinished, total)
 	return nil
 }

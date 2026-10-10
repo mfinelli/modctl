@@ -33,6 +33,7 @@ import (
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/extractor"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -243,7 +244,7 @@ archives.`,
 
 		// no-op if unchanged
 		if string(result) == string(editContent) {
-			fmt.Println("no changes made")
+			style.Println("no changes made")
 			return nil
 		}
 
@@ -308,9 +309,9 @@ archives.`,
 		}
 
 		if isNew {
-			fmt.Printf("override created for %q in profile %q\n", relpath, p.Name)
+			style.Printf("override created for %q in profile %q\n", relpath, p.Name)
 		} else {
-			fmt.Printf("override updated for %q in profile %q\n", relpath, p.Name)
+			style.Printf("override updated for %q in profile %q\n", relpath, p.Name)
 		}
 
 		return nil

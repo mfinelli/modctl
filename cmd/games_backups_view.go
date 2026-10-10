@@ -30,6 +30,7 @@ import (
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -134,7 +135,7 @@ Binary files are detected automatically and refused unless --force is passed.`,
 			)
 		}
 
-		fmt.Print(string(data))
+		style.Print(string(data))
 		return nil
 	},
 }

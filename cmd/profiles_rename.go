@@ -30,6 +30,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -118,7 +119,7 @@ Profile names must be unique per game.`,
 			return fmt.Errorf("rename profile: %w", err)
 		}
 
-		fmt.Printf("Renamed profile %q -> %q\n", oldName, newName)
+		style.Printf("Renamed profile %q -> %q\n", oldName, newName)
 
 		return nil
 	},

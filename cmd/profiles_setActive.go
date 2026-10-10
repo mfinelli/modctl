@@ -29,6 +29,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -104,7 +105,7 @@ The current active game is used unless --game is provided.`,
 		}
 		if p.IsActive != 0 {
 			// Already active: treat as idempotent.
-			fmt.Printf("Profile %q is already active\n", profileName)
+			style.Printf("Profile %q is already active\n", profileName)
 			return nil
 		}
 
@@ -131,7 +132,7 @@ The current active game is used unless --game is provided.`,
 			return fmt.Errorf("commit: %w", err)
 		}
 
-		fmt.Printf("Active profile set to %q\n", profileName)
+		style.Printf("Active profile set to %q\n", profileName)
 
 		return nil
 	},

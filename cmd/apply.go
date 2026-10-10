@@ -26,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
@@ -37,6 +36,7 @@ import (
 	"github.com/mfinelli/modctl/internal/patchapply"
 	"github.com/mfinelli/modctl/internal/planner"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -137,7 +137,7 @@ Use --dry-run to preview the plan without making any changes. Add the
 				return fmt.Errorf("mark last operation failed: %w", err)
 			}
 			if applyAbort {
-				fmt.Println("Operation marked as failed. Run 'modctl apply' to reapply or 'modctl unapply' to clean up.")
+				style.Println("Operation marked as failed. Run 'modctl apply' to reapply or 'modctl unapply' to clean up.")
 				return nil
 			}
 		}
@@ -176,19 +176,10 @@ Use --dry-run to preview the plan without making any changes. Add the
 			plans = append(plans, plan)
 		}
 
-		// TODO extract these styles somewhere
-		boldStyle := lipgloss.NewStyle().Bold(true)
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-		greenStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
-		redStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
-		yellowStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
-		cyanStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("14"))
-
 		// Dry-run output
 		if applyDryRun {
 			for _, plan := range plans {
-				printApplyPlan(plan, p.Name, gi.DisplayName, applyShowConflicts, boldStyle, subtleStyle, warnStyle, greenStyle, redStyle, yellowStyle, cyanStyle)
+				printApplyPlan(plan, p.Name, gi.DisplayName, applyShowConflicts)
 			}
 			return nil
 		}
@@ -202,9 +193,9 @@ Use --dry-run to preview the plan without making any changes. Add the
 		if len(plans) > 1 {
 			targetLabel = "targets"
 		}
-		fmt.Println(boldStyle.Render(fmt.Sprintf("Applying %q → %s", p.Name, gi.DisplayName)) +
-			"  " + subtleStyle.Render(fmt.Sprintf("(%s: %s)", targetLabel, strings.Join(targetNames, ", "))))
-		fmt.Println()
+		style.Println(style.Bold.Render(fmt.Sprintf("Applying %q → %s", p.Name, gi.DisplayName)) +
+			"  " + style.Subtle.Render(fmt.Sprintf("(%s: %s)", targetLabel, strings.Join(targetNames, ", "))))
+		style.Println()
 
 		bs := blobstore.Store{
 			ArchivesDir:  viper.GetString("archives_dir"),
@@ -271,7 +262,7 @@ Use --dry-run to preview the plan without making any changes. Add the
 
 		// Print an initial line so \r updates have something to overwrite
 		if !applyVerbose {
-			fmt.Printf("  [%*d/%d] ...", width, 0, total)
+			style.Printf("  [%*d/%d] ...", width, 0, total)
 		}
 
 		// With several targets in one run, say which one each op belongs to
@@ -289,19 +280,19 @@ Use --dry-run to preview the plan without making any changes. Add the
 			}
 			line := fmt.Sprintf("  "+fmtCounter+" %s %s", current, total, symbol, path)
 			if detail != "" {
-				line += subtleStyle.Render("  " + detail)
+				line += style.Subtle.Render("  " + detail)
 			}
 			if applyVerbose {
-				fmt.Println(line)
+				style.Println(line)
 			} else {
-				fmt.Printf("\r%-*s", 80, line)
+				style.Printf("\r%-*s", 80, line)
 			}
 		}
 
 		for _, plan := range plans {
 			currentTarget = plan.TargetName
 			if multiTarget && applyVerbose {
-				fmt.Println(subtleStyle.Render(fmt.Sprintf("  target: %s", plan.TargetName)))
+				style.Println(style.Subtle.Render(fmt.Sprintf("  target: %s", plan.TargetName)))
 			}
 
 			archiveMap := make(map[string]*archiveGroup)
@@ -352,10 +343,10 @@ Use --dry-run to preview the plan without making any changes. Add the
 				}
 
 				for _, planOp := range group.ops {
-					symbol := greenStyle.Render("+")
+					symbol := style.Added.Render("+")
 					detail := ""
 					if planOp.Kind == planner.PlanOpOverwrite {
-						symbol = yellowStyle.Render("~")
+						symbol = style.Changed.Render("~")
 					}
 					if planOp.NeedsBackup {
 						detail = "(backing up original)"
@@ -365,7 +356,7 @@ Use --dry-run to preview the plan without making any changes. Add the
 					result, err := ext.DeployFile(ctx, db, q, planOp, stagingPath, plan.TargetRoot, gi.ID, plan.TargetID, p.ID, op.ID)
 					if err != nil {
 						if applyVerbose {
-							fmt.Println(warnStyle.Render(fmt.Sprintf("    ✗ %v", err)))
+							style.Println(style.Warning.Render(fmt.Sprintf("    ✗ %v", err)))
 						}
 						return markFailed(fmt.Errorf("deploy %q: %w", planOp.DestPath, err))
 					}
@@ -383,10 +374,10 @@ Use --dry-run to preview the plan without making any changes. Add the
 
 			// Deploy override ops
 			for _, planOp := range overrideOps {
-				symbol := greenStyle.Render("+")
+				symbol := style.Added.Render("+")
 				detail := "(override)"
 				if planOp.Kind == planner.PlanOpOverwrite {
-					symbol = yellowStyle.Render("~")
+					symbol = style.Changed.Render("~")
 				}
 				if planOp.NeedsBackup {
 					detail = "(override, backing up original)"
@@ -434,7 +425,7 @@ Use --dry-run to preview the plan without making any changes. Add the
 
 			// Remove ops
 			for _, planOp := range removeOps {
-				printOp(redStyle.Render("-"), planOp.DestPath, "")
+				printOp(style.Removed.Render("-"), planOp.DestPath, "")
 				if _, err := ext.RemoveFile(ctx, db, q, planOp, plan.TargetRoot, gi.ID, plan.TargetID, op.ID); err != nil {
 					return markFailed(fmt.Errorf("remove %q: %w", planOp.DestPath, err))
 				}
@@ -444,7 +435,7 @@ Use --dry-run to preview the plan without making any changes. Add the
 
 			// Restore ops
 			for _, planOp := range restoreOps {
-				printOp(cyanStyle.Render("↩"), planOp.DestPath, "")
+				printOp(style.Restored.Render("↩"), planOp.DestPath, "")
 				if _, err := ext.RestoreFile(ctx, db, q, planOp, plan.TargetRoot, gi.ID, plan.TargetID, op.ID); err != nil {
 					return markFailed(fmt.Errorf("restore %q: %w", planOp.DestPath, err))
 				}
@@ -460,7 +451,7 @@ Use --dry-run to preview the plan without making any changes. Add the
 
 		// Clear the spinner line before printing summary
 		if !applyVerbose {
-			fmt.Print("\r" + strings.Repeat(" ", 80) + "\r")
+			style.Print("\r" + strings.Repeat(" ", 80) + "\r")
 		}
 
 		// Mark operation successful and update applied state in one transaction
@@ -496,38 +487,38 @@ Use --dry-run to preview the plan without making any changes. Add the
 		if !applyKeepStaging {
 			if err := ext.CleanupStaging(ctx); err != nil {
 				// Non-fatal - warn but don't fail the apply
-				fmt.Println(warnStyle.Render(fmt.Sprintf("  warning: cleanup staging: %v", err)))
+				style.Println(style.Warning.Render(fmt.Sprintf("  warning: cleanup staging: %v", err)))
 			}
 		} else {
-			fmt.Println(subtleStyle.Render(fmt.Sprintf("  staging kept at: %s", ext.StagingPathFor(""))))
+			style.Println(style.Subtle.Render(fmt.Sprintf("  staging kept at: %s", ext.StagingPathFor(""))))
 		}
 
 		// Summary
 		elapsed := time.Since(mustParseTime(op.StartedAt))
-		fmt.Println(boldStyle.Render(fmt.Sprintf("Apply complete in %.1fs", elapsed.Seconds())))
+		style.Println(style.Bold.Render(fmt.Sprintf("Apply complete in %.1fs", elapsed.Seconds())))
 		if countWrite > 0 {
-			fmt.Printf("  written:     %d\n", countWrite)
+			style.Printf("  written:     %d\n", countWrite)
 		}
 		if countOverwrite > 0 {
-			fmt.Printf("  overwritten: %d\n", countOverwrite)
+			style.Printf("  overwritten: %d\n", countOverwrite)
 		}
 		if countRemove > 0 {
-			fmt.Printf("  removed:     %d\n", countRemove)
+			style.Printf("  removed:     %d\n", countRemove)
 		}
 		if countRestore > 0 {
-			fmt.Printf("  restored:    %d\n", countRestore)
+			style.Printf("  restored:    %d\n", countRestore)
 		}
 		if countBackedUp > 0 {
-			fmt.Printf("  backed up:   %d\n", countBackedUp)
+			style.Printf("  backed up:   %d\n", countBackedUp)
 		}
 		var allWarnings []string
 		for _, plan := range plans {
 			allWarnings = append(allWarnings, plan.Warnings...)
 		}
 		if len(allWarnings) > 0 {
-			fmt.Println(warnStyle.Render(fmt.Sprintf("  warnings:    %d", len(allWarnings))))
+			style.Println(style.Warning.Render(fmt.Sprintf("  warnings:    %d", len(allWarnings))))
 			for _, w := range allWarnings {
-				fmt.Println(warnStyle.Render("    ⚠  " + w))
+				style.Println(style.Warning.Render("    ⚠  " + w))
 			}
 		}
 		return nil
@@ -575,11 +566,10 @@ func printApplyPlan(
 	profileName string,
 	gameName string,
 	showConflicts bool,
-	bold, subtle, warn, green, red, yellow, cyan lipgloss.Style,
 ) {
-	fmt.Println(bold.Render(fmt.Sprintf("Apply plan for %q → %s", profileName, gameName)) +
-		"  " + subtle.Render(fmt.Sprintf("(target: %s)", plan.TargetName)))
-	fmt.Println()
+	style.Println(style.Bold.Render(fmt.Sprintf("Apply plan for %q → %s", profileName, gameName)) +
+		"  " + style.Subtle.Render(fmt.Sprintf("(target: %s)", plan.TargetName)))
+	style.Println()
 
 	var (
 		countWrite     int
@@ -593,66 +583,66 @@ func printApplyPlan(
 	for _, op := range plan.Ops {
 		switch op.Kind {
 		case planner.PlanOpWrite:
-			symbol := green.Render("+")
+			symbol := style.Added.Render("+")
 			detail := ""
 			if op.NeedsBackup {
-				detail = subtle.Render("(backup needed)")
+				detail = style.Subtle.Render("(backup needed)")
 				countBackup++
 			} else if op.SkipBackup {
-				detail = subtle.Render("(skip-backup)")
+				detail = style.Subtle.Render("(skip-backup)")
 			}
 			modInfo := ""
 			if op.File != nil {
 				winner := op.File.Winner()
 				modInfo = formatModInfo(winner)
 			} else if op.OverrideID.Valid {
-				modInfo = subtle.Render("(override)")
+				modInfo = style.Subtle.Render("(override)")
 			}
-			fmt.Printf("  %s %-50s %s %s\n", symbol, op.DestPath, modInfo, detail)
+			style.Printf("  %s %-50s %s %s\n", symbol, op.DestPath, modInfo, detail)
 			countWrite++
 			if op.File != nil && len(op.File.Conflicts) > 1 {
 				countConflict++
 				if showConflicts {
-					printConflictLosers(op.File, subtle)
+					printConflictLosers(op.File)
 				}
 			}
 
 		case planner.PlanOpOverwrite:
-			symbol := yellow.Render("~")
+			symbol := style.Changed.Render("~")
 			detail := ""
 			if op.NeedsBackup {
-				detail = subtle.Render("(backup needed)")
+				detail = style.Subtle.Render("(backup needed)")
 				countBackup++
 			} else if op.SkipBackup {
-				detail = subtle.Render("(skip-backup)")
+				detail = style.Subtle.Render("(skip-backup)")
 			}
 			modInfo := ""
 			if op.File != nil {
 				winner := op.File.Winner()
 				modInfo = formatModInfo(winner)
 			} else if op.OverrideID.Valid {
-				modInfo = subtle.Render("(override)")
+				modInfo = style.Subtle.Render("(override)")
 			}
-			fmt.Printf("  %s %-50s %s %s\n", symbol, op.DestPath, modInfo, detail)
+			style.Printf("  %s %-50s %s %s\n", symbol, op.DestPath, modInfo, detail)
 			countOverwrite++
 			if op.File != nil && len(op.File.Conflicts) > 1 {
 				countConflict++
 				if showConflicts {
-					printConflictLosers(op.File, subtle)
+					printConflictLosers(op.File)
 				}
 			}
 
 		case planner.PlanOpRemove:
-			fmt.Printf("  %s %s\n", red.Render("-"), op.DestPath)
+			style.Printf("  %s %s\n", style.Removed.Render("-"), op.DestPath)
 			countRemove++
 
 		case planner.PlanOpRestoreBackup:
-			fmt.Printf("  %s %s\n", cyan.Render("↩"), op.DestPath)
+			style.Printf("  %s %s\n", style.Restored.Render("↩"), op.DestPath)
 			countRestore++
 		}
 	}
 
-	fmt.Println()
+	style.Println()
 
 	// Summary line
 	parts := []string{}
@@ -669,18 +659,18 @@ func printApplyPlan(
 		parts = append(parts, fmt.Sprintf("%d restore", countRestore))
 	}
 	total := countWrite + countOverwrite + countRemove + countRestore
-	fmt.Printf("  %d operations: %s\n", total, strings.Join(parts, ", "))
+	style.Printf("  %d operations: %s\n", total, strings.Join(parts, ", "))
 
 	if countConflict > 0 {
-		fmt.Printf("  %d conflict(s) resolved\n", countConflict)
+		style.Printf("  %d conflict(s) resolved\n", countConflict)
 	}
 	if countBackup > 0 {
-		fmt.Printf("  %d file(s) will be backed up\n", countBackup)
+		style.Printf("  %d file(s) will be backed up\n", countBackup)
 	}
 	if len(plan.Warnings) > 0 {
-		fmt.Println()
+		style.Println()
 		for _, w := range plan.Warnings {
-			fmt.Println(warn.Render("  ⚠  " + w))
+			style.Println(style.Warning.Render("  ⚠  " + w))
 		}
 	}
 }
@@ -692,17 +682,17 @@ func formatModInfo(c planner.Conflict) string {
 	if c.VersionString != "" {
 		s += " " + c.VersionString
 	}
-	return lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render(s)
+	return style.Subtle.Render(s)
 }
 
 // printConflictLosers prints the losing mods for a conflicted path, indented
 // and muted, sorted by priority descending (same order as Conflicts slice).
-func printConflictLosers(pf *planner.PlanFile, subtle lipgloss.Style) {
+func printConflictLosers(pf *planner.PlanFile) {
 	for _, c := range pf.Conflicts {
 		if c.Won {
 			continue
 		}
-		fmt.Println(subtle.Render(fmt.Sprintf("      ✗ %s", formatModInfoRaw(c))))
+		style.Println(style.Subtle.Render(fmt.Sprintf("      ✗ %s", formatModInfoRaw(c))))
 	}
 }
 

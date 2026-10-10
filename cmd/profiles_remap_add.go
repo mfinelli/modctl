@@ -28,6 +28,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -147,7 +148,12 @@ Examples:
 			return err
 		}
 
-		return internal.AddRemapRule(ctx, db, q, itemID, ruleType, intVal, textVal, profilesRemapAddPosition)
+		position, err := internal.AddRemapRule(ctx, db, q, itemID, ruleType, intVal, textVal, profilesRemapAddPosition)
+		if err != nil {
+			return err
+		}
+		style.Printf("Added %s rule at position %d\n", ruleType, position)
+		return nil
 	},
 }
 

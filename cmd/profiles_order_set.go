@@ -30,6 +30,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -125,7 +126,7 @@ Higher priority wins conflicts. Priorities must be unique within a profile.`,
 		}
 
 		if item.Priority == newPrio {
-			fmt.Printf("Priority for version %d is already %d in profile %q\n", mfv.ID, newPrio, p.Name)
+			style.Printf("Priority for version %d is already %d in profile %q\n", mfv.ID, newPrio, p.Name)
 			return nil
 		}
 
@@ -157,7 +158,7 @@ Higher priority wins conflicts. Priorities must be unique within a profile.`,
 			return fmt.Errorf("commit: %w", err)
 		}
 
-		fmt.Printf("Set priority for version %d to %d in profile %q\n", mfv.ID, newPrio, p.Name)
+		style.Printf("Set priority for version %d to %d in profile %q\n", mfv.ID, newPrio, p.Name)
 
 		return nil
 	},

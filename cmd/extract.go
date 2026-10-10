@@ -28,10 +28,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/archivescanner"
 	"github.com/mfinelli/modctl/internal/restore"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -71,13 +71,6 @@ Examples:
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO extract....
-		boldStyle := lipgloss.NewStyle().Bold(true)
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-		errStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("1"))
-
 		ctx := cmd.Context()
 
 		bundlePath := args[0]
@@ -93,12 +86,12 @@ Examples:
 
 		// warn if --game passed on game-scoped bundle
 		if !isFull && extractGame != "" {
-			fmt.Println(warnStyle.Render("  ⚠ --game has no effect on a game-scoped bundle, ignoring"))
+			style.Println(style.Warning.Render("  ⚠ --game has no effect on a game-scoped bundle, ignoring"))
 		}
 
 		// list mode
 		if extractMod == "" {
-			return runExtractList(ctx, bq, bundle, isFull, boldStyle, subtleStyle)
+			return runExtractList(ctx, bq, bundle, isFull)
 		}
 
 		// extraction mode
@@ -117,7 +110,6 @@ Examples:
 
 		return runExtract(
 			ctx, bq, bundle, isFull,
-			boldStyle, subtleStyle, okStyle, warnStyle, errStyle,
 			outDir,
 		)
 	},
@@ -152,7 +144,6 @@ func runExtractList(
 	bq *dbq.Queries,
 	bundle *restore.Bundle,
 	isFull bool,
-	bold, subtle lipgloss.Style,
 ) error {
 	games, err := bq.ExportGetGameInstalls(ctx)
 	if err != nil {
@@ -162,8 +153,8 @@ func runExtractList(
 	for _, gi := range games {
 		header := fmt.Sprintf("Mods in bundle (game: %s  %s:%s)",
 			gi.DisplayName, gi.StoreID, gi.StoreGameID)
-		fmt.Println(bold.Render(header))
-		fmt.Println()
+		style.Println(style.Bold.Render(header))
+		style.Println()
 
 		pages, err := bq.ExportGetModPagesForGameInstall(ctx, gi.ID)
 		if err != nil {
@@ -171,13 +162,13 @@ func runExtractList(
 		}
 
 		if len(pages) == 0 {
-			fmt.Println(subtle.Render("  (no mods)"))
-			fmt.Println()
+			style.Println(style.Subtle.Render("  (no mods)"))
+			style.Println()
 			continue
 		}
 
 		for _, page := range pages {
-			fmt.Printf("  Mod Page: %s\n", page.Name)
+			style.Printf("  Mod Page: %s\n", page.Name)
 
 			files, err := bq.ExportGetModFilesForGameInstall(ctx, gi.ID)
 			if err != nil {
@@ -188,7 +179,7 @@ func runExtractList(
 				if f.ModPageID != page.ID {
 					continue
 				}
-				fmt.Printf("    File: %s\n", f.Label)
+				style.Printf("    File: %s\n", f.Label)
 
 				versions, err := bq.ExportGetModFileVersionsForGameInstall(ctx, gi.ID)
 				if err != nil {
@@ -199,21 +190,21 @@ func runExtractList(
 					if v.ModFileID != f.ID {
 						continue
 					}
-					verStr := subtle.Render("(no version)")
+					verStr := style.Subtle.Render("(no version)")
 					if v.VersionString.Valid {
 						verStr = v.VersionString.String
 					}
-					sha := v.ArchiveSha256[:16] + "..."
-					line := fmt.Sprintf("      %s  %s", verStr, subtle.Render(sha))
+					sha := style.ShortSha(v.ArchiveSha256)
+					line := fmt.Sprintf("      %s  %s", verStr, style.Subtle.Render(sha))
 
 					// nexus info
 					if v.NexusFileID.Valid {
-						line += "  " + subtle.Render(fmt.Sprintf("(nexus file_id=%d)", v.NexusFileID.Int64))
+						line += "  " + style.Subtle.Render(fmt.Sprintf("(nexus file_id=%d)", v.NexusFileID.Int64))
 					}
-					fmt.Println(line)
+					style.Println(line)
 				}
 			}
-			fmt.Println()
+			style.Println()
 		}
 	}
 
@@ -226,7 +217,6 @@ func runExtract(
 	bq *dbq.Queries,
 	bundle *restore.Bundle,
 	isFull bool,
-	bold, subtle, ok, warn, errSty lipgloss.Style,
 	outDir string,
 ) error {
 	games, err := bq.ExportGetGameInstalls(ctx)
@@ -267,12 +257,12 @@ func runExtract(
 			}
 		}
 		if matchedPage == nil {
-			fmt.Println(errSty.Render(fmt.Sprintf(
+			style.Println(style.Failure.Render(fmt.Sprintf(
 				"no mod page matching %q found", extractMod,
 			)))
-			fmt.Println(subtle.Render("available mod pages:"))
+			style.Println(style.Subtle.Render("available mod pages:"))
 			for _, p := range pages {
-				fmt.Println(subtle.Render("  " + p.Name))
+				style.Println(style.Subtle.Render("  " + p.Name))
 			}
 			return fmt.Errorf("mod page not found")
 		}
@@ -299,23 +289,23 @@ func runExtract(
 				}
 			}
 			if matchedFile == nil {
-				fmt.Println(errSty.Render(fmt.Sprintf(
+				style.Println(style.Failure.Render(fmt.Sprintf(
 					"no file matching %q found for mod %q", extractFile, extractMod,
 				)))
-				fmt.Println(subtle.Render("available files:"))
+				style.Println(style.Subtle.Render("available files:"))
 				for _, f := range pageFiles {
-					fmt.Println(subtle.Render("  " + f.Label))
+					style.Println(style.Subtle.Render("  " + f.Label))
 				}
 				return fmt.Errorf("mod file not found")
 			}
 		} else if len(pageFiles) == 1 {
 			matchedFile = &pageFiles[0]
 		} else {
-			fmt.Println(errSty.Render(fmt.Sprintf(
+			style.Println(style.Failure.Render(fmt.Sprintf(
 				"multiple files found for mod %q, use --file to select one", extractMod,
 			)))
 			for _, f := range pageFiles {
-				fmt.Println(subtle.Render("  " + f.Label))
+				style.Println(style.Subtle.Render("  " + f.Label))
 			}
 			return fmt.Errorf("ambiguous mod file selection")
 		}
@@ -343,16 +333,16 @@ func runExtract(
 				}
 			}
 			if matchedVersion == nil {
-				fmt.Println(errSty.Render(fmt.Sprintf(
+				style.Println(style.Failure.Render(fmt.Sprintf(
 					"no version matching %q found for mod %q file %q",
 					extractVersion, extractMod, matchedFile.Label,
 				)))
-				fmt.Println(subtle.Render("available versions:"))
+				style.Println(style.Subtle.Render("available versions:"))
 				for _, v := range fileVersions {
 					if v.VersionString.Valid {
-						fmt.Println(subtle.Render("  " + v.VersionString.String))
+						style.Println(style.Subtle.Render("  " + v.VersionString.String))
 					} else {
-						fmt.Println(subtle.Render("  (no version) " + v.ArchiveSha256[:16] + "..."))
+						style.Println(style.Subtle.Render("  (no version) " + style.ShortSha(v.ArchiveSha256)))
 					}
 				}
 				return fmt.Errorf("mod file version not found")
@@ -360,15 +350,15 @@ func runExtract(
 		} else if len(fileVersions) == 1 {
 			matchedVersion = &fileVersions[0]
 		} else {
-			fmt.Println(errSty.Render(fmt.Sprintf(
+			style.Println(style.Failure.Render(fmt.Sprintf(
 				"multiple versions found for mod %q file %q, use --version to select one",
 				extractMod, matchedFile.Label,
 			)))
 			for _, v := range fileVersions {
 				if v.VersionString.Valid {
-					fmt.Println(subtle.Render("  " + v.VersionString.String))
+					style.Println(style.Subtle.Render("  " + v.VersionString.String))
 				} else {
-					fmt.Println(subtle.Render("  (no version) " + v.ArchiveSha256[:16] + "..."))
+					style.Println(style.Subtle.Render("  (no version) " + style.ShortSha(v.ArchiveSha256)))
 				}
 			}
 			return fmt.Errorf("ambiguous version selection")
@@ -382,7 +372,6 @@ func runExtract(
 			matchedPage,
 			matchedFile,
 			outDir,
-			bold, subtle, ok, warn,
 		); err != nil {
 			return err
 		}
@@ -404,7 +393,6 @@ func extractBlob(
 	page *dbq.ModPage,
 	file *dbq.ModFile,
 	outDir string,
-	bold, subtle, ok, warn lipgloss.Style,
 ) error {
 	sha := version.ArchiveSha256
 	fan := sha[:2]
@@ -413,7 +401,7 @@ func extractBlob(
 	// verify blob hash before extracting
 	actual, err := hashFile(blobPath)
 	if err != nil {
-		return fmt.Errorf("hash blob %s: %w", sha[:16], err)
+		return fmt.Errorf("hash blob %s: %w", style.ShortSha(sha), err)
 	}
 	if actual != sha {
 		return fmt.Errorf(
@@ -433,7 +421,7 @@ func extractBlob(
 	// check for existing file
 	if _, err := os.Stat(outPath); err == nil {
 		if !extractOverwrite {
-			fmt.Println(warn.Render(fmt.Sprintf(
+			style.Println(style.Warning.Render(fmt.Sprintf(
 				"  ⚠ skipping %s (already exists, use --overwrite to replace)",
 				outName,
 			)))
@@ -446,7 +434,7 @@ func extractBlob(
 		return fmt.Errorf("copy blob to output: %w", err)
 	}
 
-	fmt.Println(ok.Render(fmt.Sprintf("  ✓ extracted: %s", outName)))
+	style.Println(style.Success.Render(fmt.Sprintf("  ✓ extracted: %s", outName)))
 
 	// print nexus info if available
 	if version.NexusFileID.Valid {
@@ -458,7 +446,7 @@ func extractBlob(
 			nexusLine += fmt.Sprintf("\n    url: https://www.nexusmods.com/%s/mods/%d",
 				page.NexusGameDomain.String, page.NexusModID.Int64)
 		}
-		fmt.Println(subtle.Render(nexusLine))
+		style.Println(style.Subtle.Render(nexusLine))
 	}
 
 	return nil

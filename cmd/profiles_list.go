@@ -22,12 +22,12 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -47,11 +47,6 @@ The current active game is used unless --game is provided.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: extract these somewhere else
-		headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-
 		ctx := cmd.Context()
 
 		err := internal.EnsureDBExists()
@@ -95,22 +90,22 @@ The current active game is used unless --game is provided.`,
 		}
 
 		if len(rows) == 0 {
-			fmt.Println(subtleStyle.Render("No profiles found"))
+			style.Println(style.Subtle.Render("No profiles found"))
 			return nil
 		}
 
-		fmt.Println(headerStyle.Render("Profiles"))
-		fmt.Println()
+		style.Println(style.Header.Render("Profiles"))
+		style.Println()
 
 		for _, p := range rows {
 			prefix := "  "
 			if p.IsActive != 0 {
-				prefix = okStyle.Render("  * ")
+				prefix = style.Success.Render("  * ")
 			}
-			fmt.Printf("%s%s\n", prefix, p.Name)
+			style.Printf("%s%s\n", prefix, p.Name)
 
 			if p.Description.Valid && p.Description.String != "" {
-				fmt.Println(subtleStyle.Render("    " + p.Description.String))
+				style.Println(style.Subtle.Render("    " + p.Description.String))
 			}
 		}
 

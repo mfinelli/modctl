@@ -27,6 +27,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -110,7 +111,7 @@ Use --multiple to assign priorities as N, 2N, 3N, ... (for example, --multiple
 			return fmt.Errorf("list profile items: %w", err)
 		}
 		if len(items) == 0 {
-			fmt.Printf("Profile %q has no items\n", p.Name)
+			style.Printf("Profile %q has no items\n", p.Name)
 			return nil
 		}
 
@@ -123,9 +124,9 @@ Use --multiple to assign priorities as N, 2N, 3N, ... (for example, --multiple
 		}
 
 		if profilesOrderCompactMultiple > 0 {
-			fmt.Printf("Compacted priorities in profile %q using multiple %d\n", p.Name, profilesOrderCompactMultiple)
+			style.Printf("Compacted priorities in profile %q using multiple %d\n", p.Name, profilesOrderCompactMultiple)
 		} else {
-			fmt.Printf("Compacted priorities in profile %q\n", p.Name)
+			style.Printf("Compacted priorities in profile %q\n", p.Name)
 		}
 
 		return nil

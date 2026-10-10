@@ -24,12 +24,12 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -47,9 +47,6 @@ var modsNexusUnlinkCmd = &cobra.Command{
 	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: extract styles
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-
 		ctx := cmd.Context()
 
 		err := internal.EnsureDBExists()
@@ -109,7 +106,7 @@ var modsNexusUnlinkCmd = &cobra.Command{
 
 		// No-op check
 		if !nexusFileID.Valid {
-			fmt.Println(subtleStyle.Render(fmt.Sprintf(
+			style.Println(style.Subtle.Render(fmt.Sprintf(
 				"  mod_file_version %d is already unlinked (no changes made)",
 				mfv.ID,
 			)))
@@ -125,7 +122,7 @@ var modsNexusUnlinkCmd = &cobra.Command{
 			return fmt.Errorf("unlinking mod file version: %w", err)
 		}
 
-		fmt.Println(subtleStyle.Render(fmt.Sprintf(
+		style.Println(style.Subtle.Render(fmt.Sprintf(
 			"  unlinked mod_file_version %d (was linked to nexus file_id %d)",
 			mfv.ID, oldFileID,
 		)))

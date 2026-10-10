@@ -28,13 +28,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/term"
@@ -68,11 +68,6 @@ to proceed even if the operation would exhaust your API quota.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: extract styles
-		subtleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-		nexusUpdateStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Bold(true)
-
 		ctx := cmd.Context()
 
 		apiKey := viper.GetString("nexus.apikey")
@@ -126,7 +121,7 @@ to proceed even if the operation would exhaust your API quota.`,
 			return fmt.Errorf("fetching linked mod pages: %w", err)
 		}
 		if len(modPages) == 0 {
-			fmt.Println(subtleStyle.Render("  no linked mod pages found; run 'mods nexus link' first"))
+			style.Println(style.Subtle.Render("  no linked mod pages found; run 'mods nexus link' first"))
 			return nil
 		}
 
@@ -247,7 +242,7 @@ to proceed even if the operation would exhaust your API quota.`,
 		}
 
 		if len(entries) == 0 {
-			fmt.Println(subtleStyle.Render("  all mods are up to date or superseded"))
+			style.Println(style.Subtle.Render("  all mods are up to date or superseded"))
 			return nil
 		}
 
@@ -276,17 +271,17 @@ to proceed even if the operation would exhaust your API quota.`,
 			hourly, daily := rateLimitState.EffectiveRemaining()
 			conservative := min(int64(hourly), int64(daily)) - 10 // leave headroom of 10 api calls
 			if needed > int64(hourly) || needed > int64(daily) {
-				fmt.Printf("  ⚠ this operation requires ~%d API calls (hourly remaining: %d, daily remaining: %d)\n",
+				style.Printf("  ⚠ this operation requires ~%d API calls (hourly remaining: %d, daily remaining: %d)\n",
 					needed, hourly, daily)
 				if !modsNexusCheckUpdatesForce {
 					suggested := max(0, conservative)
-					fmt.Println(warnStyle.Render(fmt.Sprintf(
+					style.Println(style.Warning.Render(fmt.Sprintf(
 						"  operation aborted: not enough API quota remaining; use --limit %d to check as many mods as your quota allows",
 						suggested,
 					)))
 					return nil
 				}
-				fmt.Println(warnStyle.Render("  proceeding anyway due to --force"))
+				style.Println(style.Warning.Render("  proceeding anyway due to --force"))
 			}
 		}
 
@@ -311,14 +306,14 @@ to proceed even if the operation would exhaust your API quota.`,
 			line := fmt.Sprintf("  "+fmtCounter+" Checking: %s... (%d calls remaining)",
 				current, total, modName, remaining)
 			if modsNexusCheckUpdatesPrintAll {
-				fmt.Println(line)
+				style.Println(line)
 			} else {
-				fmt.Printf("\r%-*s", termWidth, line)
+				style.Printf("\r%-*s", termWidth, line)
 			}
 		}
 
 		if !modsNexusCheckUpdatesPrintAll {
-			fmt.Printf("  [%*d/%d] Checking... (%d calls remaining)", width, 0, total, remaining)
+			style.Printf("  [%*d/%d] Checking... (%d calls remaining)", width, 0, total, remaining)
 		}
 
 		type updateResult struct {
@@ -343,9 +338,9 @@ to proceed even if the operation would exhaust your API quota.`,
 				fresh, err := client.GetModFiles(mp.NexusGameDomain.String, mp.NexusModID.Int64)
 				if err != nil {
 					if !modsNexusCheckUpdatesPrintAll {
-						fmt.Println()
+						style.Println()
 					}
-					fmt.Println(warnStyle.Render(fmt.Sprintf(
+					style.Println(style.Warning.Render(fmt.Sprintf(
 						"  ⚠ failed to fetch file info for mod page %d: %s",
 						mp.ModPageID, err,
 					)))
@@ -456,9 +451,9 @@ to proceed even if the operation would exhaust your API quota.`,
 				if hasUpdate {
 					// Print update line immediately, breaking out of the \r
 					if !modsNexusCheckUpdatesPrintAll {
-						fmt.Print("\r" + strings.Repeat(" ", termWidth) + "\r")
+						style.Print("\r" + strings.Repeat(" ", termWidth) + "\r")
 					}
-					fmt.Printf("  %s\n", nexusUpdateStyle.Render(fmt.Sprintf(
+					style.Printf("  %s\n", style.UpdateAvailable.Render(fmt.Sprintf(
 						"↑ %s / %s: %s → %s",
 						r.modPageName, r.fileLabel, r.currentVersion, r.latestVersion,
 					)))
@@ -467,7 +462,7 @@ to proceed even if the operation would exhaust your API quota.`,
 						printProgress(i+1, mp.ModPageName)
 					}
 				} else if modsNexusCheckUpdatesPrintAll {
-					fmt.Printf("  %s\n", subtleStyle.Render(fmt.Sprintf(
+					style.Printf("  %s\n", style.Subtle.Render(fmt.Sprintf(
 						"✓ %s / %s: %s",
 						r.modPageName, r.fileLabel, r.currentVersion,
 					)))
@@ -477,7 +472,7 @@ to proceed even if the operation would exhaust your API quota.`,
 
 		// Clear progress line
 		if !modsNexusCheckUpdatesPrintAll {
-			fmt.Print("\r" + strings.Repeat(" ", termWidth) + "\r")
+			style.Print("\r" + strings.Repeat(" ", termWidth) + "\r")
 		}
 
 		// Summary
@@ -488,16 +483,16 @@ to proceed even if the operation would exhaust your API quota.`,
 			}
 		}
 
-		fmt.Println()
+		style.Println()
 		if updatesAvailable > 0 {
-			fmt.Printf("  %s\n", nexusUpdateStyle.Render(fmt.Sprintf(
+			style.Printf("  %s\n", style.UpdateAvailable.Render(fmt.Sprintf(
 				"%d update(s) available", updatesAvailable,
 			)))
 		} else {
-			fmt.Println(subtleStyle.Render("  all mods are up to date"))
+			style.Println(style.Subtle.Render("  all mods are up to date"))
 		}
 		if failed > 0 {
-			fmt.Println(warnStyle.Render(fmt.Sprintf("  ⚠ %d mod page(s) failed to fetch", failed)))
+			style.Println(style.Warning.Render(fmt.Sprintf("  ⚠ %d mod page(s) failed to fetch", failed)))
 		}
 
 		return nil

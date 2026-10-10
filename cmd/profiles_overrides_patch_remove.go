@@ -29,6 +29,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -180,10 +181,10 @@ For ini patches, use --section to identify entries in a specific section.`,
 			return fmt.Errorf("commit: %w", err)
 		}
 
-		fmt.Printf("removed patch entry %q from override for %q in profile %q\n",
+		style.Printf("removed patch entry %q from override for %q in profile %q\n",
 			entryKey, relpath, p.Name)
 		if overrideRemoved {
-			fmt.Println("  override removed (no remaining patch entries)")
+			style.Println("  override removed (no remaining patch entries)")
 		}
 
 		return nil

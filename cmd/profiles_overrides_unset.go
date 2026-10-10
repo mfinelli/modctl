@@ -28,6 +28,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
 
@@ -115,8 +116,8 @@ path back to the mod winner or remove it if no mod provides it.`,
 			return fmt.Errorf("delete override: %w", err)
 		}
 
-		fmt.Printf("override removed for %q in profile %q\n", relpath, p.Name)
-		fmt.Println("  run 'modctl apply' to reconcile the game directory")
+		style.Printf("override removed for %q in profile %q\n", relpath, p.Name)
+		style.Println("  run 'modctl apply' to reconcile the game directory")
 		return nil
 	},
 }

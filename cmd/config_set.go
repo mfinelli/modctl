@@ -27,7 +27,7 @@ import (
 	"strings"
 
 	"github.com/adrg/xdg"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/mfinelli/modctl/internal/style"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -55,18 +55,14 @@ Valid keys:
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO extract
-		subtleStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("245"))
-
 		key, value := args[0], args[1]
 		if !slices.Contains(knownConfigKeys, key) {
 			return fmt.Errorf("unknown config key %q\n  valid keys: %s", key, strings.Join(knownConfigKeys, ", "))
 		}
 
 		if key == "nexus.apikey" {
-			fmt.Println(subtleStyle.Render("  Please note: your API key will be stored in plain text in the config file."))
-			fmt.Println()
+			style.Println(style.Subtle.Render("  Please note: your API key will be stored in plain text in the config file."))
+			style.Println()
 		}
 
 		configPath := viper.ConfigFileUsed()
@@ -104,8 +100,7 @@ Valid keys:
 			return fmt.Errorf("write config file: %w", err)
 		}
 
-		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-		fmt.Println(okStyle.Render(fmt.Sprintf("  ✓ %s set in %s", key, configPath)))
+		style.Println(style.Success.Render(fmt.Sprintf("  ✓ %s set in %s", key, configPath)))
 
 		return nil
 	},
