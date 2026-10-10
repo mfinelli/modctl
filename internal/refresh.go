@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -193,18 +194,18 @@ func ScanStores(ctx context.Context, db *sql.DB) (RefreshResult, error) {
 func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries) (RefreshResult, error) {
 	var result RefreshResult
 
-	libs, didScan, warns, err := discoverSteamLibraries()
-	result.Warnings = append(result.Warnings, warns...)
+	steam, err := discoverSteamLibraries()
+	result.Warnings = append(result.Warnings, steam.Warnings...)
 	if err != nil {
 		return result, fmt.Errorf("error scanning for steam libraries: %w", err)
 	}
-	if !didScan {
+	if !steam.DidScan {
 		// discovery did not meaningfully run -> do NOT mark installs missing
 		return result, nil
 	}
 
-	instanceByLib := assignSteamInstanceIDs(libs)
-	installs, skips, warns, err := discoverSteamInstalls(libs, instanceByLib)
+	instanceByLib := assignSteamInstanceIDs(steam.Libs, steam.Roots)
+	installs, skips, warns, err := discoverSteamInstalls(steam.Libs, instanceByLib)
 	result.Skipped = append(result.Skipped, skips...)
 	result.Warnings = append(result.Warnings, warns...)
 	if err != nil {
@@ -267,23 +268,43 @@ func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries) (RefreshResul
 	return result, nil
 }
 
-// DiscoverSteamLibraries finds Steam library roots by locating and parsing
+// steamLibraries is what looking for Steam found.
+type steamLibraries struct {
+	// Libs are the canonicalized, deduped library root paths, sorted.
+	Libs []string
+
+	// Roots are the Steam installations that the libraries were read from
+	// (canonicalized, and in the order that they are looked for in, which is
+	// the order of preference). Each of them is the location of the library
+	// that is part of the installation itself.
+	Roots []string
+
+	// DidScan is true if at least one libraryfolders.vdf was successfully
+	// parsed.
+	DidScan bool
+
+	// Warnings are the non-fatal issues (missing files, parse errors, etc.).
+	Warnings []string
+}
+
+// discoverSteamLibraries finds Steam library roots by locating and parsing
 // steamapps/libraryfolders.vdf from common Steam installation roots.
-//
-// Returns:
-// - libs: canonicalized, deduped library root paths
-// - didScan: true if at least one libraryfolders.vdf was successfully parsed
-// - warnings: non-fatal issues (missing files, parse errors, etc.)
-func discoverSteamLibraries() ([]string, bool, []string, error) {
-	roots := candidateSteamRoots()
-	seenRoots := make(map[string]struct{}, len(roots))
+func discoverSteamLibraries() (steamLibraries, error) {
+	return discoverSteamLibrariesIn(candidateSteamRoots()), nil
+}
+
+// discoverSteamLibrariesIn is discoverSteamLibraries for the given places to
+// look for Steam installations, instead of the usual ones.
+func discoverSteamLibrariesIn(candidates []string) steamLibraries {
+	seenRoots := make(map[string]struct{}, len(candidates))
 
 	didScan := false
 	warnings := []string{}
+	foundRoots := []string{}
 
 	// Deduplicate candidate roots (after best-effort canonicalization)
 	var uniqRoots []string
-	for _, r := range roots {
+	for _, r := range candidates {
 		r = expandHome(r)
 		canon, err := canonicalizePathBestEffort(r)
 		if err != nil {
@@ -334,6 +355,7 @@ func discoverSteamLibraries() ([]string, bool, []string, error) {
 		}
 
 		didScan = true
+		foundRoots = append(foundRoots, root)
 		for _, p := range paths {
 			p = strings.TrimSpace(p)
 			if p == "" {
@@ -357,23 +379,50 @@ func discoverSteamLibraries() ([]string, bool, []string, error) {
 	}
 	sort.Strings(libs)
 
-	return libs, didScan, warnings, nil
+	return steamLibraries{
+		Libs:     libs,
+		Roots:    foundRoots,
+		DidScan:  didScan,
+		Warnings: warnings,
+	}
 }
 
-func assignSteamInstanceIDs(libs []string) map[string]string {
+// assignSteamInstanceIDs gives each Steam library the instance id that the
+// installs in it get: "default" for the main library, and "library_2",
+// "library_3", ... for the others, in order of path.
+//
+// The main library is the one in the Steam installation itself, which is there
+// for as long as Steam is, so the installs in it keep their identity when other
+// libraries come and go. roots are the Steam installations that were found, in
+// order of preference: the first of them that is one of libs wins. With none of
+// them among libs (which should not happen) the main library is the first one
+// in order of path.
+//
+// TODO: the ids of the other libraries still change when one is added or
+// removed, and so does everything attached to the installs in them. They are
+// to be made stable, by keeping the id that a library already has.
+func assignSteamInstanceIDs(libs, roots []string) map[string]string {
 	if len(libs) == 0 {
 		return map[string]string{}
 	}
 
-	// Choose default deterministically: lexicographically smallest
-	// TODO improve later using "library containing Steam root"
 	sorted := append([]string{}, libs...)
 	sort.Strings(sorted)
+
 	defaultLib := sorted[0]
+	for _, root := range roots {
+		if slices.Contains(sorted, root) {
+			defaultLib = root
+			break
+		}
+	}
 
 	m := map[string]string{defaultLib: "default"}
 	n := 2
-	for _, lib := range sorted[1:] {
+	for _, lib := range sorted {
+		if lib == defaultLib {
+			continue
+		}
 		m[lib] = fmt.Sprintf("library_%d", n)
 		n++
 	}
