@@ -18,6 +18,14 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
   finishes the change to the `default` library in v0.8.0. If your installs
   were already affected by it they are not put back: they are kept as they are
   now.
+- Steam libraries are now recognized by the content id that Steam gives them
+  (`contentid` in `libraryfolders.vdf`), so a library that moves to another
+  path, for instance a disk that is mounted somewhere else, keeps its instance
+  id, its installs, and what is attached to them, and `games refresh` says that
+  it moved. A library that has no content id, or shares it with another, is
+  recognized by its path as before. Installs that are already known get the
+  content id of their library the next time they are found, and keep their
+  instance.
 - `apply` now warns when a file that a mod installs is a symlink in the game
   directory. The symlink is replaced by a regular file (what it points to is
   not changed), and `unapply` can't bring the symlink back.

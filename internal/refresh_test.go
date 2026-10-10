@@ -21,6 +21,7 @@ package internal
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -28,6 +29,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/andygrunwald/vdf"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/pressly/goose/v3"
@@ -694,11 +696,11 @@ func TestExistingLibraryInstances(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			byLib, inUse := existingLibraryInstances(tc.installs)
+			ex := existingLibraryInstances(tc.installs)
 
-			assert.Equal(t, tc.wantByLib, byLib)
-			ids := make([]string, 0, len(inUse))
-			for id := range inUse {
+			assert.Equal(t, tc.wantByLib, ex.ByPath)
+			ids := make([]string, 0, len(ex.InUse))
+			for id := range ex.InUse {
 				ids = append(ids, id)
 			}
 			assert.ElementsMatch(t, tc.wantInUse, ids)
@@ -710,20 +712,30 @@ func TestLibraryOfInstall(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		metadata sql.NullString
-		want     string
+		name          string
+		metadata      sql.NullString
+		wantRoot      string
+		wantContentID string
 	}{
 		{"the metadata that discovery writes", sql.NullString{
 			String: `{"install_root_raw":"/lib/steamapps/common/Game","library_root":"/lib","manifest_path":"/lib/steamapps/appmanifest_1.acf","steamapps_root":"/lib/steamapps"}`,
 			Valid:  true,
-		}, "/lib"},
-		{"no metadata", sql.NullString{}, ""},
-		{"empty metadata", sql.NullString{String: "", Valid: true}, ""},
-		{"metadata that is not json", sql.NullString{String: "library_root=/lib", Valid: true}, ""},
-		{"json without the library", sql.NullString{String: `{"manifest_path":"/x"}`, Valid: true}, ""},
-		{"json of another shape", sql.NullString{String: `["/lib"]`, Valid: true}, ""},
-		{"a library that is not a string", sql.NullString{String: `{"library_root":7}`, Valid: true}, ""},
+		}, "/lib", ""},
+		{"with the content id of the library", sql.NullString{
+			String: `{"library_root":"/lib","library_content_id":"-7695053421422003000"}`,
+			Valid:  true,
+		}, "/lib", "-7695053421422003000"},
+		{"a content id without the library", sql.NullString{
+			String: `{"library_content_id":"123"}`,
+			Valid:  true,
+		}, "", "123"},
+		{"no metadata", sql.NullString{}, "", ""},
+		{"empty metadata", sql.NullString{String: "", Valid: true}, "", ""},
+		{"metadata that is not json", sql.NullString{String: "library_root=/lib", Valid: true}, "", ""},
+		{"json without the library", sql.NullString{String: `{"manifest_path":"/x"}`, Valid: true}, "", ""},
+		{"json of another shape", sql.NullString{String: `["/lib"]`, Valid: true}, "", ""},
+		{"a library that is not a string", sql.NullString{String: `{"library_root":7}`, Valid: true}, "", ""},
+		{"a content id that is not a string", sql.NullString{String: `{"library_root":"/lib","library_content_id":123}`, Valid: true}, "", ""},
 	}
 
 	for _, tc := range tests {
@@ -731,7 +743,10 @@ func TestLibraryOfInstall(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, tc.want, libraryOfInstall(tc.metadata))
+			root, contentID := libraryOfInstall(tc.metadata)
+
+			assert.Equal(t, tc.wantRoot, root)
+			assert.Equal(t, tc.wantContentID, contentID)
 		})
 	}
 }
@@ -947,4 +962,631 @@ func TestRefreshSteamLibraries(t *testing.T) {
 		assert.Equal(t, first["100"].ID, second["100"].ID)
 		assert.Equal(t, int64(1), second["100"].IsPresent, "not marked as missing")
 	})
+}
+
+func parseVDF(t *testing.T, text string) any {
+	t.Helper()
+
+	parsed, err := vdf.NewParser(strings.NewReader(text)).Parse()
+	require.NoError(t, err)
+	return parsed
+}
+
+func TestExtractSteamLibraries(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		vdf  string
+		want []steamLibraryEntry
+	}{
+		{
+			name: "the format that Steam writes now, with content ids",
+			vdf: `"libraryfolders"
+{
+	"0"
+	{
+		"path"		"/home/u/.local/share/Steam"
+		"label"		""
+		"contentid"		"3328371409298419016"
+		"totalsize"		"0"
+		"apps"
+		{
+			"228980"		"1234"
+		}
+	}
+	"1"
+	{
+		"path"		"/mnt/games"
+		"contentid"		"1039182383252157525"
+	}
+}`,
+			want: []steamLibraryEntry{
+				{Path: "/home/u/.local/share/Steam", ContentID: "3328371409298419016"},
+				{Path: "/mnt/games", ContentID: "1039182383252157525"},
+			},
+		},
+		{
+			name: "a content id can be negative",
+			vdf:  `"libraryfolders" { "0" { "path" "/a" "contentid" "-7695053421422003000" } }`,
+			want: []steamLibraryEntry{{Path: "/a", ContentID: "-7695053421422003000"}},
+		},
+		{
+			name: "a library that Steam has not given one yet has none",
+			vdf:  `"libraryfolders" { "0" { "path" "/a" "contentid" "5" } "1" { "path" "/b" } }`,
+			want: []steamLibraryEntry{{Path: "/a", ContentID: "5"}, {Path: "/b"}},
+		},
+		{
+			name: "zero is no content id",
+			vdf:  `"libraryfolders" { "0" { "path" "/a" "contentid" "0" } }`,
+			want: []steamLibraryEntry{{Path: "/a"}},
+		},
+		{
+			name: "an empty content id is none",
+			vdf:  `"libraryfolders" { "0" { "path" "/a" "contentid" "  " } }`,
+			want: []steamLibraryEntry{{Path: "/a"}},
+		},
+		{
+			name: "the old format has paths only",
+			vdf:  `"libraryfolders" { "0" "/a" "1" "/b" }`,
+			want: []steamLibraryEntry{{Path: "/a"}, {Path: "/b"}},
+		},
+		{
+			name: "the entries come in the order of their keys, not as the file lists them",
+			vdf:  `"libraryfolders" { "10" { "path" "/ten" } "2" { "path" "/two" } "1" { "path" "/one" } }`,
+			want: []steamLibraryEntry{{Path: "/one"}, {Path: "/two"}, {Path: "/ten"}},
+		},
+		{
+			name: "keys that are not libraries are passed over",
+			vdf:  `"libraryfolders" { "contentstatsid" "123" "0" { "path" "/a" } }`,
+			want: []steamLibraryEntry{{Path: "/a"}},
+		},
+		{
+			name: "an entry without a path is passed over",
+			vdf:  `"libraryfolders" { "0" { "contentid" "5" } "1" { "path" "/b" } }`,
+			want: []steamLibraryEntry{{Path: "/b"}},
+		},
+		{
+			name: "nothing at all",
+			vdf:  `"libraryfolders" { }`,
+			want: nil,
+		},
+		{
+			name: "something else",
+			vdf:  `"appstate" { "appid" "1" }`,
+			want: nil,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tc.want, extractSteamLibraries(parseVDF(t, tc.vdf)))
+		})
+	}
+
+	t.Run("a parsed file that is not a map", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Nil(t, extractSteamLibraries("libraryfolders"))
+		assert.Nil(t, extractSteamLibraries(nil))
+	})
+}
+
+// writeSteamRootWithIDs is writeSteamRoot for libraries that have content ids.
+func writeSteamRootWithIDs(t *testing.T, root string, libs ...steamLibraryEntry) {
+	t.Helper()
+
+	var b strings.Builder
+	b.WriteString("\"libraryfolders\"\n{\n")
+	for i, lib := range libs {
+		fmt.Fprintf(&b, "\t\"%d\"\n\t{\n\t\t\"path\"\t\t\"%s\"\n", i, lib.Path)
+		if lib.ContentID != "" {
+			fmt.Fprintf(&b, "\t\t\"contentid\"\t\t\"%s\"\n", lib.ContentID)
+		}
+		b.WriteString("\t}\n")
+	}
+	b.WriteString("}\n")
+
+	writeVDF(t, root, b.String())
+}
+
+func TestDiscoverSteamLibrariesInContentIDs(t *testing.T) {
+	t.Parallel()
+
+	t.Run("the content ids are by library path", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		root := filepath.Join(dir, "Steam")
+		ext := filepath.Join(dir, "games")
+		bare := filepath.Join(dir, "no-id")
+		writeSteamRootWithIDs(t, root,
+			steamLibraryEntry{Path: root, ContentID: "111"},
+			steamLibraryEntry{Path: ext, ContentID: "-222"},
+			steamLibraryEntry{Path: bare})
+
+		got := discoverSteamLibrariesIn([]string{root})
+
+		assert.Equal(t, map[string]string{root: "111", ext: "-222"}, got.ContentIDs)
+		assert.Equal(t, sortedPaths(root, ext, bare), got.Libs)
+		assert.Empty(t, got.Warnings)
+	})
+
+	t.Run("without any there are none", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		root := filepath.Join(dir, "Steam")
+		writeSteamRoot(t, root, root)
+
+		got := discoverSteamLibrariesIn([]string{root})
+
+		assert.Empty(t, got.ContentIDs)
+	})
+
+	t.Run("a library that two installations list is known once", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		native := filepath.Join(dir, "native", "Steam")
+		flatpak := filepath.Join(dir, "flatpak", "Steam")
+		shared := filepath.Join(dir, "shared")
+		writeSteamRootWithIDs(t, native,
+			steamLibraryEntry{Path: native, ContentID: "1"},
+			steamLibraryEntry{Path: shared, ContentID: "9"})
+		writeSteamRootWithIDs(t, flatpak,
+			steamLibraryEntry{Path: flatpak, ContentID: "2"},
+			steamLibraryEntry{Path: shared, ContentID: "9"})
+
+		got := discoverSteamLibrariesIn([]string{native, flatpak})
+
+		assert.Equal(t, map[string]string{native: "1", flatpak: "2", shared: "9"}, got.ContentIDs)
+		assert.Empty(t, got.Warnings, "it is one library, not two that look alike")
+	})
+
+	t.Run("two content ids for one library is a warning, and the first is used", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		native := filepath.Join(dir, "native", "Steam")
+		flatpak := filepath.Join(dir, "flatpak", "Steam")
+		shared := filepath.Join(dir, "shared")
+		writeSteamRootWithIDs(t, native, steamLibraryEntry{Path: shared, ContentID: "9"})
+		writeSteamRootWithIDs(t, flatpak, steamLibraryEntry{Path: shared, ContentID: "10"})
+
+		got := discoverSteamLibrariesIn([]string{native, flatpak})
+
+		assert.Equal(t, "9", got.ContentIDs[shared])
+		require.Len(t, got.Warnings, 1)
+		assert.Contains(t, got.Warnings[0], "two content ids")
+		assert.Contains(t, got.Warnings[0], shared)
+	})
+
+	t.Run("libraries that share a content id are a warning", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		root := filepath.Join(dir, "Steam")
+		a := filepath.Join(dir, "a-disk")
+		b := filepath.Join(dir, "b-disk")
+		writeSteamRootWithIDs(t, root,
+			steamLibraryEntry{Path: root, ContentID: "1"},
+			steamLibraryEntry{Path: b, ContentID: "77"},
+			steamLibraryEntry{Path: a, ContentID: "77"})
+
+		got := discoverSteamLibrariesIn([]string{root})
+
+		assert.Equal(t, "77", got.ContentIDs[a])
+		assert.Equal(t, "77", got.ContentIDs[b])
+		require.Len(t, got.Warnings, 1)
+		assert.Contains(t, got.Warnings[0], "same content id")
+		assert.Contains(t, got.Warnings[0], "(77)")
+		assert.Contains(t, got.Warnings[0], fmt.Sprintf("%s, %s", a, b), "in order of path")
+	})
+}
+
+func TestKnownLibraryInstances(t *testing.T) {
+	t.Parallel()
+
+	in := func(id, root, contentID string) installLibrary {
+		return installLibrary{InstanceID: id, LibraryRoot: root, LibraryContentID: contentID, Present: true}
+	}
+
+	t.Run("by path when there are no content ids", func(t *testing.T) {
+		t.Parallel()
+
+		ex := existingLibraryInstances([]installLibrary{in("default", "/a", ""), in("library_2", "/b", "")})
+
+		known, moves := knownLibraryInstances([]string{"/a", "/b", "/c"}, nil, ex)
+
+		assert.Equal(t, map[string]string{"/a": "default", "/b": "library_2"}, known)
+		assert.Empty(t, moves)
+	})
+
+	t.Run("a library that is where it was is not a move", func(t *testing.T) {
+		t.Parallel()
+
+		ex := existingLibraryInstances([]installLibrary{in("library_2", "/b", "22")})
+
+		known, moves := knownLibraryInstances([]string{"/b"}, map[string]string{"/b": "22"}, ex)
+
+		assert.Equal(t, map[string]string{"/b": "library_2"}, known)
+		assert.Empty(t, moves)
+	})
+
+	t.Run("a library that has moved keeps its id, and the move is reported", func(t *testing.T) {
+		t.Parallel()
+
+		ex := existingLibraryInstances([]installLibrary{in("library_2", "/old/b", "22")})
+
+		known, moves := knownLibraryInstances([]string{"/new/b"}, map[string]string{"/new/b": "22"}, ex)
+
+		assert.Equal(t, map[string]string{"/new/b": "library_2"}, known)
+		assert.Equal(t, []steamLibraryMove{{Lib: "/new/b", From: []string{"/old/b"}, InstanceID: "library_2"}}, moves)
+	})
+
+	t.Run("where it was is where most of its installs were", func(t *testing.T) {
+		t.Parallel()
+
+		ex := existingLibraryInstances([]installLibrary{
+			in("library_2", "/first", "22"),
+			in("library_2", "/second", "22"),
+			in("library_2", "/second", "22"),
+		})
+
+		_, moves := knownLibraryInstances([]string{"/third"}, map[string]string{"/third": "22"}, ex)
+
+		require.Len(t, moves, 1)
+		assert.Equal(t, []string{"/second", "/first"}, moves[0].From)
+	})
+
+	t.Run("a library that has no id yet is known by its path, and that is how it gets one", func(t *testing.T) {
+		t.Parallel()
+
+		// what is known was found before there were content ids
+		ex := existingLibraryInstances([]installLibrary{in("library_2", "/b", "")})
+
+		known, moves := knownLibraryInstances([]string{"/b"}, map[string]string{"/b": "22"}, ex)
+
+		assert.Equal(t, map[string]string{"/b": "library_2"}, known)
+		assert.Empty(t, moves, "nothing says it has moved")
+	})
+
+	t.Run("the content id comes before the path", func(t *testing.T) {
+		t.Parallel()
+
+		// /p used to be the library 33, and the library 22 is there now
+		ex := existingLibraryInstances([]installLibrary{
+			in("library_2", "/p", "33"),
+			in("library_3", "/q", "22"),
+		})
+
+		known, _ := knownLibraryInstances([]string{"/p"}, map[string]string{"/p": "22"}, ex)
+
+		assert.Equal(t, map[string]string{"/p": "library_3"}, known)
+	})
+
+	t.Run("a library that takes the place of one that moved does not take its id", func(t *testing.T) {
+		t.Parallel()
+
+		// library 22 was at /p and is at /q now, and library 44 is at /p
+		ex := existingLibraryInstances([]installLibrary{in("library_2", "/p", "22")})
+
+		known, moves := knownLibraryInstances(
+			[]string{"/p", "/q"},
+			map[string]string{"/p": "44", "/q": "22"},
+			ex)
+
+		assert.Equal(t, map[string]string{"/q": "library_2"}, known, "/p is not given library_2 as well")
+		require.Len(t, moves, 1)
+		assert.Equal(t, "/q", moves[0].Lib)
+	})
+
+	t.Run("but one that has no content id at all can't be told, and is known by its path", func(t *testing.T) {
+		t.Parallel()
+
+		ex := existingLibraryInstances([]installLibrary{in("library_2", "/p", "22")})
+
+		known, _ := knownLibraryInstances([]string{"/p"}, nil, ex)
+
+		assert.Equal(t, map[string]string{"/p": "library_2"}, known)
+	})
+
+	t.Run("libraries that share a content id are known by their paths", func(t *testing.T) {
+		t.Parallel()
+
+		ex := existingLibraryInstances([]installLibrary{
+			in("library_2", "/a", "77"),
+			in("library_3", "/b", "77"),
+		})
+
+		known, moves := knownLibraryInstances(
+			[]string{"/a", "/b"},
+			map[string]string{"/a": "77", "/b": "77"},
+			ex)
+
+		assert.Equal(t, map[string]string{"/a": "library_2", "/b": "library_3"}, known)
+		assert.Empty(t, moves)
+	})
+
+	t.Run("a copy of a library next to the library is not it", func(t *testing.T) {
+		t.Parallel()
+
+		// 77 is at /a, and has been copied to /copy: neither is a move
+		ex := existingLibraryInstances([]installLibrary{in("library_2", "/a", "77")})
+
+		known, moves := knownLibraryInstances(
+			[]string{"/a", "/copy"},
+			map[string]string{"/a": "77", "/copy": "77"},
+			ex)
+
+		assert.Equal(t, map[string]string{"/a": "library_2"}, known)
+		assert.Empty(t, moves)
+	})
+
+	t.Run("a library that nothing is known of is not known", func(t *testing.T) {
+		t.Parallel()
+
+		ex := existingLibraryInstances([]installLibrary{in("default", "/a", "11")})
+
+		known, moves := knownLibraryInstances([]string{"/new"}, map[string]string{"/new": "99"}, ex)
+
+		assert.Empty(t, known)
+		assert.Empty(t, moves)
+	})
+}
+
+func TestExistingLibraryInstancesContentIDs(t *testing.T) {
+	t.Parallel()
+
+	in := func(id, root, contentID string, present bool) installLibrary {
+		return installLibrary{InstanceID: id, LibraryRoot: root, LibraryContentID: contentID, Present: present}
+	}
+
+	t.Run("by content id and by path", func(t *testing.T) {
+		t.Parallel()
+
+		ex := existingLibraryInstances([]installLibrary{
+			in("default", "/a", "11", true),
+			in("library_2", "/b", "22", true),
+			in("library_3", "/c", "", true),
+		})
+
+		assert.Equal(t, map[string]string{"/a": "default", "/b": "library_2", "/c": "library_3"}, ex.ByPath)
+		assert.Equal(t, map[string]string{"11": "default", "22": "library_2"}, ex.ByContentID)
+	})
+
+	t.Run("a library that moved has the one id, wherever its installs were", func(t *testing.T) {
+		t.Parallel()
+
+		ex := existingLibraryInstances([]installLibrary{
+			in("library_2", "/old", "22", false),
+			in("library_2", "/new", "22", true),
+			in("library_2", "/new", "22", true),
+		})
+
+		assert.Equal(t, map[string]string{"22": "library_2"}, ex.ByContentID)
+		assert.Equal(t, []string{"/new", "/old"}, ex.RootsOfContentID["22"])
+	})
+
+	t.Run("the content ids that were at a path", func(t *testing.T) {
+		t.Parallel()
+
+		ex := existingLibraryInstances([]installLibrary{
+			in("library_2", "/p", "22", false),
+			in("library_3", "/p", "44", true),
+			in("library_3", "/p", "44", true),
+			in("library_4", "/q", "", true),
+		})
+
+		assert.Equal(t, []string{"22", "44"}, ex.ContentIDsOfRoot["/p"])
+		assert.NotContains(t, ex.ContentIDsOfRoot, "/q", "no content id to speak of")
+	})
+
+	t.Run("claims are resolved on their own for each of the two", func(t *testing.T) {
+		t.Parallel()
+
+		// two libraries claim library_2 by content id: the one with most
+		// installs has it, and the other has none by content id, but still
+		// has the one that its path says
+		ex := existingLibraryInstances([]installLibrary{
+			in("library_2", "/a", "77", true),
+			in("library_2", "/b", "77", true),
+			in("library_2", "/b", "77", true),
+		})
+
+		assert.Equal(t, map[string]string{"77": "library_2"}, ex.ByContentID)
+		assert.Equal(t, map[string]string{"/b": "library_2"}, ex.ByPath)
+	})
+}
+
+func TestRefreshSteamLibrariesContentIDs(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	// libs makes what discovery gives, the first library being the one in the
+	// Steam installation.
+	libs := func(ids map[string]string, root string, others ...string) steamLibraries {
+		return steamLibraries{
+			Libs:       sortedPaths(append([]string{root}, others...)...),
+			Roots:      []string{root},
+			ContentIDs: ids,
+			DidScan:    true,
+		}
+	}
+
+	refresh := func(t *testing.T, db *sql.DB, steam steamLibraries) (steamState, RefreshResult) {
+		t.Helper()
+
+		q := dbq.New(db)
+		result, err := refreshSteamLibraries(ctx, db, q, steam)
+		require.NoError(t, err)
+		return readSteamState(t, q), result
+	}
+
+	t.Run("a library that moves keeps its instance, its installs and what is attached to them", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		root := filepath.Join(dir, "Steam")
+		before := filepath.Join(dir, "disk-a", "SteamLibrary")
+		after := filepath.Join(dir, "disk-b", "SteamLibrary")
+		writeSteamGame(t, root, "100", "Root Game")
+		writeSteamGame(t, before, "200", "Ext Game")
+		writeSteamGame(t, after, "200", "Ext Game") // where the disk is mounted now
+		db := migratedDB(t)
+
+		first, _ := refresh(t, db, libs(map[string]string{root: "11", before: "22"}, root, before))
+		require.Equal(t, "library_2", first["200"].InstanceID)
+
+		second, result := refresh(t, db, libs(map[string]string{root: "11", after: "22"}, root, after))
+
+		assert.Equal(t, first["200"].ID, second["200"].ID, "the same install, not a new one")
+		assert.Equal(t, "library_2", second["200"].InstanceID)
+		assert.Equal(t, int64(1), second["200"].IsPresent)
+		assert.Equal(t, filepath.Join(after, "steamapps", "common", "Ext Game"), second["200"].InstallRoot)
+		assert.Equal(t, first["100"].ID, second["100"].ID)
+		assert.Len(t, second, 2)
+
+		moved := warningsContainingText(result.Warnings, "was found at")
+		require.Len(t, moved, 1)
+		assert.Contains(t, moved[0], after)
+		assert.Contains(t, moved[0], before)
+		assert.Contains(t, moved[0], "library_2")
+	})
+
+	t.Run("a moved library does not make the one that is new take its instance", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		root := filepath.Join(dir, "Steam")
+		path := filepath.Join(dir, "disk", "SteamLibrary") // the same path for two different disks
+		elsewhere := filepath.Join(dir, "other", "SteamLibrary")
+		writeSteamGame(t, root, "100", "Root Game")
+		writeSteamGame(t, path, "200", "Old Disk Game")
+		writeSteamGame(t, elsewhere, "200", "Old Disk Game")
+		db := migratedDB(t)
+
+		first, _ := refresh(t, db, libs(map[string]string{root: "11", path: "22"}, root, path))
+		require.Equal(t, "library_2", first["200"].InstanceID)
+
+		// the old disk is somewhere else now, and another one is at its place
+		require.NoError(t, os.RemoveAll(filepath.Join(path, "steamapps")))
+		writeSteamGame(t, path, "300", "New Disk Game")
+		second, _ := refresh(t, db, libs(map[string]string{root: "11", path: "44", elsewhere: "22"}, root, path, elsewhere))
+
+		assert.Equal(t, first["200"].ID, second["200"].ID)
+		assert.Equal(t, "library_2", second["200"].InstanceID, "the old disk keeps it")
+		assert.Equal(t, filepath.Join(elsewhere, "steamapps", "common", "Old Disk Game"), second["200"].InstallRoot)
+		assert.Equal(t, "library_3", second["300"].InstanceID, "the new one has an id of its own")
+	})
+
+	t.Run("installs from before there were content ids keep their instance, and are known by it from then on", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		root := filepath.Join(dir, "Steam")
+		before := filepath.Join(dir, "disk-a", "SteamLibrary")
+		after := filepath.Join(dir, "disk-b", "SteamLibrary")
+		writeSteamGame(t, root, "100", "Root Game")
+		writeSteamGame(t, before, "200", "Ext Game")
+		writeSteamGame(t, after, "200", "Ext Game")
+		db := migratedDB(t)
+
+		legacy, _ := refresh(t, db, libs(nil, root, before))
+		_, contentID := libraryOfInstall(legacy["200"].Metadata)
+		require.Empty(t, contentID, "as it was before")
+
+		upgraded, result := refresh(t, db, libs(map[string]string{root: "11", before: "22"}, root, before))
+
+		assert.Equal(t, legacy["100"].ID, upgraded["100"].ID)
+		assert.Equal(t, legacy["200"].ID, upgraded["200"].ID)
+		assert.Equal(t, "default", upgraded["100"].InstanceID)
+		assert.Equal(t, "library_2", upgraded["200"].InstanceID)
+		_, contentID = libraryOfInstall(upgraded["200"].Metadata)
+		assert.Equal(t, "22", contentID, "it is written down now")
+		assert.Empty(t, warningsContainingText(result.Warnings, "was found at"), "nothing has moved")
+
+		moved, _ := refresh(t, db, libs(map[string]string{root: "11", after: "22"}, root, after))
+
+		assert.Equal(t, legacy["200"].ID, moved["200"].ID)
+		assert.Equal(t, "library_2", moved["200"].InstanceID)
+	})
+
+	t.Run("an entry with no content id is known by its path, as it was", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		root := filepath.Join(dir, "Steam")
+		ext := filepath.Join(dir, "games")
+		writeSteamGame(t, root, "100", "Root Game")
+		writeSteamGame(t, ext, "200", "Ext Game")
+		db := migratedDB(t)
+
+		first, _ := refresh(t, db, libs(map[string]string{root: "11"}, root, ext))
+		second, _ := refresh(t, db, libs(map[string]string{root: "11"}, root, ext))
+
+		assert.Equal(t, first["200"].ID, second["200"].ID)
+		assert.Equal(t, "library_2", second["200"].InstanceID)
+		_, contentID := libraryOfInstall(second["200"].Metadata)
+		assert.Empty(t, contentID)
+		_, contentID = libraryOfInstall(second["100"].Metadata)
+		assert.Equal(t, "11", contentID)
+	})
+
+	t.Run("libraries that share a content id are told apart by their path", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		root := filepath.Join(dir, "Steam")
+		a := filepath.Join(dir, "a-disk")
+		b := filepath.Join(dir, "b-disk")
+		writeSteamGame(t, root, "100", "Root Game")
+		writeSteamGame(t, a, "200", "A Game")
+		writeSteamGame(t, b, "300", "B Game")
+		db := migratedDB(t)
+		ids := map[string]string{root: "11", a: "77", b: "77"}
+
+		first, result := refresh(t, db, libs(ids, root, a, b))
+		require.Equal(t, "library_2", first["200"].InstanceID)
+		require.Equal(t, "library_3", first["300"].InstanceID)
+		assert.Len(t, warningsContainingText(result.Warnings, "same content id"), 0, "that is for discovery to say")
+
+		second, _ := refresh(t, db, libs(ids, root, a, b))
+
+		assert.Equal(t, first["200"].ID, second["200"].ID)
+		assert.Equal(t, first["300"].ID, second["300"].ID)
+		assert.Equal(t, "library_2", second["200"].InstanceID)
+		assert.Equal(t, "library_3", second["300"].InstanceID)
+	})
+
+	t.Run("the content id is written down with the install", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		root := filepath.Join(dir, "Steam")
+		writeSteamGame(t, root, "100", "Root Game")
+		db := migratedDB(t)
+
+		got, _ := refresh(t, db, libs(map[string]string{root: "-7695053421422003000"}, root))
+
+		var meta map[string]any
+		require.NoError(t, json.Unmarshal([]byte(got["100"].Metadata.String), &meta))
+		assert.Equal(t, "-7695053421422003000", meta["library_content_id"])
+		assert.Equal(t, root, meta["library_root"])
+	})
+}
+
+func warningsContainingText(warnings []string, substr string) []string {
+	var out []string
+	for _, w := range warnings {
+		if strings.Contains(w, substr) {
+			out = append(out, w)
+		}
+	}
+	return out
 }

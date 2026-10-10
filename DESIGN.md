@@ -1240,7 +1240,8 @@ installed files) follows its id and not its library, so a library keeps the id
 that it already has when others are added or removed, or when it is away (a
 disk that isn't plugged in). What a library already has is read from the
 installs that are known: each of them has the library it was found in
-(`library_root`) in its metadata, and the id it was given. This goes in order:
+(`library_root`) in its metadata, the content id that Steam gave that library
+(`library_content_id`, see below), and the id it was given. This goes in order:
 
 1. A library has the id that most of its installs have. If libraries claim the
    same id (which is what one that was renumbered in the past looks like) it
@@ -1253,8 +1254,27 @@ installs that are known: each of them has the library it was found in
    of path). So for a new database it is that one, and for an existing one it
    is the library that already has it, wherever it is.
 
-A library is told apart by its path, so one that moves is a library that is new
-(and the installs in the old place are kept, as not present).
+How a library is told apart is a matter of Steam, and nothing outside of the
+Steam code depends on it. Steam gives each library a content id (`contentid`
+in `libraryfolders.vdf`, a 64-bit number that can be negative, kept as the text
+it is written as), which stays with the library when it is moved or mounted
+somewhere else. So a library is known by its content id when it has one that
+no other library found has, and by its path when it has not (it is not there
+yet in what is known, it is in the old format of the file, or two libraries
+have the same one, which is what a disk that was cloned looks like, and a
+warning says so). Specifically:
+
+- A library that is found by its content id and was somewhere else keeps its
+  id, and the refresh warns that it has moved. Its installs are the same rows,
+  with their new `install_root`, and everything attached to them stays.
+- A library is not given the id that belongs to a library that was at its path
+  before (which has moved or is away) when its content id is a different one.
+- Installs that were found before content ids were written down are known by
+  their path, and get the content id of their library the next time they are
+  found. Nothing changes for them.
+- A library that has no content id is known by its path only, and one that
+  moves is a new library (the installs in the old place are kept, as not
+  present).
 
 #### Target discovery
 

@@ -226,16 +226,24 @@ func refreshSteamLibraries(
 
 	inLibraries := make([]installLibrary, len(existing))
 	for i, e := range existing {
+		root, contentID := libraryOfInstall(e.Metadata)
 		inLibraries[i] = installLibrary{
-			InstanceID:  e.InstanceID,
-			LibraryRoot: libraryOfInstall(e.Metadata),
-			Present:     e.IsPresent != 0,
+			InstanceID:       e.InstanceID,
+			LibraryRoot:      root,
+			LibraryContentID: contentID,
+			Present:          e.IsPresent != 0,
 		}
 	}
-	instanceOfLib, reservedIDs := existingLibraryInstances(inLibraries)
+	instances := existingLibraryInstances(inLibraries)
+	instanceOfLib, moves := knownLibraryInstances(steam.Libs, steam.ContentIDs, instances)
+	for _, m := range moves {
+		result.Warnings = append(result.Warnings, fmt.Sprintf(
+			"steam library %s was found at %s before: it keeps its instance %q",
+			m.Lib, strings.Join(m.From, ", "), m.InstanceID))
+	}
 
-	instanceByLib := assignSteamInstanceIDs(steam.Libs, steam.Roots, instanceOfLib, reservedIDs)
-	installs, skips, warns, err := discoverSteamInstalls(steam.Libs, instanceByLib)
+	instanceByLib := assignSteamInstanceIDs(steam.Libs, steam.Roots, instanceOfLib, instances.InUse)
+	installs, skips, warns, err := discoverSteamInstalls(steam.Libs, instanceByLib, steam.ContentIDs)
 	result.Skipped = append(result.Skipped, skips...)
 	result.Warnings = append(result.Warnings, warns...)
 	if err != nil {
@@ -303,6 +311,12 @@ type steamLibraries struct {
 	// that is part of the installation itself.
 	Roots []string
 
+	// ContentIDs are the content ids that Steam gives the libraries, by
+	// library path, for those that have one. Two libraries can have the same
+	// one (a disk that was cloned): it is not an identity then, and
+	// Warnings says so.
+	ContentIDs map[string]string
+
 	// DidScan is true if at least one libraryfolders.vdf was successfully
 	// parsed.
 	DidScan bool
@@ -325,6 +339,7 @@ func discoverSteamLibrariesIn(candidates []string) steamLibraries {
 	didScan := false
 	warnings := []string{}
 	foundRoots := []string{}
+	contentIDs := make(map[string]string)
 
 	// Deduplicate candidate roots (after best-effort canonicalization)
 	var uniqRoots []string
@@ -370,8 +385,8 @@ func discoverSteamLibrariesIn(candidates []string) steamLibraries {
 			continue
 		}
 
-		paths := extractLibraryPaths(parsed)
-		if len(paths) == 0 {
+		entries := extractSteamLibraries(parsed)
+		if len(entries) == 0 {
 			// We successfully parsed a VDF file, so this still counts as a scan.
 			didScan = true
 			warnings = append(warnings, fmt.Sprintf("no libraries found in %s", vdfPath))
@@ -380,8 +395,8 @@ func discoverSteamLibrariesIn(candidates []string) steamLibraries {
 
 		didScan = true
 		foundRoots = append(foundRoots, root)
-		for _, p := range paths {
-			p = strings.TrimSpace(p)
+		for _, entry := range entries {
+			p := strings.TrimSpace(entry.Path)
 			if p == "" {
 				continue
 			}
@@ -393,6 +408,17 @@ func discoverSteamLibrariesIn(candidates []string) steamLibraries {
 				canon = filepath.Clean(p)
 			}
 			libSet[canon] = struct{}{}
+
+			if entry.ContentID == "" {
+				continue
+			}
+			if prev, has := contentIDs[canon]; has && prev != entry.ContentID {
+				warnings = append(warnings, fmt.Sprintf(
+					"steam library %s is listed with two content ids (%s and %s): using %s",
+					canon, prev, entry.ContentID, prev))
+				continue
+			}
+			contentIDs[canon] = entry.ContentID
 		}
 	}
 
@@ -403,12 +429,43 @@ func discoverSteamLibrariesIn(candidates []string) steamLibraries {
 	}
 	sort.Strings(libs)
 
+	warnings = append(warnings, duplicateContentIDWarnings(contentIDs)...)
+
 	return steamLibraries{
-		Libs:     libs,
-		Roots:    foundRoots,
-		DidScan:  didScan,
-		Warnings: warnings,
+		Libs:       libs,
+		Roots:      foundRoots,
+		ContentIDs: contentIDs,
+		DidScan:    didScan,
+		Warnings:   warnings,
 	}
+}
+
+// duplicateContentIDWarnings says which libraries share a content id, in order
+// of content id.
+func duplicateContentIDWarnings(contentIDs map[string]string) []string {
+	libsOf := make(map[string][]string)
+	for lib, id := range contentIDs {
+		libsOf[id] = append(libsOf[id], lib)
+	}
+
+	var ids []string
+	for id, libs := range libsOf {
+		if len(libs) > 1 {
+			ids = append(ids, id)
+		}
+	}
+	sort.Strings(ids)
+
+	var warnings []string
+	for _, id := range ids {
+		libs := libsOf[id]
+		sort.Strings(libs)
+		warnings = append(warnings, fmt.Sprintf(
+			"steam libraries %s have the same content id (%s): they are told apart by their path",
+			strings.Join(libs, ", "), id))
+	}
+
+	return warnings
 }
 
 // installLibrary is where a Steam install that is already known was found.
@@ -420,24 +477,30 @@ type installLibrary struct {
 	// down).
 	LibraryRoot string
 
+	// LibraryContentID is the content id that Steam gave that library, if it
+	// had one when the install was found.
+	LibraryContentID string
+
 	Present bool
 }
 
-// libraryOfInstall is the library that a Steam install was found in, from the
-// metadata that was saved with it, or "" when that doesn't say.
-func libraryOfInstall(metadata sql.NullString) string {
+// libraryOfInstall is the library that a Steam install was found in, and the
+// content id of that library, from the metadata that was saved with it ("" for
+// what that doesn't say).
+func libraryOfInstall(metadata sql.NullString) (root, contentID string) {
 	if !metadata.Valid {
-		return ""
+		return "", ""
 	}
 
 	var meta struct {
-		LibraryRoot string `json:"library_root"`
+		LibraryRoot      string `json:"library_root"`
+		LibraryContentID string `json:"library_content_id"`
 	}
 	if err := json.Unmarshal([]byte(metadata.String), &meta); err != nil {
-		return ""
+		return "", ""
 	}
 
-	return meta.LibraryRoot
+	return meta.LibraryRoot, meta.LibraryContentID
 }
 
 // instanceOrder is the place of an instance id in the order they are given
@@ -454,35 +517,104 @@ func instanceOrder(id string) int {
 	return int(^uint(0) >> 1)
 }
 
+// existingInstances is what the Steam installs that are known say about the
+// instance ids of libraries.
+type existingInstances struct {
+	// ByPath is the id that a library has, by the path of the library.
+	ByPath map[string]string
+
+	// ByContentID is the id that a library has, by the content id that Steam
+	// gave it. It is what a library is known by when it is somewhere else.
+	ByContentID map[string]string
+
+	// InUse is every instance id that an install has, including those of
+	// libraries that are not there now (a disk that isn't plugged in), since
+	// the ids are what the profiles and mods of an install are attached to,
+	// and have to stay where they are for when it comes back.
+	InUse map[string]struct{}
+
+	// RootsOfContentID are the places where the installs of a library were
+	// found, by its content id, the one with most installs first.
+	RootsOfContentID map[string][]string
+
+	// ContentIDsOfRoot are the content ids of the libraries whose installs
+	// were found at a path. More than one means that another library took the
+	// place of one that moved.
+	ContentIDsOfRoot map[string][]string
+}
+
 // existingLibraryInstances works out which instance id each library already
 // has, from the installs that are known: the id they were given when they
-// were found in it. It also returns every instance id that is in use, which
-// includes those of libraries that are not there now (a disk that isn't
-// plugged in), since the ids are what the profiles and mods of an install are
-// attached to, and have to stay where they are for when it comes back.
+// were found in it, and what they say of the library (where it was, and the
+// content id that Steam gave it).
 //
 // What is attached to an install follows its id, so a library is taken to
 // have the one that most of its installs have. If libraries claim the same id
 // (which is what a library that got renumbered in the past looks like) it
 // goes to the one that has most installs with it, and then to the one that
 // has the most that are present, and then the lowest in order of path.
-func existingLibraryInstances(installs []installLibrary) (byLib map[string]string, inUse map[string]struct{}) {
-	inUse = make(map[string]struct{})
+func existingLibraryInstances(installs []installLibrary) existingInstances {
+	ex := existingInstances{
+		InUse:            make(map[string]struct{}),
+		RootsOfContentID: make(map[string][]string),
+		ContentIDsOfRoot: make(map[string][]string),
+	}
+	for _, in := range installs {
+		if in.InstanceID != "" {
+			ex.InUse[in.InstanceID] = struct{}{}
+		}
+	}
 
+	ex.ByPath = resolveLibraryClaims(installs, func(in installLibrary) string { return in.LibraryRoot })
+	ex.ByContentID = resolveLibraryClaims(installs, func(in installLibrary) string { return in.LibraryContentID })
+
+	rootCounts := make(map[string]map[string]int)
+	for _, in := range installs {
+		if in.LibraryContentID == "" || in.LibraryRoot == "" {
+			continue
+		}
+		if rootCounts[in.LibraryContentID] == nil {
+			rootCounts[in.LibraryContentID] = make(map[string]int)
+		}
+		rootCounts[in.LibraryContentID][in.LibraryRoot]++
+
+		if !slices.Contains(ex.ContentIDsOfRoot[in.LibraryRoot], in.LibraryContentID) {
+			ex.ContentIDsOfRoot[in.LibraryRoot] = append(ex.ContentIDsOfRoot[in.LibraryRoot], in.LibraryContentID)
+		}
+	}
+	for _, ids := range ex.ContentIDsOfRoot {
+		sort.Strings(ids)
+	}
+	for id, counts := range rootCounts {
+		roots := make([]string, 0, len(counts))
+		for root := range counts {
+			roots = append(roots, root)
+		}
+		sort.Slice(roots, func(i, j int) bool {
+			if counts[roots[i]] != counts[roots[j]] {
+				return counts[roots[i]] > counts[roots[j]]
+			}
+			return roots[i] < roots[j]
+		})
+		ex.RootsOfContentID[id] = roots
+	}
+
+	return ex
+}
+
+// resolveLibraryClaims gives each library, as told apart by key (the path or
+// the content id of it), the instance id that most of its installs have. An
+// install that has no key has no say.
+func resolveLibraryClaims(installs []installLibrary, key func(installLibrary) string) map[string]string {
 	type claim struct{ lib, id string }
 	type score struct{ installs, present int }
 	scores := make(map[claim]*score)
 
 	for _, in := range installs {
-		if in.InstanceID == "" {
+		if in.InstanceID == "" || key(in) == "" {
 			continue
 		}
-		inUse[in.InstanceID] = struct{}{}
-
-		if in.LibraryRoot == "" {
-			continue
-		}
-		c := claim{in.LibraryRoot, in.InstanceID}
+		c := claim{key(in), in.InstanceID}
 		if scores[c] == nil {
 			scores[c] = &score{}
 		}
@@ -513,7 +645,7 @@ func existingLibraryInstances(installs []installLibrary) (byLib map[string]strin
 	})
 
 	// a library has one id, and an id belongs to one library
-	byLib = make(map[string]string)
+	byLib := make(map[string]string)
 	idTaken := make(map[string]struct{})
 	for _, c := range claims {
 		if _, has := byLib[c.lib]; has {
@@ -526,7 +658,62 @@ func existingLibraryInstances(installs []installLibrary) (byLib map[string]strin
 		idTaken[c.id] = struct{}{}
 	}
 
-	return byLib, inUse
+	return byLib
+}
+
+// steamLibraryMove is a library that has an id, and that is not where it was.
+type steamLibraryMove struct {
+	Lib        string
+	From       []string // where its installs were found, the most of them first
+	InstanceID string
+}
+
+// knownLibraryInstances says which of libs already have an instance id. A
+// library is known by the content id that Steam gave it when there is one that
+// is its alone, wherever it is, and by its path when there is not (it has no
+// content id, or another library has the same one, which is what a disk that
+// was cloned looks like). A library that is known by its content id and is
+// not where its installs were is a move.
+//
+// A path is not enough when it is the path of a different library: the id
+// that the installs there have is that of the library that was there, which
+// has moved or is away, and not of the one that is there now.
+func knownLibraryInstances(
+	libs []string,
+	contentIDs map[string]string,
+	ex existingInstances,
+) (known map[string]string, moves []steamLibraryMove) {
+	owners := make(map[string]int)
+	for _, lib := range libs {
+		if id := contentIDs[lib]; id != "" {
+			owners[id]++
+		}
+	}
+
+	known = make(map[string]string)
+	for _, lib := range libs {
+		contentID := contentIDs[lib]
+		if contentID != "" && owners[contentID] == 1 {
+			if id, ok := ex.ByContentID[contentID]; ok {
+				known[lib] = id
+				if from := ex.RootsOfContentID[contentID]; len(from) > 0 && !slices.Contains(from, lib) {
+					moves = append(moves, steamLibraryMove{Lib: lib, From: from, InstanceID: id})
+				}
+				continue
+			}
+		}
+
+		id, ok := ex.ByPath[lib]
+		if !ok {
+			continue
+		}
+		if seen := ex.ContentIDsOfRoot[lib]; contentID != "" && len(seen) > 0 && !slices.Contains(seen, contentID) {
+			continue
+		}
+		known[lib] = id
+	}
+
+	return known, moves
 }
 
 // assignSteamInstanceIDs gives each Steam library the instance id that the
@@ -618,6 +805,7 @@ func assignSteamInstanceIDs(
 func discoverSteamInstalls(
 	libraryRoots []string, // canonical library roots
 	instanceByLib map[string]string, // canonical lib root -> instance_id
+	contentIDs map[string]string, // canonical lib root -> Steam's content id of it, if it has one
 ) ([]steamInstall, []string, []string, error) {
 	// for each lib:
 	// - list steamapps/appmanifest_*.acf
@@ -625,7 +813,8 @@ func discoverSteamInstalls(
 	// - get appid, name, installdir
 	// - installRaw = <lib>/steamapps/common/<installdir>
 	// - installCanon = canonicalizePathBestEffort(installRaw)
-	// - metadata: include install_root_raw + library_root (+ manifest_path)
+	// - metadata: include install_root_raw + library_root (+ manifest_path), and
+	//   the content id of the library when there is one
 	warnings := []string{}
 	skipped := []string{}
 	installs := []steamInstall{}
@@ -695,6 +884,9 @@ func discoverSteamInstalls(
 				"library_root":     libRoot,
 				"manifest_path":    manifestPath,
 				"steamapps_root":   steamapps,
+			}
+			if id := contentIDs[libRoot]; id != "" {
+				meta["library_content_id"] = id
 			}
 			metaJSON, merr := json.Marshal(meta)
 			if merr != nil {
@@ -825,18 +1017,29 @@ func expandHome(p string) string {
 	return p
 }
 
-// extractLibraryPaths supports both the old and new libraryfolders.vdf formats.
+// steamLibraryEntry is a library as libraryfolders.vdf lists it.
+type steamLibraryEntry struct {
+	Path string
+
+	// ContentID is the id that Steam gives a library (the same one that is in
+	// the libraryfolder.vdf in the library itself, which is how a library
+	// that is moved or added again is known to Steam), or "" if the entry has
+	// none. It is a 64-bit number that can be negative, kept as the text it
+	// is written as.
+	ContentID string
+}
+
+// extractSteamLibraries lists the libraries in a parsed libraryfolders.vdf, in
+// the order of their keys. It supports both the old and new formats.
 //
 // Old-ish format (seen historically):
-// "libraryfolders" { "1" "/path/to/library" "2" "/path" }
+//
+//	"libraryfolders" { "0" "/path/a"  "1" "/path/b" }
 //
 // New-ish format:
 //
-//	"libraryfolders" {
-//	  "1" { "path" "/path/to/library" "label" "" ... }
-//	  "2" { "path" "/path" ... }
-//	}
-func extractLibraryPaths(parsed any) []string {
+//	"libraryfolders" { "0" { "path" "/path/a" "contentid" "123" ... } ... }
+func extractSteamLibraries(parsed any) []steamLibraryEntry {
 	root, ok := parsed.(map[string]any)
 	if !ok {
 		return nil
@@ -849,27 +1052,55 @@ func extractLibraryPaths(parsed any) []string {
 		return nil
 	}
 
-	var out []string
+	// Library entries are usually numeric keys ("0", "1", "2", ...)
+	// but there are also non-library keys like "contentstatsid".
+	var keys []int
+	byKey := make(map[int]any)
 	for k, v := range lf {
-		// Library entries are usually numeric keys ("0", "1", "2", ...)
-		// but there are also non-library keys like "contentstatsid".
-		if _, err := strconv.Atoi(k); err != nil {
+		n, err := strconv.Atoi(k)
+		if err != nil {
 			continue
 		}
+		keys = append(keys, n)
+		byKey[n] = v
+	}
+	sort.Ints(keys)
 
-		switch vv := v.(type) {
+	var out []steamLibraryEntry
+	for _, k := range keys {
+		switch vv := byKey[k].(type) {
 		case string:
 			// old format: "1" "/path"
-			out = append(out, vv)
+			out = append(out, steamLibraryEntry{Path: vv})
 		case map[string]any:
 			// new format: "1" { "path" "/path" ... }
 			if p, ok := vv["path"].(string); ok && strings.TrimSpace(p) != "" {
-				out = append(out, p)
+				out = append(out, steamLibraryEntry{
+					Path:      p,
+					ContentID: normalizeSteamContentID(vv["contentid"]),
+				})
 			}
 		}
 	}
 
 	return out
+}
+
+// normalizeSteamContentID is the content id as it is written in the file, or
+// "" if it isn't there or is 0, which is what a library has before Steam has
+// given it one.
+func normalizeSteamContentID(v any) string {
+	id, ok := v.(string)
+	if !ok {
+		return ""
+	}
+
+	id = strings.TrimSpace(id)
+	if id == "0" {
+		return ""
+	}
+
+	return id
 }
 
 // parseAppManifest parses a single Steam appmanifest_*.acf and extracts:
