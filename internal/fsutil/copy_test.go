@@ -23,6 +23,9 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"testing/iotest"
@@ -184,4 +187,225 @@ func TestCopyWithContext(t *testing.T) {
 		require.ErrorIs(t, err, io.ErrShortWrite)
 		assert.Equal(t, int64(3), n)
 	})
+}
+
+// dirNames returns the names of the entries in dir, sorted.
+func dirNames(t *testing.T, dir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	sort.Strings(names)
+	return names
+}
+
+func TestCopyFile(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	t.Run("copies the content", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name string
+			data []byte
+		}{
+			{"empty file", []byte{}},
+			{"short content", []byte("hello")},
+			{"exactly the smallest buffer", patterned(minBufferSize)},
+			{"larger than the largest buffer", patterned(3*maxBufferSize + 17)},
+		}
+
+		for _, tc := range tests {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				dir := t.TempDir()
+				src := filepath.Join(dir, "src")
+				dst := filepath.Join(dir, "dst")
+				require.NoError(t, os.WriteFile(src, tc.data, 0o644))
+
+				require.NoError(t, CopyFile(ctx, src, dst))
+
+				got, err := os.ReadFile(dst)
+				require.NoError(t, err)
+				assert.Equal(t, tc.data, got)
+				assert.Equal(t, tc.data, mustRead(t, src), "the source is untouched")
+			})
+		}
+	})
+
+	t.Run("new file has mode 0644 whatever the mode of the source", func(t *testing.T) {
+		t.Parallel()
+
+		for _, mode := range []os.FileMode{0o600, 0o755, 0o444} {
+			dir := t.TempDir()
+			src := filepath.Join(dir, "src")
+			dst := filepath.Join(dir, "dst")
+			require.NoError(t, os.WriteFile(src, []byte("x"), mode))
+			require.NoError(t, os.Chmod(src, mode)) // WriteFile is subject to the umask
+
+			require.NoError(t, CopyFile(ctx, src, dst))
+
+			info, err := os.Stat(dst)
+			require.NoError(t, err)
+			assert.Equal(t, os.FileMode(0o644), info.Mode().Perm(), "source mode %v", mode)
+		}
+	})
+
+	t.Run("replaces an existing file", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		src := filepath.Join(dir, "src")
+		dst := filepath.Join(dir, "dst")
+		require.NoError(t, os.WriteFile(src, []byte("new"), 0o644))
+		require.NoError(t, os.WriteFile(dst, []byte("a much longer old content"), 0o600))
+
+		require.NoError(t, CopyFile(ctx, src, dst))
+
+		assert.Equal(t, []byte("new"), mustRead(t, dst))
+		info, err := os.Stat(dst)
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o644), info.Mode().Perm())
+	})
+
+	t.Run("leaves no temporary files behind", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		src := filepath.Join(dir, "src")
+		require.NoError(t, os.WriteFile(src, []byte("x"), 0o644))
+
+		require.NoError(t, CopyFile(ctx, src, filepath.Join(dir, "dst")))
+
+		assert.Equal(t, []string{"dst", "src"}, dirNames(t, dir))
+	})
+
+	t.Run("source and destination can be the same file", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.TempDir(), "file")
+		require.NoError(t, os.WriteFile(path, []byte("keep me"), 0o644))
+
+		require.NoError(t, CopyFile(ctx, path, path))
+
+		assert.Equal(t, []byte("keep me"), mustRead(t, path))
+	})
+
+	t.Run("a destination that is a symlink is replaced and not followed", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		src := filepath.Join(dir, "src")
+		target := filepath.Join(dir, "target")
+		link := filepath.Join(dir, "link")
+		require.NoError(t, os.WriteFile(src, []byte("new"), 0o644))
+		require.NoError(t, os.WriteFile(target, []byte("original"), 0o644))
+		require.NoError(t, os.Symlink(target, link))
+
+		require.NoError(t, CopyFile(ctx, src, link))
+
+		info, err := os.Lstat(link)
+		require.NoError(t, err)
+		assert.True(t, info.Mode().IsRegular(), "the link was replaced by a regular file")
+		assert.Equal(t, []byte("new"), mustRead(t, link))
+		assert.Equal(t, []byte("original"), mustRead(t, target))
+	})
+
+	t.Run("source that does not exist", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		dst := filepath.Join(dir, "dst")
+
+		err := CopyFile(ctx, filepath.Join(dir, "missing"), dst)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, os.ErrNotExist)
+		assert.Contains(t, err.Error(), "open src")
+		assert.Empty(t, dirNames(t, dir))
+	})
+
+	t.Run("source that can't be read leaves the destination alone", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		dst := filepath.Join(dir, "dst")
+		require.NoError(t, os.WriteFile(dst, []byte("old"), 0o644))
+
+		// a directory can be opened but not read, whoever is running the test
+		src := filepath.Join(dir, "srcdir")
+		require.NoError(t, os.Mkdir(src, 0o755))
+
+		err := CopyFile(ctx, src, dst)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "copy")
+		assert.Equal(t, []byte("old"), mustRead(t, dst))
+		assert.Equal(t, []string{"dst", "srcdir"}, dirNames(t, dir))
+	})
+
+	t.Run("canceled context leaves the destination alone", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		src := filepath.Join(dir, "src")
+		existing := filepath.Join(dir, "existing")
+		fresh := filepath.Join(dir, "fresh")
+		require.NoError(t, os.WriteFile(src, []byte("new"), 0o644))
+		require.NoError(t, os.WriteFile(existing, []byte("old"), 0o644))
+
+		canceled, cancel := context.WithCancel(ctx)
+		cancel()
+
+		for _, dst := range []string{existing, fresh} {
+			err := CopyFile(canceled, src, dst)
+			require.Error(t, err)
+			assert.ErrorIs(t, err, context.Canceled)
+		}
+
+		assert.Equal(t, []byte("old"), mustRead(t, existing))
+		assert.NoFileExists(t, fresh)
+		assert.Equal(t, []string{"existing", "src"}, dirNames(t, dir))
+	})
+
+	t.Run("destination directory that does not exist", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		src := filepath.Join(dir, "src")
+		require.NoError(t, os.WriteFile(src, []byte("x"), 0o644))
+
+		err := CopyFile(ctx, src, filepath.Join(dir, "missing", "dst"))
+		require.Error(t, err)
+		assert.ErrorIs(t, err, os.ErrNotExist)
+		assert.Contains(t, err.Error(), "create temp")
+	})
+
+	t.Run("destination that is a directory", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		src := filepath.Join(dir, "src")
+		dst := filepath.Join(dir, "dstdir")
+		require.NoError(t, os.WriteFile(src, []byte("x"), 0o644))
+		require.NoError(t, os.Mkdir(dst, 0o755))
+
+		err := CopyFile(ctx, src, dst)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "rename into place")
+		assert.DirExists(t, dst)
+		assert.Equal(t, []string{"dstdir", "src"}, dirNames(t, dir))
+	})
+}
+
+func mustRead(t *testing.T, path string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return data
 }

@@ -21,7 +21,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -429,7 +428,7 @@ func extractBlob(
 	}
 
 	// copy blob to output
-	if err := copyFile(blobPath, outPath); err != nil {
+	if err := fsutil.CopyFile(ctx, blobPath, outPath); err != nil {
 		return fmt.Errorf("copy blob to output: %w", err)
 	}
 
@@ -513,37 +512,4 @@ func archiveFormatToExt(format, compression string) string {
 	default:
 		return ".tar.gz" // we wrap unknowns in tar.gz on import
 	}
-}
-
-// TODO: this is at least the second version
-// copyFile copies src to dst atomically.
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("open source: %w", err)
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return fmt.Errorf("create destination: %w", err)
-	}
-
-	success := false
-	defer func() {
-		out.Close()
-		if !success {
-			os.Remove(dst)
-		}
-	}()
-
-	if _, err := io.Copy(out, in); err != nil {
-		return fmt.Errorf("copy: %w", err)
-	}
-	if err := out.Sync(); err != nil {
-		return fmt.Errorf("fsync: %w", err)
-	}
-
-	success = true
-	return nil
 }

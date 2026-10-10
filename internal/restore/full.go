@@ -31,6 +31,7 @@ import (
 	"github.com/mfinelli/modctl/internal/archivescanner"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/exporter"
+	"github.com/mfinelli/modctl/internal/fsutil"
 )
 
 // Full imports a full bundle into a fresh database.
@@ -90,7 +91,7 @@ func Full(
 	if err := os.Remove(dbPath); err != nil && !os.IsNotExist(err) {
 		return res, fmt.Errorf("remove existing database: %w", err)
 	}
-	if err := copyFile(bundleDBPath, dbPath); err != nil {
+	if err := fsutil.CopyFile(ctx, bundleDBPath, dbPath); err != nil {
 		return res, fmt.Errorf("restore database: %w", err)
 	}
 

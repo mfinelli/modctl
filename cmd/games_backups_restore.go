@@ -20,7 +20,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -30,6 +29,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/planner"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
@@ -188,7 +188,7 @@ that can't be read to check it.`,
 		if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
 			return fmt.Errorf("create parent directories: %w", err)
 		}
-		if err := copyFileSimple(blobPath, absPath); err != nil {
+		if err := fsutil.CopyFile(ctx, blobPath, absPath); err != nil {
 			return fmt.Errorf("restore backup: %w", err)
 		}
 
@@ -215,29 +215,6 @@ func init() {
 
 	gamesBackupsRestoreCmd.Flags().BoolVar(&gamesBackupsRestoreForce, "force", false,
 		"Restore even if the on-disk file has drifted from what modctl installed")
-}
-
-// copyFileSimple copies src to dst, creating or truncating dst.
-// TODO: we have a couple of other similar functions floating around we can
-//
-//	probably consolidate
-func copyFileSimple(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("open source: %w", err)
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return fmt.Errorf("create destination: %w", err)
-	}
-	defer out.Close()
-
-	if _, err := io.Copy(out, in); err != nil {
-		return fmt.Errorf("copy: %w", err)
-	}
-	return out.Sync()
 }
 
 // TODO copied from the internal/planner package, let's either export it from

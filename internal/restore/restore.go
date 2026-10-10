@@ -160,37 +160,6 @@ func OpenAndValidate(ctx context.Context, bundlePath string) (*Bundle, error) {
 	}, nil
 }
 
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("open source: %w", err)
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return fmt.Errorf("create destination: %w", err)
-	}
-
-	success := false
-	defer func() {
-		out.Close()
-		if !success {
-			os.Remove(dst)
-		}
-	}()
-
-	if _, err := io.Copy(out, in); err != nil {
-		return fmt.Errorf("copy: %w", err)
-	}
-	if err := out.Sync(); err != nil {
-		return fmt.Errorf("fsync: %w", err)
-	}
-
-	success = true
-	return nil
-}
-
 func scanMissingInventories(
 	ctx context.Context,
 	db *sql.DB,

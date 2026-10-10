@@ -356,7 +356,7 @@ func (e Extractor) RestoreFile(
 
 	// Copy backup blob to target. We don't rehash since the blob store
 	// is content-addressed and user editing of blobs is unsupported.
-	if err := copyFile(ctx, backupPath, absDestPath); err != nil {
+	if err := fsutil.CopyFile(ctx, backupPath, absDestPath); err != nil {
 		return RestoreFileResult{}, fmt.Errorf("restore %q: %w", op.DestPath, err)
 	}
 
@@ -637,44 +637,6 @@ func copyAndHash(ctx context.Context, src, dst string) (string, int64, error) {
 	}
 
 	return hex.EncodeToString(h.Sum(nil)), written, nil
-}
-
-// copyFile copies src to dst atomically via a temp file in dst's directory.
-// Used for restore operations where we don't need to hash the content.
-func copyFile(ctx context.Context, src, dst string) error {
-	srcFile, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("open src: %w", err)
-	}
-	defer srcFile.Close()
-
-	dstDir := filepath.Dir(dst)
-	tmp, err := os.CreateTemp(dstDir, ".restore-*")
-	if err != nil {
-		return fmt.Errorf("create temp: %w", err)
-	}
-	tmpName := tmp.Name()
-	defer func() {
-		_ = tmp.Close()
-		_ = os.Remove(tmpName)
-	}()
-
-	buf := make([]byte, 1024*1024)
-	if _, err := fsutil.CopyWithContext(ctx, tmp, srcFile, buf); err != nil {
-		return fmt.Errorf("copy: %w", err)
-	}
-
-	if err := tmp.Sync(); err != nil {
-		return fmt.Errorf("fsync: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("close temp: %w", err)
-	}
-	if err := os.Rename(tmpName, dst); err != nil {
-		return fmt.Errorf("rename into place: %w", err)
-	}
-
-	return nil
 }
 
 // removeFromDisk deletes the file at absDestPath for RemoveFile, and returns

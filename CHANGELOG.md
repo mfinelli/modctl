@@ -34,6 +34,11 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
   version of modctl supports, instead of only comparing modctl versions.
 - `games backups restore` now requires `--force` when the file on disk can't
   be read to check it for drift, instead of silently skipping the check.
+- Fix files restored from backups by `apply` and `unapply` being written with
+  mode `0600`; they now get `0644`.
+- `extract`, `import` and `games backups restore` now write their files
+  atomically: a failure or Ctrl-C no longer leaves a partly written file
+  behind, and an existing file is only replaced once the copy is complete.
 
 ## v0.7.1 - 2026-10-03
 
