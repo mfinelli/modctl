@@ -273,7 +273,11 @@ TODO:
 						vline += fmt.Sprintf("  version=%q", v.VersionString.String)
 					}
 
-					// TODO: think about also showing v.OriginalName later (only if not-null)
+					// the name of the archive as it was when it was imported
+					if v.OriginalName.Valid && v.OriginalName.String != "" {
+						vline += fmt.Sprintf("  filename=%q", v.OriginalName.String)
+					}
+
 					style.Println(style.Subtle.Render(vline))
 				}
 			}
