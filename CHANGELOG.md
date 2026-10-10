@@ -30,6 +30,8 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 - Import, `verify` and `extract` now work with bundles exported by older
   versions: the bundle's database is migrated to the current schema in a
   temporary copy before it is read.
+- `verify` now warns when a bundle's database schema is newer than this
+  version of modctl supports, instead of only comparing modctl versions.
 
 ## v0.7.1 - 2026-10-03
 

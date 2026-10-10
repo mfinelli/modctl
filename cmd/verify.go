@@ -99,20 +99,19 @@ Exits non-zero if any integrity issues are found. Version warnings
 			)))
 		}
 
-		// get current schema version for comparison
-		// TODO: i'm not actually doing this yet... I'm not sure that
-		//       i want to require a databse to verify a bundle
-		// var currentSchema int64
-		// if db, err := internal.SetupDB(); err == nil {
-		// 	currentSchema, _ = restore.CurrentSchemaVersion(ctx, db)
-		// 	db.Close()
-		// }
-		// if currentSchema > 0 && bundle.Manifest.SchemaVersion > currentSchema {
-		// 	fmt.Println(warnStyle.Render(fmt.Sprintf(
-		// 		"  ⚠ bundle schema version %d is newer than current %d - upgrade modctl before importing",
-		// 		bundle.Manifest.SchemaVersion, currentSchema,
-		// 	)))
-		// }
+		// The bundle's schema has to be one that this version of modctl knows
+		// about. We compare against the migrations built into the binary and
+		// not against the database on disk: that one is a stand-in for the
+		// same thing (every command migrates it), but it may not exist yet, or
+		// may not have been migrated since an upgrade. An older schema is not
+		// worth a warning since import migrates it.
+		if latest, err := internal.LatestSchemaVersion(); err == nil &&
+			bundle.Manifest.SchemaVersion > latest {
+			style.Println(style.Warning.Render(fmt.Sprintf(
+				"  ⚠ bundle schema version %d is newer than the latest this version of modctl supports (%d) - upgrade modctl before importing",
+				bundle.Manifest.SchemaVersion, latest,
+			)))
+		}
 
 		// collect all integrity issues
 		var issues []string
