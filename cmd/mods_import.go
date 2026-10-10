@@ -40,6 +40,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/importer"
 	"github.com/mfinelli/modctl/internal/nexus"
 	"github.com/mfinelli/modctl/internal/nexusclient"
@@ -146,7 +147,7 @@ has been safely stored and the database has been updated successfully.`,
 			if !info.Mode().IsRegular() {
 				return fmt.Errorf("--rm requires a regular file input")
 			}
-			under, err := internal.IsUnderDir(inputPath, archivesDir)
+			under, err := fsutil.IsUnderDir(inputPath, archivesDir)
 			if err != nil {
 				return fmt.Errorf("check --rm safety: %w", err)
 			}
