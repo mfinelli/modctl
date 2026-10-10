@@ -19,7 +19,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -31,7 +30,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/fsutil"
+	"github.com/mfinelli/modctl/internal/planner"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -145,13 +144,33 @@ that can't be read to check it.`,
 		if err == nil {
 			// File is tool-owned - check for drift
 			if _, exists := diskStat(absPath); exists {
-				warning, err := checkDrift(ctx, absPath, relpath,
-					installedFile.ContentSha256, gamesBackupsRestoreForce)
+				drift, err := planner.CheckDrift(ctx, absPath, installedFile.ContentSha256)
 				if err != nil {
-					return err
+					return fmt.Errorf("check %q for drift: %w", relpath, err)
 				}
-				if warning != "" {
-					style.Println(style.Warning.Render(warning))
+				switch drift.State {
+				case planner.DriftModified:
+					if !gamesBackupsRestoreForce {
+						return fmt.Errorf(
+							"file %q has been modified since modctl installed it (drift detected); pass --force to restore anyway",
+							relpath,
+						)
+					}
+					style.Println(style.Warning.Render(fmt.Sprintf(
+						"  warning: %q has been modified since modctl installed it, restoring backup anyway",
+						relpath,
+					)))
+				case planner.DriftUnknown:
+					if !gamesBackupsRestoreForce {
+						return fmt.Errorf(
+							"could not check %q for drift: %w; pass --force to restore anyway",
+							relpath, drift.Err,
+						)
+					}
+					style.Println(style.Warning.Render(fmt.Sprintf(
+						"  warning: could not check %q for drift (%v), restoring backup anyway",
+						relpath, drift.Err,
+					)))
 				}
 			}
 		}
@@ -196,47 +215,6 @@ func init() {
 
 	gamesBackupsRestoreCmd.Flags().BoolVar(&gamesBackupsRestoreForce, "force", false,
 		"Restore even if the on-disk file has drifted from what modctl installed")
-}
-
-// checkDrift compares the file at absPath with the sha256 modctl recorded when
-// it installed it (installedSha), before a backup is restored over it. A file
-// that differs, or that can't be read to find out, is only restored over with
-// force; in that case the warning to show the user is returned. relpath is the
-// path relative to the target, for messages.
-//
-// Being told to stop is always an error, with or without force: we must not
-// carry on to overwrite a file we didn't get to check.
-func checkDrift(ctx context.Context, absPath, relpath, installedSha string, force bool) (warning string, err error) {
-	onDiskHash, err := fsutil.HashFile(ctx, absPath)
-	switch {
-	case err != nil && ctx.Err() != nil:
-		// report that we were told to stop, not whatever the hash ran into
-		return "", fmt.Errorf("check %q for drift: %w", relpath, ctx.Err())
-	case err != nil:
-		if !force {
-			return "", fmt.Errorf(
-				"could not check %q for drift: %w; pass --force to restore anyway",
-				relpath, err,
-			)
-		}
-		return fmt.Sprintf(
-			"  warning: could not check %q for drift (%v), restoring backup anyway",
-			relpath, err,
-		), nil
-	case onDiskHash != installedSha:
-		if !force {
-			return "", fmt.Errorf(
-				"file %q has been modified since modctl installed it (drift detected); pass --force to restore anyway",
-				relpath,
-			)
-		}
-		return fmt.Sprintf(
-			"  warning: %q has been modified since modctl installed it, restoring backup anyway",
-			relpath,
-		), nil
-	}
-
-	return "", nil
 }
 
 // copyFileSimple copies src to dst, creating or truncating dst.
