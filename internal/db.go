@@ -176,6 +176,33 @@ func latestMigrationVersion(fsys fs.FS) (int64, error) {
 	return latest, nil
 }
 
+// OpenDB opens the database that the commands use: it has to be there (it is
+// made by init), and it is migrated to the latest schema before it is handed
+// over. The caller closes it.
+func OpenDB(ctx context.Context) (*sql.DB, error) {
+	return openDB(ctx, MigrateDB)
+}
+
+// openDB is OpenDB with the migrating done by migrate, so that a test can
+// have migrations that are not the ones that are embedded in the binary.
+func openDB(ctx context.Context, migrate func(context.Context, *sql.DB) error) (*sql.DB, error) {
+	if err := EnsureDBExists(); err != nil {
+		return nil, err
+	}
+
+	db, err := SetupDB()
+	if err != nil {
+		return nil, fmt.Errorf("error setting up database: %w", err)
+	}
+
+	if err := migrate(ctx, db); err != nil {
+		db.Close()
+		return nil, err
+	}
+
+	return db, nil
+}
+
 // EnsureDBExists verifies that the configured database file exists
 // and is a regular file. If not, it returns a user-friendly error.
 func EnsureDBExists() error {
