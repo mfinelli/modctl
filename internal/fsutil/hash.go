@@ -26,12 +26,6 @@ import (
 	"os"
 )
 
-const (
-	// the smallest and the largest read buffer HashFile will use
-	minHashBuffer = 32 * 1024
-	maxHashBuffer = 1024 * 1024
-)
-
 // HashFile computes the sha256 digest of the file at path and returns it as
 // a lowercase hex string. It stops early if ctx is canceled, which matters
 // when hashing very large files (such as archives) in a command that has to
@@ -49,30 +43,10 @@ func HashFile(ctx context.Context, path string) (string, error) {
 	defer f.Close()
 
 	h := sha256.New()
-	buf := make([]byte, hashBufferSize(f))
+	buf := make([]byte, bufferSizeOf(f))
 	if _, err := CopyWithContext(ctx, h, f, buf); err != nil {
 		return "", fmt.Errorf("hash file contents: %w", err)
 	}
 
 	return hex.EncodeToString(h.Sum(nil)), nil
-}
-
-// hashBufferSize picks the read buffer size for f.
-func hashBufferSize(f *os.File) int {
-	info, err := f.Stat()
-	if err != nil {
-		// we can't tell how big it is, so assume it could be large
-		return maxHashBuffer
-	}
-
-	return bufferSizeFor(info.Size())
-}
-
-// bufferSizeFor returns the read buffer size to use for a file of the given
-// size: the size of the file itself, kept between a minimum (so that small
-// files don't get a tiny buffer) and a maximum (so that a huge file doesn't
-// get a huge one). The size is only a hint: a file that grows while it is
-// being read is still read to the end.
-func bufferSizeFor(size int64) int {
-	return int(min(max(size, minHashBuffer), maxHashBuffer))
 }

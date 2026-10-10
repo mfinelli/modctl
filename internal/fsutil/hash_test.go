@@ -72,23 +72,23 @@ func TestHashFile(t *testing.T) {
 		},
 		{
 			"exactly the smallest buffer",
-			patterned(minHashBuffer),
-			sumHex(patterned(minHashBuffer)),
+			patterned(minBufferSize),
+			sumHex(patterned(minBufferSize)),
 		},
 		{
 			"one byte more than the smallest buffer",
-			patterned(minHashBuffer + 1),
-			sumHex(patterned(minHashBuffer + 1)),
+			patterned(minBufferSize + 1),
+			sumHex(patterned(minBufferSize + 1)),
 		},
 		{
 			"exactly the largest buffer",
-			patterned(maxHashBuffer),
-			sumHex(patterned(maxHashBuffer)),
+			patterned(maxBufferSize),
+			sumHex(patterned(maxBufferSize)),
 		},
 		{
 			"larger than the largest buffer",
-			patterned(3*maxHashBuffer + 17),
-			sumHex(patterned(3*maxHashBuffer + 17)),
+			patterned(3*maxBufferSize + 17),
+			sumHex(patterned(3*maxBufferSize + 17)),
 		},
 	}
 
@@ -147,7 +147,7 @@ func TestHashFile(t *testing.T) {
 
 		// different sizes, so the goroutines use different buffer sizes too
 		dir := t.TempDir()
-		sizes := []int{0, 10, minHashBuffer, minHashBuffer + 1, 300 * 1024, 2*maxHashBuffer + 3}
+		sizes := []int{0, 10, minBufferSize, minBufferSize + 1, 300 * 1024, 2*maxBufferSize + 3}
 		paths := make([]string, len(sizes))
 		want := make([]string, len(sizes))
 		for i, size := range sizes {
@@ -188,32 +188,4 @@ func TestHashFile(t *testing.T) {
 			}
 		}
 	})
-}
-
-func TestBufferSizeFor(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		size int64
-		want int
-	}{
-		{"empty file gets the minimum", 0, minHashBuffer},
-		{"tiny file gets the minimum", 10, minHashBuffer},
-		{"just under the minimum", minHashBuffer - 1, minHashBuffer},
-		{"exactly the minimum", minHashBuffer, minHashBuffer},
-		{"between the limits uses the file size", 300 * 1024, 300 * 1024},
-		{"exactly the maximum", maxHashBuffer, maxHashBuffer},
-		{"just over the maximum", maxHashBuffer + 1, maxHashBuffer},
-		{"huge file gets the maximum", 10 << 30, maxHashBuffer},
-	}
-
-	for _, tc := range tests {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			assert.Equal(t, tc.want, bufferSizeFor(tc.size))
-		})
-	}
 }
