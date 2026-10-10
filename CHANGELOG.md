@@ -5,6 +5,20 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 
 `modctl` adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## unreleased
+
+### Changes
+
+- Steam library instance ids are now stable. A library keeps the instance id
+  (`default`, `library_2`, ...) that its installs already have, so adding,
+  removing or unplugging a library no longer changes which install is which,
+  or what is attached to it (profiles, mods, installed files). A new library is
+  given an id that no install has had, and the library in the Steam
+  installation is only the `default` when no install has that id yet. This
+  finishes the change to the `default` library in v0.8.0. If your installs
+  were already affected by it they are not put back: they are kept as they are
+  now.
+
 ## v0.8.0 - 2026-10-10
 
 This is another pre-release that adds a few new features. It's also a very

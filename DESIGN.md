@@ -1225,11 +1225,26 @@ and the others are `library_2`, `library_3`, ... in order of path. If none of
 the libraries is in a Steam installation (which should not happen) the first
 library in order of path is `default`.
 
-The ids of the other libraries are not stable yet: adding or removing a
-library renumbers the ones after it, and everything that is attached to an
-install (profiles, mods, installed files) follows its id and not its library.
-They are meant to be made stable, by keeping the id that a library already
-has.
+The ids are stable: everything that is attached to an install (profiles, mods,
+installed files) follows its id and not its library, so a library keeps the id
+that it already has when others are added or removed, or when it is away (a
+disk that isn't plugged in). What a library already has is read from the
+installs that are known: each of them has the library it was found in
+(`library_root`) in its metadata, and the id it was given. This goes in order:
+
+1. A library has the id that most of its installs have. If libraries claim the
+   same id (which is what one that was renumbered in the past looks like) it
+   goes to the one with most installs with it, then to the one with most that
+   are present, then to the first in order of path.
+2. A library that has none is given one that no install has, whether or not
+   its library is there now: the first unused `library_N`, in order of path.
+3. `default` is only given out when no install has it yet: to the library in
+   the Steam installation (or, if none of them is, the first library in order
+   of path). So for a new database it is that one, and for an existing one it
+   is the library that already has it, wherever it is.
+
+A library is told apart by its path, so one that moves is a library that is new
+(and the installs in the old place are kept, as not present).
 
 #### Target discovery
 

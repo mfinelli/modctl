@@ -192,30 +192,54 @@ func ScanStores(ctx context.Context, db *sql.DB) (RefreshResult, error) {
 }
 
 func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries) (RefreshResult, error) {
-	var result RefreshResult
-
 	steam, err := discoverSteamLibraries()
-	result.Warnings = append(result.Warnings, steam.Warnings...)
 	if err != nil {
-		return result, fmt.Errorf("error scanning for steam libraries: %w", err)
+		return RefreshResult{Warnings: steam.Warnings},
+			fmt.Errorf("error scanning for steam libraries: %w", err)
 	}
+
+	return refreshSteamLibraries(ctx, db, q, steam)
+}
+
+// refreshSteamLibraries is refreshSteam for the Steam libraries that have been
+// found, which is what lets a test have any it likes.
+func refreshSteamLibraries(
+	ctx context.Context,
+	db *sql.DB,
+	q *dbq.Queries,
+	steam steamLibraries,
+) (RefreshResult, error) {
+	var result RefreshResult
+	result.Warnings = append(result.Warnings, steam.Warnings...)
+
 	if !steam.DidScan {
 		// discovery did not meaningfully run -> do NOT mark installs missing
 		return result, nil
 	}
 
-	instanceByLib := assignSteamInstanceIDs(steam.Libs, steam.Roots)
+	// Pre-fetch existing installs for this store so we can classify changes,
+	// and so that the libraries that have an instance id keep it
+	existing, err := q.ListGameInstallsByStore(ctx, "steam")
+	if err != nil {
+		return result, fmt.Errorf("list existing steam installs: %w", err)
+	}
+
+	inLibraries := make([]installLibrary, len(existing))
+	for i, e := range existing {
+		inLibraries[i] = installLibrary{
+			InstanceID:  e.InstanceID,
+			LibraryRoot: libraryOfInstall(e.Metadata),
+			Present:     e.IsPresent != 0,
+		}
+	}
+	instanceOfLib, reservedIDs := existingLibraryInstances(inLibraries)
+
+	instanceByLib := assignSteamInstanceIDs(steam.Libs, steam.Roots, instanceOfLib, reservedIDs)
 	installs, skips, warns, err := discoverSteamInstalls(steam.Libs, instanceByLib)
 	result.Skipped = append(result.Skipped, skips...)
 	result.Warnings = append(result.Warnings, warns...)
 	if err != nil {
 		return result, fmt.Errorf("error enumerating steam installs: %w", err)
-	}
-
-	// Pre-fetch existing installs for this store so we can classify changes
-	existing, err := q.ListGameInstallsByStore(ctx, "steam")
-	if err != nil {
-		return result, fmt.Errorf("list existing steam installs: %w", err)
 	}
 
 	known := make([]knownInstall, len(existing))
@@ -387,21 +411,146 @@ func discoverSteamLibrariesIn(candidates []string) steamLibraries {
 	}
 }
 
+// installLibrary is where a Steam install that is already known was found.
+type installLibrary struct {
+	InstanceID string
+
+	// LibraryRoot is the library the install was found in, "" if it is not
+	// known (for an install that was found by something that didn't write it
+	// down).
+	LibraryRoot string
+
+	Present bool
+}
+
+// libraryOfInstall is the library that a Steam install was found in, from the
+// metadata that was saved with it, or "" when that doesn't say.
+func libraryOfInstall(metadata sql.NullString) string {
+	if !metadata.Valid {
+		return ""
+	}
+
+	var meta struct {
+		LibraryRoot string `json:"library_root"`
+	}
+	if err := json.Unmarshal([]byte(metadata.String), &meta); err != nil {
+		return ""
+	}
+
+	return meta.LibraryRoot
+}
+
+// instanceOrder is the place of an instance id in the order they are given
+// out in: "default", "library_2", "library_3", ... and then anything else.
+func instanceOrder(id string) int {
+	if id == "default" {
+		return 0
+	}
+	if n, ok := strings.CutPrefix(id, "library_"); ok {
+		if v, err := strconv.Atoi(n); err == nil {
+			return v
+		}
+	}
+	return int(^uint(0) >> 1)
+}
+
+// existingLibraryInstances works out which instance id each library already
+// has, from the installs that are known: the id they were given when they
+// were found in it. It also returns every instance id that is in use, which
+// includes those of libraries that are not there now (a disk that isn't
+// plugged in), since the ids are what the profiles and mods of an install are
+// attached to, and have to stay where they are for when it comes back.
+//
+// What is attached to an install follows its id, so a library is taken to
+// have the one that most of its installs have. If libraries claim the same id
+// (which is what a library that got renumbered in the past looks like) it
+// goes to the one that has most installs with it, and then to the one that
+// has the most that are present, and then the lowest in order of path.
+func existingLibraryInstances(installs []installLibrary) (byLib map[string]string, inUse map[string]struct{}) {
+	inUse = make(map[string]struct{})
+
+	type claim struct{ lib, id string }
+	type score struct{ installs, present int }
+	scores := make(map[claim]*score)
+
+	for _, in := range installs {
+		if in.InstanceID == "" {
+			continue
+		}
+		inUse[in.InstanceID] = struct{}{}
+
+		if in.LibraryRoot == "" {
+			continue
+		}
+		c := claim{in.LibraryRoot, in.InstanceID}
+		if scores[c] == nil {
+			scores[c] = &score{}
+		}
+		scores[c].installs++
+		if in.Present {
+			scores[c].present++
+		}
+	}
+
+	claims := make([]claim, 0, len(scores))
+	for c := range scores {
+		claims = append(claims, c)
+	}
+	sort.Slice(claims, func(i, j int) bool {
+		a, b := claims[i], claims[j]
+		sa, sb := scores[a], scores[b]
+		switch {
+		case sa.installs != sb.installs:
+			return sa.installs > sb.installs
+		case sa.present != sb.present:
+			return sa.present > sb.present
+		case instanceOrder(a.id) != instanceOrder(b.id):
+			return instanceOrder(a.id) < instanceOrder(b.id)
+		case a.id != b.id:
+			return a.id < b.id
+		}
+		return a.lib < b.lib
+	})
+
+	// a library has one id, and an id belongs to one library
+	byLib = make(map[string]string)
+	idTaken := make(map[string]struct{})
+	for _, c := range claims {
+		if _, has := byLib[c.lib]; has {
+			continue
+		}
+		if _, taken := idTaken[c.id]; taken {
+			continue
+		}
+		byLib[c.lib] = c.id
+		idTaken[c.id] = struct{}{}
+	}
+
+	return byLib, inUse
+}
+
 // assignSteamInstanceIDs gives each Steam library the instance id that the
 // installs in it get: "default" for the main library, and "library_2",
-// "library_3", ... for the others, in order of path.
+// "library_3", ... for the others.
+//
+// A library keeps the id that it already has (known, which is what
+// existingLibraryInstances makes of the installs that are known), so that
+// nothing changes for what is attached to its installs when libraries are
+// added or removed. A library that has none gets one that is not in use, which
+// is not an id that is in inUse (that of an install that is known, whether or
+// not its library is there now) and not one that another library has been
+// given: the first unused number, in order of path.
 //
 // The main library is the one in the Steam installation itself, which is there
-// for as long as Steam is, so the installs in it keep their identity when other
-// libraries come and go. roots are the Steam installations that were found, in
-// order of preference: the first of them that is one of libs wins. With none of
-// them among libs (which should not happen) the main library is the first one
-// in order of path.
-//
-// TODO: the ids of the other libraries still change when one is added or
-// removed, and so does everything attached to the installs in them. They are
-// to be made stable, by keeping the id that a library already has.
-func assignSteamInstanceIDs(libs, roots []string) map[string]string {
+// for as long as Steam is, and it is the default when none is yet. roots are
+// the Steam installations that were found, in order of preference: the first
+// of them that is a library without an id is the one. With none of them among
+// those (which should not happen) it is the first library in order of path.
+func assignSteamInstanceIDs(
+	libs, roots []string,
+	known map[string]string,
+	inUse map[string]struct{},
+) map[string]string {
 	if len(libs) == 0 {
 		return map[string]string{}
 	}
@@ -409,23 +558,55 @@ func assignSteamInstanceIDs(libs, roots []string) map[string]string {
 	sorted := append([]string{}, libs...)
 	sort.Strings(sorted)
 
-	defaultLib := sorted[0]
-	for _, root := range roots {
-		if slices.Contains(sorted, root) {
-			defaultLib = root
-			break
+	m := make(map[string]string, len(sorted))
+	given := make(map[string]struct{}, len(sorted))
+	taken := func(id string) bool {
+		if _, ok := given[id]; ok {
+			return true
 		}
+		_, ok := inUse[id]
+		return ok
 	}
 
-	m := map[string]string{defaultLib: "default"}
-	n := 2
+	// what the libraries already have
+	var unknown []string
 	for _, lib := range sorted {
-		if lib == defaultLib {
+		id, ok := known[lib]
+		if _, isGiven := given[id]; !ok || id == "" || isGiven {
+			unknown = append(unknown, lib)
 			continue
 		}
-		m[lib] = fmt.Sprintf("library_%d", n)
-		n++
+		m[lib] = id
+		given[id] = struct{}{}
 	}
+
+	// the main library, if nothing has been
+	if !taken("default") && len(unknown) > 0 {
+		defaultLib := unknown[0]
+		for _, root := range roots {
+			if slices.Contains(unknown, root) {
+				defaultLib = root
+				break
+			}
+		}
+
+		m[defaultLib] = "default"
+		given["default"] = struct{}{}
+		unknown = slices.DeleteFunc(unknown, func(lib string) bool { return lib == defaultLib })
+	}
+
+	// and the others
+	n := 2
+	for _, lib := range unknown {
+		id := fmt.Sprintf("library_%d", n)
+		for taken(id) {
+			n++
+			id = fmt.Sprintf("library_%d", n)
+		}
+		m[lib] = id
+		given[id] = struct{}{}
+	}
+
 	return m
 }
 
