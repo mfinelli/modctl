@@ -495,7 +495,12 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 
 	// For each currently installed path not in the new winner set, determine
 	// whether to remove, restore a backup, or promote a loser
-	for relpath, installedFile := range installed {
+	//
+	// This goes through installedFiles (which come ordered by path) and not
+	// through the installed map, because the order of a map is different every
+	// time and a plan has to be the same every time.
+	for _, installedFile := range installedFiles {
+		relpath := installedFile.Relpath
 		if _, stillWanted := winners[relpath]; stillWanted {
 			continue
 		}

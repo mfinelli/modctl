@@ -23,6 +23,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -240,14 +241,46 @@ func TestRemovalPlans(t *testing.T) {
 				plan, err := build(f)
 				require.NoError(t, err)
 
-				// the order the files come in is not specified, so go by path
-				ops := opsByPath(t, plan)
-				require.Len(t, ops, 3)
-				assert.Equal(t, PlanOpRemove, ops["plain.dll"].Kind)
-				assert.Equal(t, PlanOpRestoreBackup, ops["data/backed.dll"].Kind)
-				assert.Equal(t, PlanOpRemove, ops["gone.dll"].Kind)
+				// in order of path
+				require.Len(t, plan.Ops, 3)
+				assert.Equal(t, PlanOp{
+					Kind:         PlanOpRestoreBackup,
+					DestPath:     "data/backed.dll",
+					BackupSha256: backupSha,
+				}, plan.Ops[0])
+				assert.Equal(t, PlanOp{Kind: PlanOpRemove, DestPath: "gone.dll"}, plan.Ops[1])
+				assert.Equal(t, PlanOp{Kind: PlanOpRemove, DestPath: "plain.dll"}, plan.Ops[2])
 				require.Len(t, plan.Warnings, 1)
 				assert.Contains(t, plan.Warnings[0], "gone.dll")
+			})
+
+			t.Run("the files come in the same order every time: by path", func(t *testing.T) {
+				t.Parallel()
+
+				f := newPlanFixture(t)
+				// recorded in a different order from the one they have to
+				// come out in, so that the order they were installed in and
+				// the order the database happens to return them in (and the
+				// order of a map) are all different from it
+				paths := []string{"z.dll", "y/b.dll", "y/a.dll", "m.dll", "c.dll", "b.dll", "a.dll", "A.dll"}
+				for _, p := range paths {
+					f.installed(t, p)
+				}
+				want := append([]string(nil), paths...)
+				sort.Strings(want)
+
+				// a map goes through its keys in a different order each time,
+				// so one run proves nothing
+				for i := 0; i < 20; i++ {
+					plan, err := build(f)
+					require.NoError(t, err)
+
+					got := make([]string, 0, len(plan.Ops))
+					for _, op := range plan.Ops {
+						got = append(got, op.DestPath)
+					}
+					require.Equal(t, want, got, "run %d", i)
+				}
 			})
 
 			t.Run("files of another target are not part of the plan", func(t *testing.T) {

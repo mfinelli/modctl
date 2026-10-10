@@ -238,6 +238,12 @@ Outputs:
 - list of file ops: write/overwrite/remove
 - list of required backups
 
+A plan is deterministic: the same state of the database and of the disk gives
+the same operations in the same order, so that `apply --dry-run` output can be
+compared between runs. Removals and backup restores are ordered by path; the
+other operations follow profile priority and the order of the entries in each
+archive.
+
 ### Operation
 
 A logged apply/switch/unapply run:

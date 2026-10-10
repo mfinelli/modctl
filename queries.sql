@@ -807,7 +807,8 @@ ORDER BY position ASC;
 -- name: GetInstalledFilesForTarget :many
 SELECT * FROM installed_files
 WHERE game_install_id = ?
-  AND target_id = ?;
+  AND target_id = ?
+ORDER BY relpath ASC;
 
 -- name: GetBackupForPath :one
 SELECT
