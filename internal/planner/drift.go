@@ -20,6 +20,8 @@ package planner
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 
 	"github.com/mfinelli/modctl/internal/fsutil"
 )
@@ -31,6 +33,9 @@ type DriftState int
 const (
 	// DriftNone means the file matches what modctl installed.
 	DriftNone DriftState = iota
+	// DriftMissing means there is no file at the path (any more), so there is
+	// nothing that could have drifted.
+	DriftMissing
 	// DriftModified means the content of the file differs from what modctl
 	// installed.
 	DriftModified
@@ -50,8 +55,9 @@ type DriftResult struct {
 // CheckDrift hashes the file at absPath and compares it with installedSha, the
 // content hash modctl recorded when it installed the file.
 //
-// A file that can't be read is reported as DriftUnknown and not as an error:
-// what to do about not knowing is up to the caller. The one error is being told
+// A file that isn't there is reported as DriftMissing. A file that is there but
+// can't be read is reported as DriftUnknown and not as an error: what to do
+// about not knowing is up to the caller. The one error is being told
 // to stop (ctx is done), in which case the result is not meaningful, and the
 // caller must not go on to overwrite a file that it didn't get to check.
 func CheckDrift(ctx context.Context, absPath, installedSha string) (DriftResult, error) {
@@ -60,6 +66,10 @@ func CheckDrift(ctx context.Context, absPath, installedSha string) (DriftResult,
 		if ctx.Err() != nil {
 			// report that we were told to stop, not whatever the hash ran into
 			return DriftResult{}, ctx.Err()
+		}
+
+		if errors.Is(err, fs.ErrNotExist) {
+			return DriftResult{State: DriftMissing}, nil
 		}
 
 		return DriftResult{State: DriftUnknown, Err: err}, nil

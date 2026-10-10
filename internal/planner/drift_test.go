@@ -67,13 +67,24 @@ func TestCheckDrift(t *testing.T) {
 		assert.Error(t, got.Err)
 	})
 
-	t.Run("file that does not exist is unknown, not an error", func(t *testing.T) {
+	t.Run("file that does not exist is missing", func(t *testing.T) {
 		t.Parallel()
 
 		got, err := CheckDrift(context.Background(), filepath.Join(t.TempDir(), "gone.dll"), helloSha)
 		require.NoError(t, err)
+		assert.Equal(t, DriftResult{State: DriftMissing}, got)
+	})
+
+	t.Run("a path below a file is unknown and not missing", func(t *testing.T) {
+		t.Parallel()
+
+		// "not a directory" is not the same as "not there"
+		parent := writeHello(t)
+
+		got, err := CheckDrift(context.Background(), filepath.Join(parent, "child"), helloSha)
+		require.NoError(t, err)
 		assert.Equal(t, DriftUnknown, got.State)
-		assert.ErrorIs(t, got.Err, os.ErrNotExist)
+		assert.Error(t, got.Err)
 	})
 
 	t.Run("canceled context is an error whether or not the file matches", func(t *testing.T) {

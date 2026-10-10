@@ -142,36 +142,35 @@ that can't be read to check it.`,
 			Relpath:       relpath,
 		})
 		if err == nil {
-			// File is tool-owned - check for drift
-			if _, exists := diskStat(absPath); exists {
-				drift, err := planner.CheckDrift(ctx, absPath, installedFile.ContentSha256)
-				if err != nil {
-					return fmt.Errorf("check %q for drift: %w", relpath, err)
-				}
-				switch drift.State {
-				case planner.DriftModified:
-					if !gamesBackupsRestoreForce {
-						return fmt.Errorf(
-							"file %q has been modified since modctl installed it (drift detected); pass --force to restore anyway",
-							relpath,
-						)
-					}
-					style.Println(style.Warning.Render(fmt.Sprintf(
-						"  warning: %q has been modified since modctl installed it, restoring backup anyway",
+			// File is tool-owned - check for drift (a file that is already
+			// gone has nothing to drift from)
+			drift, err := planner.CheckDrift(ctx, absPath, installedFile.ContentSha256)
+			if err != nil {
+				return fmt.Errorf("check %q for drift: %w", relpath, err)
+			}
+			switch drift.State {
+			case planner.DriftModified:
+				if !gamesBackupsRestoreForce {
+					return fmt.Errorf(
+						"file %q has been modified since modctl installed it (drift detected); pass --force to restore anyway",
 						relpath,
-					)))
-				case planner.DriftUnknown:
-					if !gamesBackupsRestoreForce {
-						return fmt.Errorf(
-							"could not check %q for drift: %w; pass --force to restore anyway",
-							relpath, drift.Err,
-						)
-					}
-					style.Println(style.Warning.Render(fmt.Sprintf(
-						"  warning: could not check %q for drift (%v), restoring backup anyway",
-						relpath, drift.Err,
-					)))
+					)
 				}
+				style.Println(style.Warning.Render(fmt.Sprintf(
+					"  warning: %q has been modified since modctl installed it, restoring backup anyway",
+					relpath,
+				)))
+			case planner.DriftUnknown:
+				if !gamesBackupsRestoreForce {
+					return fmt.Errorf(
+						"could not check %q for drift: %w; pass --force to restore anyway",
+						relpath, drift.Err,
+					)
+				}
+				style.Println(style.Warning.Render(fmt.Sprintf(
+					"  warning: could not check %q for drift (%v), restoring backup anyway",
+					relpath, drift.Err,
+				)))
 			}
 		}
 
