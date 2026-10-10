@@ -26,24 +26,26 @@ import (
 	"testing"
 
 	"github.com/mfinelli/modctl/dbq"
+	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/planner"
 	"github.com/mfinelli/modctl/internal/testbuilder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// removeFixture is a game install with a target on disk, a running operation,
-// and helpers to put files on disk and in installed_files.
-type removeFixture struct {
+// fileOpFixture is a game install with a target on disk, a running operation,
+// a blob store, and helpers to put files on disk and in installed_files.
+type fileOpFixture struct {
 	db          *sql.DB
 	q           *dbq.Queries
+	store       blobstore.Store
 	gameID      int64
 	targetID    int64
 	operationID int64
 	root        string
 }
 
-func newRemoveFixture(t *testing.T) removeFixture {
+func newFileOpFixture(t *testing.T) fileOpFixture {
 	t.Helper()
 
 	ctx := context.Background()
@@ -66,11 +68,19 @@ func newRemoveFixture(t *testing.T) removeFixture {
 	})
 	require.NoError(t, err)
 
-	return removeFixture{db: db, q: q, gameID: gi.ID, targetID: target.ID, operationID: op.ID, root: root}
+	return fileOpFixture{
+		db:          db,
+		q:           q,
+		store:       blobstore.Store{BackupsDir: t.TempDir()},
+		gameID:      gi.ID,
+		targetID:    target.ID,
+		operationID: op.ID,
+		root:        root,
+	}
 }
 
 // install writes a file under the target and records it as installed.
-func (f removeFixture) install(t *testing.T, relpath, content, sha string) {
+func (f fileOpFixture) install(t *testing.T, relpath, content, sha string) {
 	t.Helper()
 
 	abs := filepath.Join(f.root, relpath)
@@ -81,7 +91,7 @@ func (f removeFixture) install(t *testing.T, relpath, content, sha string) {
 }
 
 // record adds an installed_files row without putting anything on disk.
-func (f removeFixture) record(t *testing.T, relpath string, size int64, sha string) {
+func (f fileOpFixture) record(t *testing.T, relpath string, size int64, sha string) {
 	t.Helper()
 
 	require.NoError(t, f.q.UpsertInstalledFile(context.Background(), dbq.UpsertInstalledFileParams{
@@ -94,7 +104,7 @@ func (f removeFixture) record(t *testing.T, relpath string, size int64, sha stri
 	}))
 }
 
-func (f removeFixture) isInstalled(t *testing.T, relpath string) bool {
+func (f fileOpFixture) isInstalled(t *testing.T, relpath string) bool {
 	t.Helper()
 
 	_, err := f.q.GetInstalledFileByPath(context.Background(), dbq.GetInstalledFileByPathParams{
@@ -109,7 +119,7 @@ func (f removeFixture) isInstalled(t *testing.T, relpath string) bool {
 	return true
 }
 
-func (f removeFixture) changes(t *testing.T, operationID int64) []dbq.OperationChange {
+func (f fileOpFixture) changes(t *testing.T, operationID int64) []dbq.OperationChange {
 	t.Helper()
 
 	changes, err := f.q.ListOperationChanges(context.Background(), operationID)
@@ -117,7 +127,7 @@ func (f removeFixture) changes(t *testing.T, operationID int64) []dbq.OperationC
 	return changes
 }
 
-func (f removeFixture) remove(ctx context.Context, relpath string, operationID int64) (RemoveFileResult, error) {
+func (f fileOpFixture) remove(ctx context.Context, relpath string, operationID int64) (RemoveFileResult, error) {
 	return Extractor{}.RemoveFile(ctx, f.db, f.q,
 		planner.PlanOp{Kind: planner.PlanOpRemove, DestPath: relpath},
 		f.root, f.gameID, f.targetID, operationID)
@@ -131,7 +141,7 @@ func TestRemoveFile(t *testing.T) {
 	t.Run("removes the file, forgets it and records the change", func(t *testing.T) {
 		t.Parallel()
 
-		f := newRemoveFixture(t)
+		f := newFileOpFixture(t)
 		f.install(t, "bin/mod.dll", "hello", helloSha)
 
 		res, err := f.remove(ctx, "bin/mod.dll", f.operationID)
@@ -157,7 +167,7 @@ func TestRemoveFile(t *testing.T) {
 	t.Run("leaves the directories the file was in", func(t *testing.T) {
 		t.Parallel()
 
-		f := newRemoveFixture(t)
+		f := newFileOpFixture(t)
 		f.install(t, "data/sub/mod.dll", "hello", helloSha)
 
 		_, err := f.remove(ctx, "data/sub/mod.dll", f.operationID)
@@ -170,7 +180,7 @@ func TestRemoveFile(t *testing.T) {
 	t.Run("other installed files are not touched", func(t *testing.T) {
 		t.Parallel()
 
-		f := newRemoveFixture(t)
+		f := newFileOpFixture(t)
 		f.install(t, "a.dll", "hello", helloSha)
 		f.install(t, "b.dll", "hello", helloSha)
 
@@ -185,7 +195,7 @@ func TestRemoveFile(t *testing.T) {
 	t.Run("a file that is already gone is still forgotten", func(t *testing.T) {
 		t.Parallel()
 
-		f := newRemoveFixture(t)
+		f := newFileOpFixture(t)
 		f.record(t, "bin/mod.dll", 5, helloSha)
 
 		_, err := f.remove(ctx, "bin/mod.dll", f.operationID)
@@ -203,7 +213,7 @@ func TestRemoveFile(t *testing.T) {
 	t.Run("canceled context leaves the file and the database alone", func(t *testing.T) {
 		t.Parallel()
 
-		f := newRemoveFixture(t)
+		f := newFileOpFixture(t)
 		f.install(t, "bin/mod.dll", "hello", helloSha)
 
 		canceled, cancel := context.WithCancel(ctx)
@@ -221,7 +231,7 @@ func TestRemoveFile(t *testing.T) {
 	t.Run("a failure recording the change rolls back what the database did", func(t *testing.T) {
 		t.Parallel()
 
-		f := newRemoveFixture(t)
+		f := newFileOpFixture(t)
 		f.install(t, "bin/mod.dll", "hello", helloSha)
 
 		// an operation that doesn't exist makes the insert violate a foreign
