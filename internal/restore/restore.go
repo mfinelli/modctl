@@ -32,7 +32,6 @@ import (
 	"strings"
 
 	"github.com/klauspost/compress/zstd"
-	"github.com/mattn/go-sqlite3"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/archivescanner"
@@ -336,11 +335,4 @@ func importBlobs(ctx context.Context, bundle *Bundle, bs blobstore.Store) (archi
 		}
 	}
 	return archiveCount, backupCount, overrideCount, nil
-}
-
-func isSQLiteUniqueConstraint(err error) bool {
-	var se sqlite3.Error
-	return errors.As(err, &se) &&
-		se.Code == sqlite3.ErrConstraint &&
-		se.ExtendedCode == sqlite3.ErrConstraintUnique
 }

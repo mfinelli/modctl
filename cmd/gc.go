@@ -28,7 +28,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mattn/go-sqlite3"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
@@ -302,11 +301,8 @@ func runGC(
 				if opts.cleanMissing {
 					if !opts.dryRun {
 						if err := q.DeleteBlob(ctx, b.Sha256); err != nil {
-							var se sqlite3.Error
-							if errors.As(err, &se) {
-								if se.Code == sqlite3.ErrConstraint && se.ExtendedCode == sqlite3.ErrConstraintForeignKey {
-									return res, fmt.Errorf("blob %s is still referenced by another row; skipping", b.Sha256)
-								}
+							if internal.IsForeignKeyConstraint(err) {
+								return res, fmt.Errorf("blob %s is still referenced by another row; skipping", b.Sha256)
 							}
 							return res, fmt.Errorf("delete missing blob row %s: %w", b.Sha256, err)
 						}
@@ -338,11 +334,8 @@ func runGC(
 			// best-effort: remove fan-out dir if now empty; ignore error
 			_ = os.Remove(filepath.Dir(path))
 			if err := q.DeleteBlob(ctx, b.Sha256); err != nil {
-				var se sqlite3.Error
-				if errors.As(err, &se) {
-					if se.Code == sqlite3.ErrConstraint && se.ExtendedCode == sqlite3.ErrConstraintForeignKey {
-						return res, fmt.Errorf("blob %s is still referenced by another row; skipping", b.Sha256)
-					}
+				if internal.IsForeignKeyConstraint(err) {
+					return res, fmt.Errorf("blob %s is still referenced by another row; skipping", b.Sha256)
 				}
 				return res, fmt.Errorf("delete blob row %s: %w", b.Sha256, err)
 			}

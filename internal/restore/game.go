@@ -606,7 +606,7 @@ func importInventory(ctx context.Context, dst, src *dbq.Queries, oldGameInstallI
 		})
 		if err != nil {
 			// skip duplicate entries (same archive already imported)
-			if isSQLiteUniqueConstraint(err) {
+			if internal.IsUniqueConstraint(err) {
 				continue
 			}
 			return fmt.Errorf("insert inventory entry: %w", err)

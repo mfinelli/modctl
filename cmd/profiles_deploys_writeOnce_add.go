@@ -115,7 +115,7 @@ Examples:
 			ProfileItemID: itemID,
 			Pattern:       pattern,
 		}); err != nil {
-			if isUniqueConstraintError(err) {
+			if internal.IsUniqueConstraint(err) {
 				return fmt.Errorf("pattern %q already exists for version %d in profile %q", pattern, mfv.ID, p.Name)
 			}
 			return fmt.Errorf("add write-once pattern: %w", err)

@@ -20,11 +20,9 @@ package cmd
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"strconv"
 
-	"github.com/mattn/go-sqlite3"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
@@ -103,8 +101,7 @@ Note: modctl automatically creates a "default" profile during game refresh.`,
 			IsActive:      util.SqliteBoolToInt(false),
 		})
 		if err != nil {
-			var se sqlite3.Error
-			if errors.As(err, &se) && se.Code == sqlite3.ErrConstraint && se.ExtendedCode == sqlite3.ErrConstraintUnique {
+			if internal.IsUniqueConstraint(err) {
 				return fmt.Errorf("profile %q already exists for this game", name)
 			}
 			return fmt.Errorf("create profile: %w", err)

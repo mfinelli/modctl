@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/mattn/go-sqlite3"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
@@ -178,24 +177,21 @@ targets cannot be used.`,
 		if err != nil {
 			// NOTE: This tells us it was a UNIQUE constraint, but not which one.
 			// We rely on the explicit IsPriorityTaken check for a clear duplicate-priority message.
-			var se sqlite3.Error
-			if errors.As(err, &se) {
-				if se.Code == sqlite3.ErrConstraint && se.ExtendedCode == sqlite3.ErrConstraintUnique {
-					// Most common case: duplicate version in profile
-					// (UNIQUE(profile_id, mod_file_version_id)).
-					// If user provided a priority on the command line
-					// duplicate priority should have been caught above
-					// unless a race occurred.
-					if profilesAddPriority != 0 {
-						return fmt.Errorf("could not add version %d to profile %q (duplicate version or priority conflict)", mfv.ID, p.Name)
-					}
-					return fmt.Errorf("version %d is already in profile %q", mfv.ID, p.Name)
+			if internal.IsUniqueConstraint(err) {
+				// Most common case: duplicate version in profile
+				// (UNIQUE(profile_id, mod_file_version_id)).
+				// If user provided a priority on the command line
+				// duplicate priority should have been caught above
+				// unless a race occurred.
+				if profilesAddPriority != 0 {
+					return fmt.Errorf("could not add version %d to profile %q (duplicate version or priority conflict)", mfv.ID, p.Name)
 				}
-				if se.Code == sqlite3.ErrConstraint && se.ExtendedCode == sqlite3.ErrConstraintForeignKey {
-					// Should be prevented by ExistsModFileVersion,
-					// but keep a friendly message anyway.
-					return fmt.Errorf("invalid reference while adding version %d to profile %q", mfv.ID, p.Name)
-				}
+				return fmt.Errorf("version %d is already in profile %q", mfv.ID, p.Name)
+			}
+			if internal.IsForeignKeyConstraint(err) {
+				// Should be prevented by ExistsModFileVersion,
+				// but keep a friendly message anyway.
+				return fmt.Errorf("invalid reference while adding version %d to profile %q", mfv.ID, p.Name)
 			}
 			return fmt.Errorf("add to profile: %w", err)
 		}
