@@ -23,11 +23,31 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/state"
 )
+
+// ResolveGameInstall resolves the game install that a command is for: the one
+// that arg says (see ResolveGameInstallArg), or the active one if arg is
+// empty, which is what leaving out --game means.
+func ResolveGameInstall(ctx context.Context, q *dbq.Queries, arg string) (dbq.GameInstall, error) {
+	if arg == "" {
+		active, err := state.LoadActive()
+		if err != nil {
+			return dbq.GameInstall{}, fmt.Errorf("load active selection: %w", err)
+		}
+		if active.ActiveGameInstallID == 0 {
+			return dbq.GameInstall{}, errors.New("no active game selected; run `modctl games set-active ...` or pass --game")
+		}
+		arg = strconv.FormatInt(active.ActiveGameInstallID, 10)
+	}
+
+	return ResolveGameInstallArg(ctx, q, arg)
+}
 
 func ResolveGameInstallArg(ctx context.Context, q *dbq.Queries, arg string) (dbq.GameInstall, error) {
 	// Fast path: numeric ID

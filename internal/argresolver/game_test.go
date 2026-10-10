@@ -21,9 +21,13 @@ package argresolver
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/adrg/xdg"
 	"github.com/mfinelli/modctl/dbq"
+	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/testbuilder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -161,5 +165,133 @@ func TestResolveGameInstallArg(t *testing.T) {
 		result, err := ResolveGameInstallArg(context.Background(), q, "モンスターハンター")
 		require.NoError(t, err)
 		assert.Equal(t, gi.ID, result.ID)
+	})
+}
+
+// useStateDir points the state directory (where the active game is kept) at a
+// directory of the test. The environment is global, so the tests that use it
+// are not run in parallel.
+func useStateDir(t *testing.T) string {
+	t.Helper()
+
+	// registered first so that it runs after the environment is put back
+	t.Cleanup(xdg.Reload)
+
+	dir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", dir)
+	xdg.Reload()
+	return dir
+}
+
+func TestResolveGameInstall(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("a game that is asked for is the one that is resolved", func(t *testing.T) {
+		useStateDir(t)
+		db := testbuilder.SetupDB(t)
+		q := dbq.New(db)
+		asked := testbuilder.NewGame(t, db).WithName("Cyberpunk 2077").WithStoreGameID("1").Build()
+		active := testbuilder.NewGame(t, db).WithName("Skyrim").WithStoreGameID("2").Build()
+		require.NoError(t, state.SaveActive(state.Active{ActiveGameInstallID: active.ID}))
+
+		byID, err := ResolveGameInstall(ctx, q, fmt.Sprintf("%d", asked.ID))
+		require.NoError(t, err)
+		assert.Equal(t, asked.ID, byID.ID, "not the active one")
+
+		byName, err := ResolveGameInstall(ctx, q, "Cyberpunk 2077")
+		require.NoError(t, err)
+		assert.Equal(t, asked.ID, byName.ID)
+	})
+
+	t.Run("a game that is asked for and is not there is an error that says so", func(t *testing.T) {
+		useStateDir(t)
+		db := testbuilder.SetupDB(t)
+		active := testbuilder.NewGame(t, db).Build()
+		require.NoError(t, state.SaveActive(state.Active{ActiveGameInstallID: active.ID}))
+
+		_, err := ResolveGameInstall(ctx, dbq.New(db), "999999")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no game install with id 999999")
+	})
+
+	t.Run("without one it is the active game", func(t *testing.T) {
+		useStateDir(t)
+		db := testbuilder.SetupDB(t)
+		q := dbq.New(db)
+		testbuilder.NewGame(t, db).WithName("Not Active").WithStoreGameID("1").Build()
+		active := testbuilder.NewGame(t, db).WithName("Active").WithStoreGameID("2").Build()
+		require.NoError(t, state.SaveActive(state.Active{ActiveGameInstallID: active.ID}))
+
+		got, err := ResolveGameInstall(ctx, q, "")
+
+		require.NoError(t, err)
+		assert.Equal(t, active.ID, got.ID)
+		assert.Equal(t, "Active", got.DisplayName)
+	})
+
+	t.Run("with no active game it says what to do", func(t *testing.T) {
+		useStateDir(t)
+		db := testbuilder.SetupDB(t)
+		testbuilder.NewGame(t, db).Build()
+
+		_, err := ResolveGameInstall(ctx, dbq.New(db), "")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no active game selected")
+		assert.Contains(t, err.Error(), "modctl games set-active")
+		assert.Contains(t, err.Error(), "--game")
+	})
+
+	t.Run("an active selection that has no game in it is no active game", func(t *testing.T) {
+		useStateDir(t)
+		db := testbuilder.SetupDB(t)
+		// a store has been chosen, but not a game
+		require.NoError(t, state.SaveActive(state.Active{ActiveStoreID: "steam"}))
+
+		_, err := ResolveGameInstall(ctx, dbq.New(db), "")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no active game selected")
+	})
+
+	t.Run("an active game that is not there any more is an error that says so", func(t *testing.T) {
+		useStateDir(t)
+		db := testbuilder.SetupDB(t)
+		require.NoError(t, state.SaveActive(state.Active{ActiveGameInstallID: 424242}))
+
+		_, err := ResolveGameInstall(ctx, dbq.New(db), "")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no game install with id 424242")
+	})
+
+	t.Run("a state file that can't be read is an error that says so", func(t *testing.T) {
+		dir := useStateDir(t)
+		db := testbuilder.SetupDB(t)
+		testbuilder.NewGame(t, db).Build()
+		path := filepath.Join(dir, "modctl", "active.json")
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte("{ not json"), 0o644))
+
+		_, err := ResolveGameInstall(ctx, dbq.New(db), "")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "load active selection")
+		assert.Contains(t, err.Error(), "active.json")
+	})
+
+	t.Run("a state file that can't be read is not looked at when a game is asked for", func(t *testing.T) {
+		dir := useStateDir(t)
+		db := testbuilder.SetupDB(t)
+		gi := testbuilder.NewGame(t, db).Build()
+		path := filepath.Join(dir, "modctl", "active.json")
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte("{ not json"), 0o644))
+
+		got, err := ResolveGameInstall(ctx, dbq.New(db), fmt.Sprintf("%d", gi.ID))
+
+		require.NoError(t, err)
+		assert.Equal(t, gi.ID, got.ID)
 	})
 }
