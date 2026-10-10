@@ -22,10 +22,12 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net/url"
 	"os"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
@@ -126,6 +128,52 @@ func schemaVersion(ctx context.Context, p *goose.Provider) (int64, error) {
 	}
 
 	return current, nil
+}
+
+// LatestSchemaVersion returns the version of the latest migration known to
+// this build of modctl: the highest version among the embedded migrations. It
+// does not look at any database, so it is the version a database ends up at
+// once it has been fully migrated, and what a bundle's schema version has to
+// be compared against to tell whether this build can import it.
+func LatestSchemaVersion() (int64, error) {
+	fsys, err := fs.Sub(Migrations, "migrations")
+	if err != nil {
+		return 0, fmt.Errorf("error preparing migrations fs: %w", err)
+	}
+
+	return latestMigrationVersion(fsys)
+}
+
+// latestMigrationVersion returns the highest version among the .sql
+// migrations in the root of fsys. It is split out from LatestSchemaVersion so
+// that tests can supply their own migrations (the embedded copy is only
+// populated in the real binary).
+func latestMigrationVersion(fsys fs.FS) (int64, error) {
+	entries, err := fs.ReadDir(fsys, ".")
+	if err != nil {
+		return 0, fmt.Errorf("read migrations: %w", err)
+	}
+
+	var latest int64
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
+			continue
+		}
+
+		// goose's own parsing, so that we can't disagree with it about which
+		// version a file is
+		v, err := goose.NumericComponent(e.Name())
+		if err != nil {
+			return 0, fmt.Errorf("migration %q: %w", e.Name(), err)
+		}
+		latest = max(latest, v)
+	}
+
+	if latest == 0 {
+		return 0, errors.New("no migrations found")
+	}
+
+	return latest, nil
 }
 
 // EnsureDBExists verifies that the configured database file exists
