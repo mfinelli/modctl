@@ -488,7 +488,7 @@ func discoverSteamInstalls(
 					CanonicalGameID: sql.NullString{},
 					DisplayName:     display,
 					InstallRoot:     installCanon,
-					Metadata:        nullStringFromBytes(metaJSON),
+					Metadata:        util.NullString(string(metaJSON)),
 					IsPresent:       util.SqliteBoolToInt(true),
 					LastSeenAt:      sql.NullString{String: nowISO8601Z(), Valid: true},
 				},
@@ -704,13 +704,6 @@ func asString(v any) string {
 		// vdf parser typically yields strings; if not, try sprint
 		return fmt.Sprint(v)
 	}
-}
-
-func nullStringFromBytes(b []byte) sql.NullString {
-	if len(b) == 0 {
-		return sql.NullString{}
-	}
-	return sql.NullString{String: string(b), Valid: true}
 }
 
 func nowISO8601Z() string {

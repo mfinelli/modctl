@@ -26,6 +26,7 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"go.finelli.dev/util"
 )
 
 // ScanAllResult summarizes the outcome of a ScanAll run
@@ -254,12 +255,12 @@ func commitArchiveInventory(
 	for _, e := range entries {
 		params := dbq.InsertArchiveInventoryEntryParams{
 			ArchiveSha256: archiveSha256,
-			RawPath:       toNullString(e.RawPath),
+			RawPath:       util.NullString(e.RawPath),
 			EntryType:     string(e.Type),
-			SizeBytes:     toNullInt64(e.SizeBytes, e.RawPath != ""),
-			LinkTarget:    toNullString(e.LinkTarget),
+			SizeBytes:     sql.NullInt64{Int64: e.SizeBytes, Valid: e.RawPath != ""},
+			LinkTarget:    util.NullString(e.LinkTarget),
 			Position:      int64(e.Position),
-			ParseError:    toNullString(e.ParseError),
+			ParseError:    util.NullString(e.ParseError),
 		}
 		if err := qtx.InsertArchiveInventoryEntry(ctx, params); err != nil {
 			return fmt.Errorf("inserting entry at position %d (%q): %w", e.Position, e.RawPath, err)
@@ -289,14 +290,4 @@ func commitArchiveInventory(
 	}
 
 	return nil
-}
-
-// TODO we already have this move to util and keep one copy
-func toNullString(s string) sql.NullString {
-	return sql.NullString{String: s, Valid: s != ""}
-}
-
-// TODO we already have this move to util and keep one copy
-func toNullInt64(v int64, valid bool) sql.NullInt64 {
-	return sql.NullInt64{Int64: v, Valid: valid}
 }

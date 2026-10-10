@@ -27,6 +27,7 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"go.finelli.dev/util"
 )
 
 type ImportOptions struct {
@@ -125,8 +126,8 @@ func ImportArchive(
 		if opts.NexusGameDomain != nil && opts.NexusModID != nil {
 			p, err := qtx.GetModPageByNexus(ctx, dbq.GetModPageByNexusParams{
 				GameInstallID:   opts.GameInstallID,
-				NexusGameDomain: nullString(opts.NexusGameDomain),
-				NexusModID:      nullInt64(opts.NexusModID),
+				NexusGameDomain: util.NullStringPtr(opts.NexusGameDomain),
+				NexusModID:      util.NullInt64Ptr(opts.NexusModID),
 			})
 			if err == nil {
 				pageID = p.ID
@@ -141,10 +142,10 @@ func ImportArchive(
 				GameInstallID:   opts.GameInstallID,
 				Name:            pageName,
 				SourceKind:      sourceKind, // "nexus" if nexus fields set, else "local"
-				SourceUrl:       nullString(opts.NexusURL),
+				SourceUrl:       util.NullStringPtr(opts.NexusURL),
 				SourceRef:       sql.NullString{Valid: false},
-				NexusGameDomain: nullString(opts.NexusGameDomain),
-				NexusModID:      nullInt64(opts.NexusModID),
+				NexusGameDomain: util.NullStringPtr(opts.NexusGameDomain),
+				NexusModID:      util.NullInt64Ptr(opts.NexusModID),
 				Notes:           sql.NullString{Valid: false},
 				Metadata:        sql.NullString{Valid: false},
 			})
@@ -184,7 +185,7 @@ func ImportArchive(
 			ModPageID: pageID,
 			Label:     label,
 			IsPrimary: isPrimary,
-			SourceUrl: nullString(opts.NexusURL),
+			SourceUrl: util.NullStringPtr(opts.NexusURL),
 			Metadata:  sql.NullString{Valid: false},
 		})
 		if err != nil {
@@ -210,7 +211,7 @@ func ImportArchive(
 	versionID, err = qtx.CreateModFileVersion(ctx, dbq.CreateModFileVersionParams{
 		ModFileID:     fileID,
 		ArchiveSha256: sha,
-		OriginalName:  nullString(&opts.OriginalBasename),
+		OriginalName:  util.NullString(opts.OriginalBasename),
 		VersionString: sql.NullString{Valid: false},
 		NexusFileID:   sql.NullInt64{Valid: false}, // we don't have file_id from nexus-url
 		UploadedAt:    sql.NullString{Valid: false},
@@ -228,18 +229,4 @@ func ImportArchive(
 	}
 
 	return pageID, fileID, versionID, sha, size, nil
-}
-
-func nullString(s *string) sql.NullString {
-	if s == nil || *s == "" {
-		return sql.NullString{Valid: false}
-	}
-	return sql.NullString{String: *s, Valid: true}
-}
-
-func nullInt64(i *int64) sql.NullInt64 {
-	if i == nil {
-		return sql.NullInt64{Valid: false}
-	}
-	return sql.NullInt64{Int64: *i, Valid: true}
 }
