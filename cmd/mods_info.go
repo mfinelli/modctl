@@ -35,6 +35,7 @@ import (
 	"github.com/mfinelli/modctl/internal/nexusclient/dbc"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
+	"github.com/mfinelli/modctl/internal/updatechain"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
 )
@@ -122,11 +123,14 @@ func init() {
 }
 
 type nexusFileCache struct {
-	Version               string
-	FetchedAt             time.Time
-	HasUpdate             bool
-	LatestVersion         string
-	UpdateAlreadyImported bool // true when superseded but head is imported
+	Version   string
+	FetchedAt time.Time
+
+	// State is where the file stands against the updates of its mod. Only
+	// when it is UpdateAvailable is LatestVersion set (to the version of the
+	// latest file, if the cache has it).
+	State         updatechain.State
+	LatestVersion string
 }
 
 type profileMembership struct {
@@ -190,9 +194,6 @@ func runModsInfo(
 	// fetch nexus cache data if applicable
 	var nexusModInfo *dbc.NexusModInfo
 	nexusFileInfos := make(map[int64]*nexusFileCache)
-	// next map and superseded set are built here and passed to renderModInfo
-	next := make(map[int64]int64)
-	superseded := make(map[int64]struct{})
 
 	// set of all nexus_file_ids we have imported for this mod page
 	importedNexusFileIDs := make(map[int64]struct{})
@@ -216,19 +217,13 @@ func runModsInfo(
 				nexusModInfo = modInfo
 			}
 
-			// fetch update chain once
-			chain, err := cacheReader.GetNexusFileUpdateChain(
+			// fetch update chain once (if it can't be, nothing is replaced)
+			chain, err := cacheReader.GetUpdateChain(
 				mp.NexusGameDomain.String,
 				mp.NexusModID.Int64,
 			)
-			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			if err != nil {
 				logger.Warn("failed to fetch nexus file update chain", "error", err)
-			}
-
-			// build next and superseded from the chain
-			for _, row := range chain {
-				next[row.OldFileID] = row.NewFileID
-				superseded[row.OldFileID] = struct{}{}
 			}
 
 			// fetch per-file cache info
@@ -257,41 +252,23 @@ func runModsInfo(
 					continue
 				}
 
-				// only walk the chain for non-superseded versions
-				_, isSuperseded := superseded[fv.NexusFileID.Int64]
+				// where the file stands against its updates: only a newer
+				// file that is not imported is worth telling the user about
+				st := chain.Status(fv.NexusFileID.Int64, importedNexusFileIDs)
 				info := &nexusFileCache{
 					Version:   row.Version.String,
 					FetchedAt: fetchedAt,
+					State:     st.State,
 				}
 
-				if !isSuperseded {
-					latestFileID := internal.WalkUpdateChain(fv.NexusFileID.Int64, next)
-					info.HasUpdate = latestFileID != fv.NexusFileID.Int64
-					if info.HasUpdate {
-						latestRow, err := cacheReader.GetNexusFileInfo(
-							mp.NexusGameDomain.String,
-							mp.NexusModID.Int64,
-							latestFileID,
-						)
-						if err == nil && latestRow.Version.Valid {
-							info.LatestVersion = latestRow.Version.String
-						}
-					}
-				} else {
-					// superseded: check if the head is already imported
-					latestFileID := internal.WalkUpdateChain(fv.NexusFileID.Int64, next)
-					_, headImported := importedNexusFileIDs[latestFileID]
-					info.UpdateAlreadyImported = headImported
-					if !headImported {
-						// need to surface the latest version string for the update prompt
-						latestRow, err := cacheReader.GetNexusFileInfo(
-							mp.NexusGameDomain.String,
-							mp.NexusModID.Int64,
-							latestFileID,
-						)
-						if err == nil && latestRow.Version.Valid {
-							info.LatestVersion = latestRow.Version.String
-						}
+				if st.State == updatechain.UpdateAvailable {
+					latestRow, err := cacheReader.GetNexusFileInfo(
+						mp.NexusGameDomain.String,
+						mp.NexusModID.Int64,
+						st.Head,
+					)
+					if err == nil && latestRow.Version.Valid {
+						info.LatestVersion = latestRow.Version.String
 					}
 				}
 
@@ -320,7 +297,7 @@ func runModsInfo(
 		}
 	}
 
-	style.Println(renderModInfo(mp, fileVersions, versionProfiles, nexusModInfo, nexusFileInfos, superseded, inventories, showInventory))
+	style.Println(renderModInfo(mp, fileVersions, versionProfiles, nexusModInfo, nexusFileInfos, inventories, showInventory))
 	return nil
 }
 
@@ -330,7 +307,6 @@ func renderModInfo(
 	versionProfiles map[int64][]profileMembership,
 	nexusModInfo *dbc.NexusModInfo,
 	nexusFileInfos map[int64]*nexusFileCache,
-	superseded map[int64]struct{},
 	inventories map[int64]versionInventory,
 	showInventory bool,
 ) string {
@@ -440,15 +416,15 @@ func renderModInfo(
 				// nexus file link state
 				if v.NexusFileID.Valid {
 					if info, ok := nexusFileInfos[v.ModFileVersionID]; ok {
-						_, isSuperseded := superseded[v.NexusFileID.Int64]
-						if isSuperseded && info.UpdateAlreadyImported {
+						switch info.State {
+						case updatechain.Superseded:
 							kvIndented.Write(&b, "  nexus version:",
 								style.Subtle.Render(fmt.Sprintf("%s (superseded)", info.Version)))
-						} else if isSuperseded || info.HasUpdate {
+						case updatechain.UpdateAvailable:
 							kvIndented.Write(&b, "  nexus version:",
 								style.UpdateAvailable.Render(fmt.Sprintf("%s ↑ update available → %s",
 									info.Version, info.LatestVersion)))
-						} else {
+						default:
 							kvIndented.Write(&b, "  nexus version:",
 								fmt.Sprintf("%s ✓ %s",
 									info.Version,
