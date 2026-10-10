@@ -35,6 +35,7 @@ import (
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
+	"github.com/mfinelli/modctl/internal/updatechain"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/term"
@@ -191,24 +192,20 @@ to proceed even if the operation would exhaust your API quota.`,
 		}
 
 		// Filter superseded mod pages unless --include-superseded.
-		// A mod page is superseded if every linked version's nexus_file_id
-		// appears as an old_file_id in the update chain AND the chain head
-		// is already in our local DB.
+		// A mod page is superseded if every linked version of it has been
+		// replaced by a newer file (in the update chain) that is already in
+		// our local DB.
 		if !modsNexusCheckUpdatesIncludeSuperseded {
 			var filtered []modPageEntry
 			for _, e := range entries {
-				chain, err := cacheReader.GetNexusFileUpdateChain(
+				chain, err := cacheReader.GetUpdateChain(
 					e.mp.NexusGameDomain.String,
 					e.mp.NexusModID.Int64,
 				)
-				if err != nil || len(chain) == 0 {
+				if err != nil {
 					// no chain data: can't determine superseded, keep it
 					filtered = append(filtered, e)
 					continue
-				}
-				next := make(map[int64]int64, len(chain))
-				for _, row := range chain {
-					next[row.OldFileID] = row.NewFileID
 				}
 				// Get linked versions for this mod page
 				linkedVersions, err := q.GetLinkedModFileVersionsForPage(ctx, e.mp.ModPageID)
@@ -216,20 +213,13 @@ to proceed even if the operation would exhaust your API quota.`,
 					filtered = append(filtered, e)
 					continue
 				}
+				// (with no chain data nothing is superseded, so it is kept)
 				allSuperseded := true
 				for _, v := range linkedVersions {
-					if !v.NexusFileID.Valid {
-						allSuperseded = false
-						break
-					}
-					head := internal.WalkUpdateChain(v.NexusFileID.Int64, next)
-					if head == v.NexusFileID.Int64 {
-						// not superseded: this version is already at the head
-						allSuperseded = false
-						break
-					}
-					if _, headImported := importedNexusFileIDs[head]; !headImported {
-						// superseded but head not imported: still needs attention
+					if !v.NexusFileID.Valid ||
+						chain.Status(v.NexusFileID.Int64, importedNexusFileIDs).State != updatechain.Superseded {
+						// up to date, or superseded by a file that is not
+						// imported: this still needs attention
 						allSuperseded = false
 						break
 					}
@@ -377,11 +367,15 @@ to proceed even if the operation would exhaust your API quota.`,
 				fileVersions[int64(f.FileID)] = f.Version
 			}
 
-			// build update chain map
-			next := make(map[int64]int64, len(filesResp.FileUpdates))
+			// build the update chain
+			updates := make([]updatechain.Update, 0, len(filesResp.FileUpdates))
 			for _, u := range filesResp.FileUpdates {
-				next[int64(u.OldFileID)] = int64(u.NewFileID)
+				updates = append(updates, updatechain.Update{
+					OldFileID: u.OldFileID,
+					NewFileID: u.NewFileID,
+				})
 			}
+			chain := updatechain.New(updates)
 
 			// get all linked versions for this mod page
 			linkedVersions, err := q.GetLinkedModFileVersionsForPage(ctx, mp.ModPageID)
@@ -390,59 +384,46 @@ to proceed even if the operation would exhaust your API quota.`,
 				continue
 			}
 
-			// Group versions by mod_file_id, keeping the one closest to the chain head
+			// Group versions by mod_file_id (in the order they come in, so that
+			// the output is always the same) and keep, of each group, the one
+			// that is closest to the chain head
 			type modFileKey struct {
 				modFileID   int64
 				modPageName string
 				fileLabel   string
 			}
 
-			type bestVersion struct {
-				nexusFileID    int64
-				versionString  string
-				distanceToHead int
-			}
-
-			best := make(map[modFileKey]bestVersion)
-
+			var order []modFileKey
+			groups := make(map[modFileKey][]dbq.GetLinkedModFileVersionsForPageRow)
 			for _, v := range linkedVersions {
-				latestFileID := internal.WalkUpdateChain(v.NexusFileID.Int64, next)
-
-				// compute distance to head by walking the chain
-				distance := 0
-				cur := v.NexusFileID.Int64
-				for cur != latestFileID {
-					cur = next[cur]
-					distance++
-					if distance > 1000 { // safety valve
-						break
-					}
-				}
-
 				key := modFileKey{
 					modFileID:   v.ModFileID,
 					modPageName: v.ModPageName,
 					fileLabel:   v.FileLabel,
 				}
-
-				if existing, ok := best[key]; !ok || distance < existing.distanceToHead {
-					best[key] = bestVersion{
-						nexusFileID:    v.NexusFileID.Int64,
-						versionString:  v.VersionString.String,
-						distanceToHead: distance,
-					}
+				if _, seen := groups[key]; !seen {
+					order = append(order, key)
 				}
+				groups[key] = append(groups[key], v)
 			}
 
-			for key, b := range best {
-				latestFileID := internal.WalkUpdateChain(b.nexusFileID, next)
-				hasUpdate := latestFileID != b.nexusFileID
+			for _, key := range order {
+				versions := groups[key]
+				candidates := make([]int64, len(versions))
+				for j, v := range versions {
+					candidates[j] = v.NexusFileID.Int64
+				}
+				bestIndex, _ := chain.Closest(candidates)
+				best := versions[bestIndex]
+
+				latestFileID := chain.Head(best.NexusFileID.Int64)
+				hasUpdate := latestFileID != best.NexusFileID.Int64
 				latestVersion := fileVersions[latestFileID]
 
 				r := updateResult{
 					modPageName:    key.modPageName,
 					fileLabel:      key.fileLabel,
-					currentVersion: b.versionString,
+					currentVersion: best.VersionString.String,
 					latestVersion:  latestVersion,
 					hasUpdate:      hasUpdate,
 				}
