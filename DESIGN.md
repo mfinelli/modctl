@@ -1215,6 +1215,22 @@ to the database, as they are internal Steam software rather than moddable games:
 - `Steam Linux Runtime *` (any title with this prefix, e.g. `Steam Linux Runtime 1.0`)
 - `Steamworks Common Redistributables`
 
+#### Library instances
+
+Each Steam library is an instance of the Steam store: the instance id of its
+library is part of the identity of the installs in it (`steam:1091500#library_2`
+is the game in the second library). The library that is part of the Steam
+installation itself is `default`, since it is there for as long as Steam is,
+and the others are `library_2`, `library_3`, ... in order of path. If none of
+the libraries is in a Steam installation (which should not happen) the first
+library in order of path is `default`.
+
+The ids of the other libraries are not stable yet: adding or removing a
+library renumbers the ones after it, and everything that is attached to an
+install (profiles, mods, installed files) follows its id and not its library.
+They are meant to be made stable, by keeping the id that a library already
+has.
+
 #### Target discovery
 
 During refresh, modctl upserts two targets for each game install:

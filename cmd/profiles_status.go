@@ -32,9 +32,9 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/nexusclient"
-	"github.com/mfinelli/modctl/internal/nexusclient/dbc"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
+	"github.com/mfinelli/modctl/internal/updatechain"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
 )
@@ -200,7 +200,12 @@ type nexusVersionInfo struct {
 	CachedVersion string // version of what the user has installed
 	LatestVersion string // version of the latest available (only set when HasUpdate is true)
 	FetchedAt     time.Time
-	HasUpdate     bool
+
+	// HasUpdate is whether something newer has replaced the file on Nexus.
+	// Whether that newer file is already imported does not matter here
+	// because the profile still has the older one, and this is what tells the
+	// user to run profiles upgrade, or they might never get the new version.
+	HasUpdate bool
 }
 
 func renderProfileStatus(
@@ -469,7 +474,7 @@ func buildNexusInfo(
 		domain string
 		modID  int64
 	}
-	chains := make(map[modPageKey][]dbc.GetNexusFileUpdateChainRow)
+	chains := make(map[modPageKey]updatechain.Chain)
 
 	for _, item := range items {
 		if !item.NexusFileID.Valid ||
@@ -482,26 +487,21 @@ func buildNexusInfo(
 
 		// fetch chain once per mod page
 		if _, ok := chains[key]; !ok {
-			chain, err := cache.GetNexusFileUpdateChain(
+			chain, err := cache.GetUpdateChain(
 				item.NexusGameDomain.String,
 				item.NexusModID.Int64,
 			)
-			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			if err != nil {
 				logger.Warn("failed to fetch nexus file update chain",
 					"game_domain", key.domain,
 					"mod_id", key.modID,
 					"error", err,
 				)
 			}
-			chains[key] = chain // store even if empty/nil so we don't retry
+			chains[key] = chain // store even if it is empty so we don't retry
 		}
 
-		// build next map from the cached chain for this mod page
-		next := make(map[int64]int64, len(chains[key]))
-		for _, row := range chains[key] {
-			next[row.OldFileID] = row.NewFileID
-		}
-		latestFileID := internal.WalkUpdateChain(item.NexusFileID.Int64, next)
+		latestFileID := chains[key].Head(item.NexusFileID.Int64)
 		hasUpdate := latestFileID != item.NexusFileID.Int64
 
 		// fetch current file info for fetched_at and version

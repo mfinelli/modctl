@@ -349,13 +349,22 @@ func (e Extractor) RestoreFile(
 		return RestoreFileResult{}, fmt.Errorf("resolve backup path: %w", err)
 	}
 
+	// We don't rehash the backup since the blob store is content-addressed
+	// and user editing of blobs is unsupported: its content is what its name
+	// says it is. Its size is looked at before touching anything, so that a
+	// backup that is missing from the store is found out before the file that
+	// it was going to replace is changed.
+	backupInfo, err := os.Stat(backupPath)
+	if err != nil {
+		return RestoreFileResult{}, fmt.Errorf("stat backup blob for %q: %w", op.DestPath, err)
+	}
+
 	// Ensure destination directory exists
 	if err := os.MkdirAll(filepath.Dir(absDestPath), 0o755); err != nil {
 		return RestoreFileResult{}, fmt.Errorf("mkdir for %q: %w", op.DestPath, err)
 	}
 
-	// Copy backup blob to target. We don't rehash since the blob store
-	// is content-addressed and user editing of blobs is unsupported.
+	// Copy backup blob to target
 	if err := fsutil.CopyFile(ctx, backupPath, absDestPath); err != nil {
 		return RestoreFileResult{}, fmt.Errorf("restore %q: %w", op.DestPath, err)
 	}
@@ -394,8 +403,8 @@ func (e Extractor) RestoreFile(
 		Action:           "restore_backup",
 		OldContentSha256: sql.NullString{},
 		OldSizeBytes:     sql.NullInt64{},
-		NewContentSha256: sql.NullString{}, // TODO: we should calculate this for completeness
-		NewSizeBytes:     sql.NullInt64{},  // TODO: we should calculate this for completeness
+		NewContentSha256: sql.NullString{String: op.BackupSha256, Valid: true},
+		NewSizeBytes:     sql.NullInt64{Int64: backupInfo.Size(), Valid: true},
 		ModFileVersionID: sql.NullInt64{},
 		BackupBlobSha256: sql.NullString{String: op.BackupSha256, Valid: true},
 		Notes:            sql.NullString{},

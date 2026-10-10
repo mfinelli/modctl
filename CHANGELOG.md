@@ -43,6 +43,18 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 - `extract`, `import` and `games backups restore` now write their files
   atomically: a failure or Ctrl-C no longer leaves a partly written file
   behind, and an existing file is only replaced once the copy is complete.
+- `mods list` now shows the latest version of Nexus-linked mods from the local
+  Nexus cache, and marks the ones that have an update to import.
+- The Steam library that is part of the Steam installation is now the
+  `default` instance, instead of the first library in order of path, so adding
+  another library no longer changes which installs are `default`. The other
+  libraries are still numbered (`library_2`, `library_3`, ...) in order of
+  path, so adding or removing one can still renumber the ones after it. Installs
+  are identified by game and instance, so if your `default` library was not the
+  one in the Steam installation, the next `games refresh` will match your
+  existing installs, and so the profiles and mods attached to them, to
+  different libraries. Most likely the next release will make these ids stable,
+  by keeping the id that a library already has.
 
 ## v0.7.1 - 2026-10-03
 
