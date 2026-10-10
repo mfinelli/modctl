@@ -284,22 +284,9 @@ func (e Extractor) RemoveFile(
 ) (RemoveFileResult, error) {
 	absDestPath := filepath.Join(targetRoot, op.DestPath)
 
-	// Hash the file before removing for operation_changes old_content_sha256.
-	// Best-effort: if the file is already gone we still clean up the DB.
-	var oldSha sql.NullString
-	var oldSize sql.NullInt64
-	if info, err := os.Stat(absDestPath); err == nil {
-		sha, err := fsutil.HashFile(ctx, absDestPath)
-		if err == nil {
-			oldSha = sql.NullString{String: sha, Valid: true}
-			oldSize = sql.NullInt64{Int64: info.Size(), Valid: true}
-		} else if ctx.Err() != nil {
-			// we were told to stop: don't go on to delete the file
-			return RemoveFileResult{}, fmt.Errorf("hash %q: %w", op.DestPath, err)
-		}
-		if err := os.Remove(absDestPath); err != nil && !os.IsNotExist(err) {
-			return RemoveFileResult{}, fmt.Errorf("remove %q: %w", op.DestPath, err)
-		}
+	oldSha, oldSize, err := removeFromDisk(ctx, absDestPath, op.DestPath)
+	if err != nil {
+		return RemoveFileResult{}, err
 	}
 
 	tx, err := db.BeginTx(ctx, nil)
@@ -688,4 +675,33 @@ func copyFile(ctx context.Context, src, dst string) error {
 	}
 
 	return nil
+}
+
+// removeFromDisk deletes the file at absDestPath for RemoveFile, and returns
+// the hash and size it had so that they can be recorded in operation_changes
+// (old_content_sha256). Recording them is best-effort: a file that can't be
+// hashed is still removed, and one that is already gone is not an error (the
+// caller still has to clean up the database), in which case the hash and size
+// come back not valid. Being told to stop is the exception: the file is left
+// where it is. destPath is the path relative to the target, for messages.
+func removeFromDisk(ctx context.Context, absDestPath, destPath string) (oldSha sql.NullString, oldSize sql.NullInt64, err error) {
+	info, err := os.Stat(absDestPath)
+	if err != nil {
+		return sql.NullString{}, sql.NullInt64{}, nil
+	}
+
+	sha, err := fsutil.HashFile(ctx, absDestPath)
+	if err == nil {
+		oldSha = sql.NullString{String: sha, Valid: true}
+		oldSize = sql.NullInt64{Int64: info.Size(), Valid: true}
+	} else if ctx.Err() != nil {
+		// we were told to stop: don't go on to delete the file
+		return sql.NullString{}, sql.NullInt64{}, fmt.Errorf("hash %q: %w", destPath, ctx.Err())
+	}
+
+	if err := os.Remove(absDestPath); err != nil && !os.IsNotExist(err) {
+		return sql.NullString{}, sql.NullInt64{}, fmt.Errorf("remove %q: %w", destPath, err)
+	}
+
+	return oldSha, oldSize, nil
 }

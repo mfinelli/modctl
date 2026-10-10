@@ -394,15 +394,12 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 				op.Kind = PlanOpOverwrite
 			} else if hasOverride && !skipRecheck {
 				// Full-file override noop check
-				onDiskHash, err := fsutil.HashFile(ctx, absPath)
+				onDiskHash, warning, err := recheckHash(ctx, absPath, pf.DestPath)
 				if err != nil {
-					// being told to stop is not a reason to warn and carry on: the
-					// rest of the plan would be built on files we never hashed
-					if ctx.Err() != nil {
-						return Plan{}, fmt.Errorf("recheck %q: %w", pf.DestPath, err)
-					}
-					plan.Warnings = append(plan.Warnings,
-						fmt.Sprintf("recheck: could not hash %q: %v", pf.DestPath, err))
+					return Plan{}, err
+				}
+				if warning != "" {
+					plan.Warnings = append(plan.Warnings, warning)
 					// Fall through to plain overwrite if we can't hash
 					op.Kind = PlanOpOverwrite
 				} else if onDiskHash == existingInstall.ContentSha256 &&
@@ -422,15 +419,12 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 				// act on it.
 				op.Kind = PlanOpNoop
 				if !skipRecheck {
-					onDiskHash, err := fsutil.HashFile(ctx, absPath)
+					onDiskHash, warning, err := recheckHash(ctx, absPath, pf.DestPath)
 					if err != nil {
-						// being told to stop is not a reason to warn and carry on: the
-						// rest of the plan would be built on files we never hashed
-						if ctx.Err() != nil {
-							return Plan{}, fmt.Errorf("recheck %q: %w", pf.DestPath, err)
-						}
-						plan.Warnings = append(plan.Warnings,
-							fmt.Sprintf("recheck: could not hash %q: %v", pf.DestPath, err))
+						return Plan{}, err
+					}
+					if warning != "" {
+						plan.Warnings = append(plan.Warnings, warning)
 					} else if onDiskHash != existingInstall.ContentSha256 {
 						plan.Warnings = append(plan.Warnings,
 							fmt.Sprintf("write-once: %q has been modified since last deploy (write-once rule active, leaving as-is)",
@@ -439,15 +433,12 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 				}
 			} else if !skipRecheck {
 				// Normal mod-owned file recheck
-				onDiskHash, err := fsutil.HashFile(ctx, absPath)
+				onDiskHash, warning, err := recheckHash(ctx, absPath, pf.DestPath)
 				if err != nil {
-					// being told to stop is not a reason to warn and carry on: the
-					// rest of the plan would be built on files we never hashed
-					if ctx.Err() != nil {
-						return Plan{}, fmt.Errorf("recheck %q: %w", pf.DestPath, err)
-					}
-					plan.Warnings = append(plan.Warnings,
-						fmt.Sprintf("recheck: could not hash %q: %v", pf.DestPath, err))
+					return Plan{}, err
+				}
+				if warning != "" {
+					plan.Warnings = append(plan.Warnings, warning)
 					op.Kind = PlanOpOverwrite
 				} else if onDiskHash == existingInstall.ContentSha256 &&
 					existingInstall.OwnerModFileVersionID.Int64 == pf.Winner().ModFileVersionID {
@@ -641,4 +632,23 @@ func matchesAny(patterns []string, path string) bool {
 		}
 	}
 	return false
+}
+
+// recheckHash hashes the file at absPath so that it can be compared with what
+// was recorded when it was installed. Not being able to hash the file is
+// normally only worth a warning (the caller then plans as if the file had
+// changed), so that comes back as a warning and not as an error. The exception
+// is being told to stop: nothing planned after that could be trusted, since it
+// would be built on files that were never hashed, so the plan is abandoned.
+func recheckHash(ctx context.Context, absPath, destPath string) (sha, warning string, err error) {
+	sha, err = fsutil.HashFile(ctx, absPath)
+	if err == nil {
+		return sha, "", nil
+	}
+	if ctx.Err() != nil {
+		// report that we were told to stop, not whatever the hash ran into
+		return "", "", fmt.Errorf("recheck %q: %w", destPath, ctx.Err())
+	}
+
+	return "", fmt.Sprintf("recheck: could not hash %q: %v", destPath, err), nil
 }

@@ -166,7 +166,8 @@ Set the active game:
 	Restore a backed-up file to disk immediately without running a full
 	unapply. Warns if the active profile is currently applied, since
 	running apply again will overwrite this path. Requires --force if
-	the on-disk file has drifted from what modctl last installed.
+	the on-disk file has drifted from what modctl last installed, or
+	can't be read to check.
 
 *modctl games backups diff* [--target <target>] [--force] <path>
 	Show a unified diff between the backed-up content and the current

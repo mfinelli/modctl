@@ -32,6 +32,8 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
   temporary copy before it is read.
 - `verify` now warns when a bundle's database schema is newer than this
   version of modctl supports, instead of only comparing modctl versions.
+- `games backups restore` now requires `--force` when the file on disk can't
+  be read to check it for drift, instead of silently skipping the check.
 
 ## v0.7.1 - 2026-10-03
 

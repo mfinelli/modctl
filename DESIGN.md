@@ -766,7 +766,10 @@ state permanently.
 
 Restore requires `--force` if the on-disk file has drifted from what modctl
 last installed, since this indicates an external modification that the user
-should be aware of before overwriting.
+should be aware of before overwriting. The same applies when the on-disk file
+can't be read to make that check (for example because of its permissions):
+modctl can't tell whether it has drifted, so it asks for `--force` instead of
+skipping the check.
 
 No operation record is created for out-of-band restores. The next apply will
 surface the path as drifted, providing an implicit audit trail.
