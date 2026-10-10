@@ -100,7 +100,7 @@ The current active game is used unless --game is provided.`,
 		for _, p := range rows {
 			prefix := "  "
 			if p.IsActive != 0 {
-				prefix = style.Success.Render("  * ")
+				prefix = style.Active.Render("  * ")
 			}
 			style.Printf("%s%s\n", prefix, p.Name)
 
