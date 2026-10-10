@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"github.com/mfinelli/modctl/dbq"
+	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
 )
 
@@ -75,7 +76,7 @@ func Game(
 	}
 
 	// Validate schema version
-	currentSchema, err := currentSchemaVersion(ctx, db)
+	currentSchema, err := internal.CurrentSchemaVersion(ctx, db)
 	if err != nil {
 		return res, fmt.Errorf("get current schema version: %w", err)
 	}

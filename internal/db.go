@@ -101,6 +101,33 @@ func MigrateDB(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
+// CurrentSchemaVersion returns the version of the latest migration that has
+// been applied to db. This is what the database itself is at, which is not
+// necessarily the latest migration this build of modctl knows about: a new
+// database reports 0 and one that has not been migrated since an upgrade
+// reports its older version.
+func CurrentSchemaVersion(ctx context.Context, db *sql.DB) (int64, error) {
+	p, err := GooseProvider(db)
+	if err != nil {
+		return 0, fmt.Errorf("get goose provider: %w", err)
+	}
+
+	return schemaVersion(ctx, p)
+}
+
+// schemaVersion returns the applied migration version as seen by p. It is
+// split out from CurrentSchemaVersion so that tests can supply a provider that
+// reads its migrations from the filesystem (the embedded copy is only
+// populated in the real binary).
+func schemaVersion(ctx context.Context, p *goose.Provider) (int64, error) {
+	current, _, err := p.GetVersions(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("get schema version: %w", err)
+	}
+
+	return current, nil
+}
+
 // EnsureDBExists verifies that the configured database file exists
 // and is a regular file. If not, it returns a user-friendly error.
 func EnsureDBExists() error {

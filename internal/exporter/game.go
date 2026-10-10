@@ -111,7 +111,7 @@ func Game(
 	}
 
 	// 2. Get schema version from source DB
-	schemaVersion, err := currentSchemaVersion(ctx, db)
+	schemaVersion, err := internal.CurrentSchemaVersion(ctx, db)
 	if err != nil {
 		return Result{}, fmt.Errorf("get schema version: %w", err)
 	}

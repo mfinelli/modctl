@@ -32,7 +32,6 @@ import (
 	"time"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
 )
 
@@ -115,18 +114,6 @@ type Manifest struct {
 	NexusCacheSha256    string         `json:"nexus_cache_sha256"`
 	Counts              ManifestCounts `json:"counts"`
 	Game                *ManifestGame  `json:"game,omitempty"`
-}
-
-func currentSchemaVersion(ctx context.Context, db *sql.DB) (int64, error) {
-	p, err := internal.GooseProvider(db)
-	if err != nil {
-		return 0, fmt.Errorf("get goose provider: %w", err)
-	}
-	current, _, err := p.GetVersions(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("get schema version: %w", err)
-	}
-	return current, nil
 }
 
 func writeManifest(tw *tar.Writer, m Manifest) error {

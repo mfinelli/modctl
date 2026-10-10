@@ -160,19 +160,6 @@ func OpenAndValidate(ctx context.Context, bundlePath string) (*Bundle, error) {
 	}, nil
 }
 
-// TODO: we also have this in the exporter
-func currentSchemaVersion(ctx context.Context, db *sql.DB) (int64, error) {
-	p, err := internal.GooseProvider(db)
-	if err != nil {
-		return 0, fmt.Errorf("get goose provider: %w", err)
-	}
-	current, _, err := p.GetVersions(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("get schema version: %w", err)
-	}
-	return current, nil
-}
-
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {

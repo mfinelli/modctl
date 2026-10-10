@@ -48,7 +48,7 @@ func Full(
 	var res Result
 
 	// Validate schema version
-	currentSchema, err := currentSchemaVersion(ctx, db)
+	currentSchema, err := internal.CurrentSchemaVersion(ctx, db)
 	if err != nil {
 		return res, fmt.Errorf("get current schema version: %w", err)
 	}
