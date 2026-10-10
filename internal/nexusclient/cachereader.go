@@ -21,10 +21,12 @@ package nexusclient
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 
 	"github.com/mfinelli/modctl/internal/nexusclient/dbc"
+	"github.com/mfinelli/modctl/internal/updatechain"
 )
 
 // CacheReader provides read-only access to the Nexus cache DB.
@@ -70,6 +72,26 @@ func (r *CacheReader) GetNexusFileUpdateChain(gameDomain string, modID int64) ([
 		NexusGameDomain: gameDomain,
 		NexusModID:      modID,
 	})
+}
+
+// GetUpdateChain returns the file update chain that is cached for a mod. A mod
+// that has nothing cached has an empty chain, in which every file is the
+// latest.
+func (r *CacheReader) GetUpdateChain(gameDomain string, modID int64) (updatechain.Chain, error) {
+	rows, err := r.GetNexusFileUpdateChain(gameDomain, modID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return updatechain.Chain{}, err
+	}
+
+	updates := make([]updatechain.Update, 0, len(rows))
+	for _, row := range rows {
+		updates = append(updates, updatechain.Update{
+			OldFileID: row.OldFileID,
+			NewFileID: row.NewFileID,
+		})
+	}
+
+	return updatechain.New(updates), nil
 }
 
 func (r *CacheReader) GetNexusModInfo(gameDomain string, modID int64) (*dbc.NexusModInfo, error) {
