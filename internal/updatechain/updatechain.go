@@ -79,6 +79,38 @@ func (c Chain) Head(fileID int64) int64 {
 	}
 }
 
+// Distance returns how many updates there are between fileID and the latest
+// file of its chain: 0 for a file that nothing replaced.
+func (c Chain) Distance(fileID int64) int {
+	head := c.Head(fileID)
+
+	// head is on the way from fileID (that is how Head finds it, even in a
+	// chain that loops), so this ends
+	distance := 0
+	for current := fileID; current != head; current = c.next[current] {
+		distance++
+	}
+
+	return distance
+}
+
+// Closest returns the index of the file of candidates that is closest to the
+// latest file of its chain, that is, the one that has the fewest updates left.
+// It is for the versions of one file that have been imported, where the one
+// that matters is the most recent. The first of several that are equally close
+// wins. ok is false when there are no candidates.
+func (c Chain) Closest(candidates []int64) (index int, ok bool) {
+	best := -1
+	for i, id := range candidates {
+		d := c.Distance(id)
+		if best == -1 || d < best {
+			best, index = d, i
+		}
+	}
+
+	return index, best != -1
+}
+
 // State is where a file stands against the updates of its mod.
 type State int
 

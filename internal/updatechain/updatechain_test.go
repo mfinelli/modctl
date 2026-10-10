@@ -86,6 +86,73 @@ func TestChainHasSuccessor(t *testing.T) {
 	assert.False(t, c.HasSuccessor(99), "nor does a file the chain doesn't know")
 }
 
+func TestChainDistance(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		updates []Update
+		from    int64
+		want    int
+	}{
+		{"no updates at all", nil, 1, 0},
+		{"a file that nothing replaced", []Update{{10, 11}}, 5, 0},
+		{"the head", []Update{{1, 2}, {2, 3}}, 3, 0},
+		{"one update", []Update{{1, 2}}, 1, 1},
+		{"several updates in a row", []Update{{1, 2}, {2, 3}, {3, 4}}, 1, 3},
+		{"from the middle of the chain", []Update{{1, 2}, {2, 3}, {3, 4}}, 2, 2},
+		{"links given out of order", []Update{{3, 4}, {1, 2}, {2, 3}}, 1, 3},
+		{"the other chain is not counted", []Update{{1, 2}, {20, 21}, {21, 22}}, 1, 1},
+		{"a file that replaces itself", []Update{{1, 1}}, 1, 0},
+		{"a loop ends where it closes", []Update{{1, 2}, {2, 1}}, 1, 0},
+		{"a loop entered from outside", []Update{{9, 1}, {1, 2}, {2, 1}}, 9, 1},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tc.want, New(tc.updates).Distance(tc.from))
+		})
+	}
+}
+
+func TestChainClosest(t *testing.T) {
+	t.Parallel()
+
+	chain := New([]Update{{1, 2}, {2, 3}, {3, 4}, {20, 21}})
+
+	tests := []struct {
+		name       string
+		candidates []int64
+		wantIndex  int
+		wantOK     bool
+	}{
+		{"no candidates", nil, 0, false},
+		{"one candidate", []int64{1}, 0, true},
+		{"the newest of two", []int64{1, 3}, 1, true},
+		{"the newest of two, the other way round", []int64{3, 1}, 0, true},
+		{"the newest of several", []int64{1, 2, 4, 3}, 2, true},
+		{"the head wins over everything", []int64{2, 4, 1}, 1, true},
+		{"the first of equally close ones wins", []int64{2, 2, 1}, 0, true},
+		{"files that nothing replaced are as close as it gets", []int64{99, 1}, 0, true},
+		{"the second of those when it comes first", []int64{1, 99}, 1, true},
+		{"files of another chain are compared by their own distance", []int64{1, 20}, 1, true},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			index, ok := chain.Closest(tc.candidates)
+			assert.Equal(t, tc.wantOK, ok)
+			assert.Equal(t, tc.wantIndex, index)
+		})
+	}
+}
+
 func TestChainStatus(t *testing.T) {
 	t.Parallel()
 
