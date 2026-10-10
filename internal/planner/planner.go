@@ -394,8 +394,13 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 				op.Kind = PlanOpOverwrite
 			} else if hasOverride && !skipRecheck {
 				// Full-file override noop check
-				onDiskHash, err := fsutil.HashFile(absPath)
+				onDiskHash, err := fsutil.HashFile(ctx, absPath)
 				if err != nil {
+					// being told to stop is not a reason to warn and carry on: the
+					// rest of the plan would be built on files we never hashed
+					if ctx.Err() != nil {
+						return Plan{}, fmt.Errorf("recheck %q: %w", pf.DestPath, err)
+					}
 					plan.Warnings = append(plan.Warnings,
 						fmt.Sprintf("recheck: could not hash %q: %v", pf.DestPath, err))
 					// Fall through to plain overwrite if we can't hash
@@ -417,8 +422,13 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 				// act on it.
 				op.Kind = PlanOpNoop
 				if !skipRecheck {
-					onDiskHash, err := fsutil.HashFile(absPath)
+					onDiskHash, err := fsutil.HashFile(ctx, absPath)
 					if err != nil {
+						// being told to stop is not a reason to warn and carry on: the
+						// rest of the plan would be built on files we never hashed
+						if ctx.Err() != nil {
+							return Plan{}, fmt.Errorf("recheck %q: %w", pf.DestPath, err)
+						}
 						plan.Warnings = append(plan.Warnings,
 							fmt.Sprintf("recheck: could not hash %q: %v", pf.DestPath, err))
 					} else if onDiskHash != existingInstall.ContentSha256 {
@@ -429,8 +439,13 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 				}
 			} else if !skipRecheck {
 				// Normal mod-owned file recheck
-				onDiskHash, err := fsutil.HashFile(absPath)
+				onDiskHash, err := fsutil.HashFile(ctx, absPath)
 				if err != nil {
+					// being told to stop is not a reason to warn and carry on: the
+					// rest of the plan would be built on files we never hashed
+					if ctx.Err() != nil {
+						return Plan{}, fmt.Errorf("recheck %q: %w", pf.DestPath, err)
+					}
 					plan.Warnings = append(plan.Warnings,
 						fmt.Sprintf("recheck: could not hash %q: %v", pf.DestPath, err))
 					op.Kind = PlanOpOverwrite

@@ -325,7 +325,7 @@ func buildGameScopedDB(
 		return "", "", 0, 0, 0, fmt.Errorf("close scoped db: %w", err)
 	}
 
-	sha, err := fsutil.HashFile(tmpPath)
+	sha, err := fsutil.HashFile(ctx, tmpPath)
 	if err != nil {
 		os.Remove(tmpPath)
 		return "", "", 0, 0, 0, fmt.Errorf("hash scoped db: %w", err)
@@ -673,7 +673,7 @@ func buildGameScopedCacheDB(
 		return "", "", fmt.Errorf("close scoped cache db: %w", err)
 	}
 
-	sha, err := fsutil.HashFile(tmpPath)
+	sha, err := fsutil.HashFile(ctx, tmpPath)
 	if err != nil {
 		os.Remove(tmpPath)
 		return "", "", fmt.Errorf("hash scoped cache db: %w", err)

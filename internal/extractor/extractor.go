@@ -289,9 +289,13 @@ func (e Extractor) RemoveFile(
 	var oldSha sql.NullString
 	var oldSize sql.NullInt64
 	if info, err := os.Stat(absDestPath); err == nil {
-		if sha, err := fsutil.HashFile(absDestPath); err == nil {
+		sha, err := fsutil.HashFile(ctx, absDestPath)
+		if err == nil {
 			oldSha = sql.NullString{String: sha, Valid: true}
 			oldSize = sql.NullInt64{Int64: info.Size(), Valid: true}
+		} else if ctx.Err() != nil {
+			// we were told to stop: don't go on to delete the file
+			return RemoveFileResult{}, fmt.Errorf("hash %q: %w", op.DestPath, err)
 		}
 		if err := os.Remove(absDestPath); err != nil && !os.IsNotExist(err) {
 			return RemoveFileResult{}, fmt.Errorf("remove %q: %w", op.DestPath, err)

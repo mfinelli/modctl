@@ -223,7 +223,7 @@ func snapshotDB(ctx context.Context, db *sql.DB) (path string, sha256hex string,
 		return "", "", fmt.Errorf("vacuum into: %w", err)
 	}
 
-	sha, err := fsutil.HashFile(tmpPath)
+	sha, err := fsutil.HashFile(ctx, tmpPath)
 	if err != nil {
 		os.Remove(tmpPath)
 		return "", "", fmt.Errorf("hash snapshot: %w", err)
@@ -259,7 +259,7 @@ func snapshotCacheDB(ctx context.Context, cacheDBPath string) (path string, sha2
 		return "", "", fmt.Errorf("vacuum cache db: %w", err)
 	}
 
-	sha, err := fsutil.HashFile(tmpPath)
+	sha, err := fsutil.HashFile(ctx, tmpPath)
 	if err != nil {
 		os.Remove(tmpPath)
 		return "", "", fmt.Errorf("hash cache snapshot: %w", err)

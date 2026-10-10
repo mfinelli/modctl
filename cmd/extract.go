@@ -398,7 +398,7 @@ func extractBlob(
 	blobPath := filepath.Join(bundle.BundleDir, "archives", fan, sha)
 
 	// verify blob hash before extracting
-	actual, err := fsutil.HashFile(blobPath)
+	actual, err := fsutil.HashFile(ctx, blobPath)
 	if err != nil {
 		return fmt.Errorf("hash blob %s: %w", style.ShortSha(sha), err)
 	}

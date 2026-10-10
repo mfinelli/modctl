@@ -23,13 +23,25 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"os"
 )
 
+const (
+	// the smallest and the largest read buffer HashFile will use
+	minHashBuffer = 32 * 1024
+	maxHashBuffer = 1024 * 1024
+)
+
 // HashFile computes the sha256 digest of the file at path and returns it as
-// a lowercase hex string.
-func HashFile(path string) (string, error) {
+// a lowercase hex string. It stops early if ctx is canceled, which matters
+// when hashing very large files (such as archives) in a command that has to
+// stay interruptible.
+//
+// HashFile is safe to call from several goroutines at once: every call reads
+// through a buffer of its own, sized to the file, and shares no state with any
+// other call. Please keep it that way (for instance, don't cache a buffer
+// between calls to save allocations).
+func HashFile(ctx context.Context, path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", fmt.Errorf("open file for hashing: %w", err)
@@ -37,35 +49,30 @@ func HashFile(path string) (string, error) {
 	defer f.Close()
 
 	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
+	buf := make([]byte, hashBufferSize(f))
+	if _, err := CopyWithContext(ctx, h, f, buf); err != nil {
 		return "", fmt.Errorf("hash file contents: %w", err)
 	}
 
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// HashFileContext is like HashFile but stops early if ctx is canceled, which
-// matters when hashing very large files (e.g. archives) in a command that
-// has to stay interruptible.
-//
-// The file is read through buf. A caller that hashes many files can allocate
-// one buffer and pass it to every call; a nil or empty buf makes
-// HashFileContext allocate a 1 MiB buffer for the call.
-func HashFileContext(ctx context.Context, path string, buf []byte) (string, error) {
-	f, err := os.Open(path)
+// hashBufferSize picks the read buffer size for f.
+func hashBufferSize(f *os.File) int {
+	info, err := f.Stat()
 	if err != nil {
-		return "", fmt.Errorf("open file for hashing: %w", err)
-	}
-	defer f.Close()
-
-	if len(buf) == 0 {
-		buf = make([]byte, 1024*1024)
+		// we can't tell how big it is, so assume it could be large
+		return maxHashBuffer
 	}
 
-	h := sha256.New()
-	if _, err := CopyWithContext(ctx, h, f, buf); err != nil {
-		return "", fmt.Errorf("hash file contents: %w", err)
-	}
+	return bufferSizeFor(info.Size())
+}
 
-	return hex.EncodeToString(h.Sum(nil)), nil
+// bufferSizeFor returns the read buffer size to use for a file of the given
+// size: the size of the file itself, kept between a minimum (so that small
+// files don't get a tiny buffer) and a maximum (so that a huge file doesn't
+// get a huge one). The size is only a hint: a file that grows while it is
+// being read is still read to the end.
+func bufferSizeFor(size int64) int {
+	return int(min(max(size, minHashBuffer), maxHashBuffer))
 }

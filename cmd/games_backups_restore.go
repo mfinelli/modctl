@@ -143,7 +143,11 @@ the command warns and requires --force to proceed.`,
 		if err == nil {
 			// File is tool-owned - check for drift
 			if _, exists := diskStat(absPath); exists {
-				onDiskHash, hashErr := fsutil.HashFile(absPath)
+				onDiskHash, hashErr := fsutil.HashFile(ctx, absPath)
+				if hashErr != nil && ctx.Err() != nil {
+					// we were told to stop: don't go on without the drift check
+					return fmt.Errorf("check %q for drift: %w", relpath, hashErr)
+				}
 				if hashErr == nil && onDiskHash != installedFile.ContentSha256 {
 					if !gamesBackupsRestoreForce {
 						return fmt.Errorf(

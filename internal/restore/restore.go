@@ -119,7 +119,7 @@ func OpenAndValidate(ctx context.Context, bundlePath string) (*Bundle, error) {
 
 	// Verify database integrity
 	dbPath := filepath.Join(tmpDir, exporter.DatabaseFilename)
-	dbSha, err := fsutil.HashFile(dbPath)
+	dbSha, err := fsutil.HashFile(ctx, dbPath)
 	if err != nil {
 		os.RemoveAll(tmpDir)
 		return nil, fmt.Errorf("hash bundle database: %w", err)
@@ -133,7 +133,7 @@ func OpenAndValidate(ctx context.Context, bundlePath string) (*Bundle, error) {
 	// Verify nexus cache integrity if present in bundle
 	cachePath := filepath.Join(tmpDir, "nexus_cache.db")
 	if manifest.NexusCacheSha256 != "" {
-		cacheSha, err := fsutil.HashFile(cachePath)
+		cacheSha, err := fsutil.HashFile(ctx, cachePath)
 		if err != nil {
 			os.RemoveAll(tmpDir)
 			return nil, fmt.Errorf("hash bundle nexus cache: %w", err)
@@ -335,7 +335,7 @@ func importBlobs(ctx context.Context, bundle *Bundle, bs blobstore.Store) (archi
 			}
 
 			// Verify blob integrity before ingesting
-			actualSha, err := fsutil.HashFile(path)
+			actualSha, err := fsutil.HashFile(ctx, path)
 			if err != nil {
 				return fmt.Errorf("hash blob %s: %w", expectedSha, err)
 			}

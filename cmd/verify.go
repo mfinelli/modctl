@@ -267,7 +267,6 @@ func checkBundleBlobs(ctx context.Context, bundle *restore.Bundle, bq *dbq.Queri
 	}
 
 	fileBlobs := make(map[string]struct{})
-	buf := make([]byte, 1024*1024)
 	total := len(dbBlobs)
 	checked := 0
 
@@ -307,7 +306,7 @@ func checkBundleBlobs(ctx context.Context, bundle *restore.Bundle, bq *dbq.Queri
 			}
 
 			// hash and verify
-			actual, err := fsutil.HashFileContext(ctx, path, buf)
+			actual, err := fsutil.HashFile(ctx, path)
 			if err != nil {
 				issues = append(issues, fmt.Sprintf("hash blob %s: %s", style.ShortSha(name), err))
 				return nil

@@ -627,7 +627,6 @@ func rehashBlobs(
 	}
 
 	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
-	buf := make([]byte, 1024*1024) // 1MiB
 
 	var hashed int
 	var skippedMissing int
@@ -670,7 +669,7 @@ func rehashBlobs(
 			)
 		}
 
-		sumHex, err := fsutil.HashFileContext(ctx, path, buf)
+		sumHex, err := fsutil.HashFile(ctx, path)
 		if err != nil {
 			style.Print("\n")
 			return fmt.Errorf("hash blob kind=%s sha=%s path=%s: %w", kind, b.Sha256, path, err)
@@ -736,8 +735,6 @@ func checkInstalledFiles(ctx context.Context) error {
 		style.Println()
 		return nil
 	}
-
-	buf := make([]byte, 1024*1024)
 
 	for _, gi := range installs {
 		label := fmt.Sprintf("%s (%s:%s)", gi.DisplayName, gi.StoreID, gi.StoreGameID)
@@ -822,7 +819,7 @@ func checkInstalledFiles(ctx context.Context) error {
 				continue
 			}
 
-			actual, err := fsutil.HashFileContext(ctx, fullPath, buf)
+			actual, err := fsutil.HashFile(ctx, fullPath)
 			if err != nil {
 				return fmt.Errorf("hash %s: %w", fullPath, err)
 			}

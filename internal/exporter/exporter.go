@@ -257,8 +257,6 @@ func verifyBlobs(
 	}
 
 	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
-	buf := make([]byte, 1024*1024)
-
 	report(VerifyStarted, 0)
 
 	for i, b := range blobs {
@@ -275,10 +273,10 @@ func verifyBlobs(
 			return fail(i+1, fmt.Errorf("derive path for %s: %w", b.sha256, err))
 		}
 
-		actual, err := fsutil.HashFileContext(ctx, path, buf)
+		actual, err := fsutil.HashFile(ctx, path)
 		if err != nil {
 			// errors.Is and not os.IsNotExist, which doesn't see through the
-			// wrapping HashFileContext adds
+			// wrapping HashFile adds
 			if errors.Is(err, os.ErrNotExist) {
 				return fail(i+1, fmt.Errorf(
 					"blob %s is missing from disk; run 'doctor' to check blob integrity",
