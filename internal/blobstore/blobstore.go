@@ -182,7 +182,14 @@ func (s Store) IngestFile(ctx context.Context, kind Kind, srcPath string) (Inges
 // different filesystems (EXDEV), it falls back to an atomic copy (so a partly
 // copied blob never shows up under its final name) and then deletes src.
 func replaceFile(ctx context.Context, src, dst string) error {
-	err := os.Rename(src, dst)
+	return replaceFileWith(ctx, os.Rename, src, dst)
+}
+
+// replaceFileWith is replaceFile with the function that does the renaming
+// supplied by the caller, so that a test can make it fail the way os.Rename
+// does between filesystems without needing a second filesystem to do it on.
+func replaceFileWith(ctx context.Context, rename func(oldpath, newpath string) error, src, dst string) error {
+	err := rename(src, dst)
 	if err == nil {
 		return nil
 	}
