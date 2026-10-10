@@ -95,7 +95,9 @@ func CopyWithContext(ctx context.Context, dst io.Writer, src io.Reader, buf []by
 // is also fine for src and dst to be the same file, and a dst that is a
 // symlink is replaced by the copy and not followed.
 //
-// The new file has mode 0644, whatever the mode of src and the umask.
+// The new file has mode 0644, whatever the mode of src and the umask. Once it
+// is in place the directory is synced too, so that the new name survives a
+// crash and not only the content (best effort, see SyncDir).
 func CopyFile(ctx context.Context, src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
@@ -131,6 +133,10 @@ func CopyFile(ctx context.Context, src, dst string) error {
 	if err := os.Rename(tmpName, dst); err != nil {
 		return fmt.Errorf("rename into place: %w", err)
 	}
+
+	// The copy has already succeeded and some filesystems can't sync a
+	// directory, so not being able to is not a reason to fail it.
+	_ = SyncDir(filepath.Dir(dst))
 
 	return nil
 }

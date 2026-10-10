@@ -173,37 +173,9 @@ func (s Store) IngestFile(ctx context.Context, kind Kind, srcPath string) (Inges
 	}
 
 	// Best-effort: fsync the directory so rename is durable.
-	_ = fsyncDir(finalDir)
+	_ = fsutil.SyncDir(finalDir)
 
 	return IngestResult{SHA256Hex: shaHex, SizeBytes: n, Existed: false}, nil
-}
-
-// fsyncDir calls fsync(2) on a directory to ensure that metadata changes
-// within that directory are durably persisted to disk.
-//
-// Why this is needed:
-// After renaming a blob into its final location (os.Rename), the file’s
-// contents are durable (because we fsync’d the temp file), but the directory
-// entry itself may still be sitting in the kernel’s metadata buffers.
-// If the system crashes at that exact moment, the file could theoretically
-// disappear after reboot even though the rename returned successfully.
-//
-// By opening the directory and calling Sync() on it, we force the directory
-// metadata (including the new filename entry) to be flushed to stable storage.
-//
-// This is best-effort: some filesystems may ignore directory fsync or relax
-// guarantees, but on modern Linux filesystems (ext4, xfs, btrfs) this provides
-// proper crash-consistency for atomic rename patterns.
-//
-// It is intentionally non-fatal in callers because durability is strongly
-// desired but not worth aborting the operation if unsupported.
-func fsyncDir(dir string) error {
-	f, err := os.Open(dir)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	return f.Sync()
 }
 
 // replaceFile atomically moves src to dst using rename. If src and dst are on
