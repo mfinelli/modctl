@@ -1,6 +1,21 @@
+sed := if os() == "macos" { "gsed" } else { "sed" }
+today := `date +%Y-%m-%d`
+url := "https://github.com/mfinelli/modctl"
+
 [private]
 default:
     @just --list
+
+bump v:
+    @grep -qi '^## unreleased' CHANGELOG.md
+    {{ sed }} -i -E "s|^## unreleased|## v{{ v }} - {{ today }}|" CHANGELOG.md
+    {{ sed }} -i -E \
+        "s|(LABEL org\.opencontainers\.image\.version=).*|\1{{ v }}|" \
+        Dockerfile
+    {{ sed }} -i -E "s|(Version:\s+\").*(\",)|\1{{ v }}\2|" cmd/root.go
+    {{ sed }} -i -E "s|^(current_version = \"v).*\"|\1{{ v }}\"|" www/zola.toml
+    {{ sed }} -i -E "s|^(release_url = \"{{ url }}/releases/tag/v).*\"|\1{{ v }}\"|" \
+        www/zola.toml
 
 rebuild:
     make
