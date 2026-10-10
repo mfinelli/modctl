@@ -19,6 +19,7 @@
 package fsutil
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -37,6 +38,32 @@ func HashFile(path string) (string, error) {
 
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
+		return "", fmt.Errorf("hash file contents: %w", err)
+	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// HashFileContext is like HashFile but stops early if ctx is canceled, which
+// matters when hashing very large files (e.g. archives) in a command that
+// has to stay interruptible.
+//
+// The file is read through buf. A caller that hashes many files can allocate
+// one buffer and pass it to every call; a nil or empty buf makes
+// HashFileContext allocate a 1 MiB buffer for the call.
+func HashFileContext(ctx context.Context, path string, buf []byte) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", fmt.Errorf("open file for hashing: %w", err)
+	}
+	defer f.Close()
+
+	if len(buf) == 0 {
+		buf = make([]byte, 1024*1024)
+	}
+
+	h := sha256.New()
+	if _, err := CopyWithContext(ctx, h, f, buf); err != nil {
 		return "", fmt.Errorf("hash file contents: %w", err)
 	}
 

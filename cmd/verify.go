@@ -20,9 +20,7 @@ package cmd
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -309,19 +307,11 @@ func checkBundleBlobs(ctx context.Context, bundle *restore.Bundle, bq *dbq.Queri
 			}
 
 			// hash and verify
-			f, err := os.Open(path)
+			actual, err := fsutil.HashFileContext(ctx, path, buf)
 			if err != nil {
-				issues = append(issues, fmt.Sprintf("open blob %s: %s", style.ShortSha(name), err))
+				issues = append(issues, fmt.Sprintf("hash blob %s: %s", style.ShortSha(name), err))
 				return nil
 			}
-			h := sha256.New()
-			_, cerr := fsutil.CopyWithContext(ctx, h, f, buf)
-			f.Close()
-			if cerr != nil {
-				issues = append(issues, fmt.Sprintf("hash blob %s: %s", style.ShortSha(name), cerr))
-				return nil
-			}
-			actual := hex.EncodeToString(h.Sum(nil))
 			if actual != name {
 				issues = append(issues, fmt.Sprintf(
 					"hash mismatch: filename=%s actual=%s", name, actual,

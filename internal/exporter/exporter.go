@@ -21,10 +21,9 @@ package exporter
 import (
 	"archive/tar"
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -276,25 +275,19 @@ func verifyBlobs(
 			return fail(i+1, fmt.Errorf("derive path for %s: %w", b.sha256, err))
 		}
 
-		f, err := os.Open(path)
+		actual, err := fsutil.HashFileContext(ctx, path, buf)
 		if err != nil {
-			if os.IsNotExist(err) {
+			// errors.Is and not os.IsNotExist, which doesn't see through the
+			// wrapping HashFileContext adds
+			if errors.Is(err, os.ErrNotExist) {
 				return fail(i+1, fmt.Errorf(
 					"blob %s is missing from disk; run 'doctor' to check blob integrity",
 					b.sha256,
 				))
 			}
-			return fail(i+1, fmt.Errorf("open blob %s: %w", b.sha256, err))
+			return fail(i+1, fmt.Errorf("hash blob %s: %w", b.sha256, err))
 		}
 
-		h := sha256.New()
-		_, cerr := fsutil.CopyWithContext(ctx, h, f, buf)
-		f.Close()
-		if cerr != nil {
-			return fail(i+1, fmt.Errorf("hash blob %s: %w", b.sha256, cerr))
-		}
-
-		actual := hex.EncodeToString(h.Sum(nil))
 		if actual != b.sha256 {
 			return fail(i+1, fmt.Errorf(
 				"blob integrity check failed: expected %s got %s - run 'doctor' to investigate",

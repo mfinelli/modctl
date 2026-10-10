@@ -20,9 +20,7 @@ package cmd
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -672,21 +670,12 @@ func rehashBlobs(
 			)
 		}
 
-		f, err := os.Open(path)
+		sumHex, err := fsutil.HashFileContext(ctx, path, buf)
 		if err != nil {
 			style.Print("\n")
-			return fmt.Errorf("open blob kind=%s sha=%s path=%s: %w", kind, b.Sha256, path, err)
+			return fmt.Errorf("hash blob kind=%s sha=%s path=%s: %w", kind, b.Sha256, path, err)
 		}
 
-		h := sha256.New()
-		_, cerr := fsutil.CopyWithContext(ctx, h, f, buf)
-		_ = f.Close()
-		if cerr != nil {
-			style.Print("\n")
-			return fmt.Errorf("hash blob kind=%s sha=%s path=%s: %w", kind, b.Sha256, path, cerr)
-		}
-
-		sumHex := hex.EncodeToString(h.Sum(nil))
 		if sumHex != b.Sha256 {
 			style.Print("\n")
 			return fmt.Errorf(
@@ -833,19 +822,11 @@ func checkInstalledFiles(ctx context.Context) error {
 				continue
 			}
 
-			file, err := os.Open(fullPath)
+			actual, err := fsutil.HashFileContext(ctx, fullPath, buf)
 			if err != nil {
-				return fmt.Errorf("open %s: %w", fullPath, err)
+				return fmt.Errorf("hash %s: %w", fullPath, err)
 			}
 
-			h := sha256.New()
-			_, cerr := fsutil.CopyWithContext(ctx, h, file, buf)
-			_ = file.Close()
-			if cerr != nil {
-				return fmt.Errorf("hash %s: %w", fullPath, cerr)
-			}
-
-			actual := hex.EncodeToString(h.Sum(nil))
 			if actual != f.ContentSha256 {
 				mismatched++
 				style.Println(style.Warning.Render(fmt.Sprintf(
