@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/mattn/go-sqlite3"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
@@ -147,8 +146,7 @@ Higher priority wins conflicts. Priorities must be unique within a profile.`,
 			ID:       item.ID,
 		}); err != nil {
 			// Race-proof fallback: unique constraint could still trip
-			var se sqlite3.Error
-			if errors.As(err, &se) && se.Code == sqlite3.ErrConstraint && se.ExtendedCode == sqlite3.ErrConstraintUnique {
+			if internal.IsUniqueConstraint(err) {
 				return fmt.Errorf("priority %d is already used in profile %q", newPrio, p.Name)
 			}
 			return fmt.Errorf("set priority: %w", err)

@@ -20,11 +20,9 @@ package cmd
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"strconv"
 
-	"github.com/mattn/go-sqlite3"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
@@ -133,19 +131,16 @@ known crashes, conflicting game mechanics, or anything else.`,
 			ModPageIDB: mpB.ID,
 			Reason:     nullReason,
 		}); err != nil {
-			var se sqlite3.Error
-			if errors.As(err, &se) {
-				if se.Code == sqlite3.ErrConstraint && se.ExtendedCode == sqlite3.ErrConstraintUnique {
-					return fmt.Errorf("mods %q (id: %d) and %q (id: %d) are already flagged as incompatible",
-						pageA.Name, pageA.ID, pageB.Name, pageB.ID)
-				}
-				if se.Code == sqlite3.ErrConstraint && se.ExtendedCode == sqlite3.ErrConstraintTrigger {
-					// Fired by trg_mod_incompatibilities_same_game_ins - shouldn't be
-					// reachable in normal use since we verify game_install_id above,
-					// but handle it gracefully in case of a race or direct DB access.
-					return fmt.Errorf("mod pages %d and %d do not belong to the same game install",
-						mpA.ID, mpB.ID)
-				}
+			if internal.IsUniqueConstraint(err) {
+				return fmt.Errorf("mods %q (id: %d) and %q (id: %d) are already flagged as incompatible",
+					pageA.Name, pageA.ID, pageB.Name, pageB.ID)
+			}
+			if internal.IsTriggerConstraint(err) {
+				// Fired by trg_mod_incompatibilities_same_game_ins - shouldn't be
+				// reachable in normal use since we verify game_install_id above,
+				// but handle it gracefully in case of a race or direct DB access.
+				return fmt.Errorf("mod pages %d and %d do not belong to the same game install",
+					mpA.ID, mpB.ID)
 			}
 			return fmt.Errorf("flagging incompatibility: %w", err)
 		}

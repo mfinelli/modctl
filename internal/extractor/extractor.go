@@ -34,6 +34,7 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/patchapply"
 	"github.com/mfinelli/modctl/internal/planner"
 )
@@ -283,18 +284,9 @@ func (e Extractor) RemoveFile(
 ) (RemoveFileResult, error) {
 	absDestPath := filepath.Join(targetRoot, op.DestPath)
 
-	// Hash the file before removing for operation_changes old_content_sha256.
-	// Best-effort: if the file is already gone we still clean up the DB.
-	var oldSha sql.NullString
-	var oldSize sql.NullInt64
-	if info, err := os.Stat(absDestPath); err == nil {
-		if sha, err := hashFile(absDestPath); err == nil {
-			oldSha = sql.NullString{String: sha, Valid: true}
-			oldSize = sql.NullInt64{Int64: info.Size(), Valid: true}
-		}
-		if err := os.Remove(absDestPath); err != nil && !os.IsNotExist(err) {
-			return RemoveFileResult{}, fmt.Errorf("remove %q: %w", op.DestPath, err)
-		}
+	oldSha, oldSize, err := removeFromDisk(ctx, absDestPath, op.DestPath)
+	if err != nil {
+		return RemoveFileResult{}, err
 	}
 
 	tx, err := db.BeginTx(ctx, nil)
@@ -364,7 +356,7 @@ func (e Extractor) RestoreFile(
 
 	// Copy backup blob to target. We don't rehash since the blob store
 	// is content-addressed and user editing of blobs is unsupported.
-	if err := copyFile(ctx, backupPath, absDestPath); err != nil {
+	if err := fsutil.CopyFile(ctx, backupPath, absDestPath); err != nil {
 		return RestoreFileResult{}, fmt.Errorf("restore %q: %w", op.DestPath, err)
 	}
 
@@ -647,58 +639,31 @@ func copyAndHash(ctx context.Context, src, dst string) (string, int64, error) {
 	return hex.EncodeToString(h.Sum(nil)), written, nil
 }
 
-// copyFile copies src to dst atomically via a temp file in dst's directory.
-// Used for restore operations where we don't need to hash the content.
-func copyFile(ctx context.Context, src, dst string) error {
-	srcFile, err := os.Open(src)
+// removeFromDisk deletes the file at absDestPath for RemoveFile, and returns
+// the hash and size it had so that they can be recorded in operation_changes
+// (old_content_sha256). Recording them is best-effort: a file that can't be
+// hashed is still removed, and one that is already gone is not an error (the
+// caller still has to clean up the database), in which case the hash and size
+// come back not valid. Being told to stop is the exception: the file is left
+// where it is. destPath is the path relative to the target, for messages.
+func removeFromDisk(ctx context.Context, absDestPath, destPath string) (oldSha sql.NullString, oldSize sql.NullInt64, err error) {
+	info, err := os.Stat(absDestPath)
 	if err != nil {
-		return fmt.Errorf("open src: %w", err)
-	}
-	defer srcFile.Close()
-
-	dstDir := filepath.Dir(dst)
-	tmp, err := os.CreateTemp(dstDir, ".restore-*")
-	if err != nil {
-		return fmt.Errorf("create temp: %w", err)
-	}
-	tmpName := tmp.Name()
-	defer func() {
-		_ = tmp.Close()
-		_ = os.Remove(tmpName)
-	}()
-
-	buf := make([]byte, 1024*1024)
-	if _, err := blobstore.CopyWithContext(ctx, tmp, srcFile, buf); err != nil {
-		return fmt.Errorf("copy: %w", err)
+		return sql.NullString{}, sql.NullInt64{}, nil
 	}
 
-	if err := tmp.Sync(); err != nil {
-		return fmt.Errorf("fsync: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("close temp: %w", err)
-	}
-	if err := os.Rename(tmpName, dst); err != nil {
-		return fmt.Errorf("rename into place: %w", err)
-	}
-
-	return nil
-}
-
-// hashFile computes the sha256 digest of the file at path and returns it as
-// a lowercase hex string.
-// TODO this is also in the planner -- extract to internal
-func hashFile(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", fmt.Errorf("open file for hashing: %w", err)
-	}
-	defer f.Close()
-
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", fmt.Errorf("hash file contents: %w", err)
+	sha, err := fsutil.HashFile(ctx, absDestPath)
+	if err == nil {
+		oldSha = sql.NullString{String: sha, Valid: true}
+		oldSize = sql.NullInt64{Int64: info.Size(), Valid: true}
+	} else if ctx.Err() != nil {
+		// we were told to stop: don't go on to delete the file
+		return sql.NullString{}, sql.NullInt64{}, fmt.Errorf("hash %q: %w", destPath, ctx.Err())
 	}
 
-	return hex.EncodeToString(h.Sum(nil)), nil
+	if err := os.Remove(absDestPath); err != nil && !os.IsNotExist(err) {
+		return sql.NullString{}, sql.NullInt64{}, fmt.Errorf("remove %q: %w", destPath, err)
+	}
+
+	return oldSha, oldSize, nil
 }

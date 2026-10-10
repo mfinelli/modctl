@@ -19,11 +19,9 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 
-	"github.com/mattn/go-sqlite3"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
@@ -118,7 +116,7 @@ Examples:
 			ProfileItemID: itemID,
 			Pattern:       pattern,
 		}); err != nil {
-			if isUniqueConstraintError(err) {
+			if internal.IsUniqueConstraint(err) {
 				return fmt.Errorf("pattern %q already exists for version %d in profile %q", pattern, mfv.ID, p.Name)
 			}
 			return fmt.Errorf("add skip-backup pattern: %w", err)
@@ -145,11 +143,4 @@ func init() {
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return completion.ProfileNames(cmd, toComplete)
 		})
-}
-
-func isUniqueConstraintError(err error) bool {
-	var se sqlite3.Error
-	return errors.As(err, &se) &&
-		se.Code == sqlite3.ErrConstraint &&
-		se.ExtendedCode == sqlite3.ErrConstraintUnique
 }

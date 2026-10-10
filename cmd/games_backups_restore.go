@@ -20,7 +20,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -30,6 +29,8 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/fsutil"
+	"github.com/mfinelli/modctl/internal/planner"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -56,7 +57,8 @@ running apply again will overwrite this path. Consider adding a write-once
 or skip-backup rule if you want to preserve this behavior permanently.
 
 If the file currently on disk differs from what modctl last installed (drift),
-the command warns and requires --force to proceed.`,
+the command warns and requires --force to proceed. The same goes for a file
+that can't be read to check it.`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -140,21 +142,35 @@ the command warns and requires --force to proceed.`,
 			Relpath:       relpath,
 		})
 		if err == nil {
-			// File is tool-owned - check for drift
-			if _, exists := diskStat(absPath); exists {
-				onDiskHash, hashErr := hashFile(absPath)
-				if hashErr == nil && onDiskHash != installedFile.ContentSha256 {
-					if !gamesBackupsRestoreForce {
-						return fmt.Errorf(
-							"file %q has been modified since modctl installed it (drift detected); pass --force to restore anyway",
-							relpath,
-						)
-					}
-					style.Println(style.Warning.Render(fmt.Sprintf(
-						"  warning: %q has been modified since modctl installed it, restoring backup anyway",
+			// File is tool-owned - check for drift (a file that is already
+			// gone has nothing to drift from)
+			drift, err := planner.CheckDrift(ctx, absPath, installedFile.ContentSha256)
+			if err != nil {
+				return fmt.Errorf("check %q for drift: %w", relpath, err)
+			}
+			switch drift.State {
+			case planner.DriftModified:
+				if !gamesBackupsRestoreForce {
+					return fmt.Errorf(
+						"file %q has been modified since modctl installed it (drift detected); pass --force to restore anyway",
 						relpath,
-					)))
+					)
 				}
+				style.Println(style.Warning.Render(fmt.Sprintf(
+					"  warning: %q has been modified since modctl installed it, restoring backup anyway",
+					relpath,
+				)))
+			case planner.DriftUnknown:
+				if !gamesBackupsRestoreForce {
+					return fmt.Errorf(
+						"could not check %q for drift: %w; pass --force to restore anyway",
+						relpath, drift.Err,
+					)
+				}
+				style.Println(style.Warning.Render(fmt.Sprintf(
+					"  warning: could not check %q for drift (%v), restoring backup anyway",
+					relpath, drift.Err,
+				)))
 			}
 		}
 
@@ -171,7 +187,7 @@ the command warns and requires --force to proceed.`,
 		if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
 			return fmt.Errorf("create parent directories: %w", err)
 		}
-		if err := copyFileSimple(blobPath, absPath); err != nil {
+		if err := fsutil.CopyFile(ctx, blobPath, absPath); err != nil {
 			return fmt.Errorf("restore backup: %w", err)
 		}
 
@@ -198,39 +214,4 @@ func init() {
 
 	gamesBackupsRestoreCmd.Flags().BoolVar(&gamesBackupsRestoreForce, "force", false,
 		"Restore even if the on-disk file has drifted from what modctl installed")
-}
-
-// copyFileSimple copies src to dst, creating or truncating dst.
-// TODO: we have a couple of other similar functions floating around we can
-//
-//	probably consolidate
-func copyFileSimple(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("open source: %w", err)
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return fmt.Errorf("create destination: %w", err)
-	}
-	defer out.Close()
-
-	if _, err := io.Copy(out, in); err != nil {
-		return fmt.Errorf("copy: %w", err)
-	}
-	return out.Sync()
-}
-
-// TODO copied from the internal/planner package, let's either export it from
-//
-//	there or copy it somewhere else and export it and use it in both
-//	places
-func diskStat(path string) (os.FileInfo, bool) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil, false
-	}
-	return info, true
 }

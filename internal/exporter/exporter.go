@@ -21,10 +21,9 @@ package exporter
 import (
 	"archive/tar"
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -32,8 +31,8 @@ import (
 	"time"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/fsutil"
 )
 
 const ExportFormatVersion = 1
@@ -117,33 +116,6 @@ type Manifest struct {
 	Game                *ManifestGame  `json:"game,omitempty"`
 }
 
-func currentSchemaVersion(ctx context.Context, db *sql.DB) (int64, error) {
-	p, err := internal.GooseProvider(db)
-	if err != nil {
-		return 0, fmt.Errorf("get goose provider: %w", err)
-	}
-	current, _, err := p.GetVersions(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("get schema version: %w", err)
-	}
-	return current, nil
-}
-
-// TODO: we already have two other copies of this export it somewhere...
-func hashFile(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
-}
-
 func writeManifest(tw *tar.Writer, m Manifest) error {
 	data, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
@@ -222,7 +194,7 @@ func writeBlobToTar(ctx context.Context, tw *tar.Writer, bs blobstore.Store, kin
 	}
 
 	buf := make([]byte, 1024*1024)
-	_, err = blobstore.CopyWithContext(ctx, tw, f, buf)
+	_, err = fsutil.CopyWithContext(ctx, tw, f, buf)
 	return false, err
 }
 
@@ -285,8 +257,6 @@ func verifyBlobs(
 	}
 
 	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
-	buf := make([]byte, 1024*1024)
-
 	report(VerifyStarted, 0)
 
 	for i, b := range blobs {
@@ -303,25 +273,19 @@ func verifyBlobs(
 			return fail(i+1, fmt.Errorf("derive path for %s: %w", b.sha256, err))
 		}
 
-		f, err := os.Open(path)
+		actual, err := fsutil.HashFile(ctx, path)
 		if err != nil {
-			if os.IsNotExist(err) {
+			// errors.Is and not os.IsNotExist, which doesn't see through the
+			// wrapping HashFile adds
+			if errors.Is(err, os.ErrNotExist) {
 				return fail(i+1, fmt.Errorf(
 					"blob %s is missing from disk; run 'doctor' to check blob integrity",
 					b.sha256,
 				))
 			}
-			return fail(i+1, fmt.Errorf("open blob %s: %w", b.sha256, err))
+			return fail(i+1, fmt.Errorf("hash blob %s: %w", b.sha256, err))
 		}
 
-		h := sha256.New()
-		_, cerr := blobstore.CopyWithContext(ctx, h, f, buf)
-		f.Close()
-		if cerr != nil {
-			return fail(i+1, fmt.Errorf("hash blob %s: %w", b.sha256, cerr))
-		}
-
-		actual := hex.EncodeToString(h.Sum(nil))
 		if actual != b.sha256 {
 			return fail(i+1, fmt.Errorf(
 				"blob integrity check failed: expected %s got %s - run 'doctor' to investigate",

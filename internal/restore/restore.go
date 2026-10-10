@@ -21,9 +21,7 @@ package restore
 import (
 	"archive/tar"
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -34,12 +32,12 @@ import (
 	"strings"
 
 	"github.com/klauspost/compress/zstd"
-	"github.com/mattn/go-sqlite3"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/archivescanner"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/exporter"
+	"github.com/mfinelli/modctl/internal/fsutil"
 )
 
 const supportedFormatVersion = 1
@@ -120,7 +118,7 @@ func OpenAndValidate(ctx context.Context, bundlePath string) (*Bundle, error) {
 
 	// Verify database integrity
 	dbPath := filepath.Join(tmpDir, exporter.DatabaseFilename)
-	dbSha, err := hashFile(dbPath)
+	dbSha, err := fsutil.HashFile(ctx, dbPath)
 	if err != nil {
 		os.RemoveAll(tmpDir)
 		return nil, fmt.Errorf("hash bundle database: %w", err)
@@ -134,7 +132,7 @@ func OpenAndValidate(ctx context.Context, bundlePath string) (*Bundle, error) {
 	// Verify nexus cache integrity if present in bundle
 	cachePath := filepath.Join(tmpDir, "nexus_cache.db")
 	if manifest.NexusCacheSha256 != "" {
-		cacheSha, err := hashFile(cachePath)
+		cacheSha, err := fsutil.HashFile(ctx, cachePath)
 		if err != nil {
 			os.RemoveAll(tmpDir)
 			return nil, fmt.Errorf("hash bundle nexus cache: %w", err)
@@ -159,64 +157,6 @@ func OpenAndValidate(ctx context.Context, bundlePath string) (*Bundle, error) {
 		BundleDir: tmpDir,
 		BundleDB:  bundleDB,
 	}, nil
-}
-
-// TODO: we also have this in the exporter
-func currentSchemaVersion(ctx context.Context, db *sql.DB) (int64, error) {
-	p, err := internal.GooseProvider(db)
-	if err != nil {
-		return 0, fmt.Errorf("get goose provider: %w", err)
-	}
-	current, _, err := p.GetVersions(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("get schema version: %w", err)
-	}
-	return current, nil
-}
-
-// TODO: we must have 4 copies of this now... just extract it already
-func hashFile(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
-}
-
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("open source: %w", err)
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return fmt.Errorf("create destination: %w", err)
-	}
-
-	success := false
-	defer func() {
-		out.Close()
-		if !success {
-			os.Remove(dst)
-		}
-	}()
-
-	if _, err := io.Copy(out, in); err != nil {
-		return fmt.Errorf("copy: %w", err)
-	}
-	if err := out.Sync(); err != nil {
-		return fmt.Errorf("fsync: %w", err)
-	}
-
-	success = true
-	return nil
 }
 
 func scanMissingInventories(
@@ -318,7 +258,7 @@ func extractBundle(ctx context.Context, bundlePath, destDir string) error {
 			if err != nil {
 				return fmt.Errorf("create %s: %w", destPath, err)
 			}
-			if _, err := blobstore.CopyWithContext(ctx, out, tr, buf); err != nil {
+			if _, err := fsutil.CopyWithContext(ctx, out, tr, buf); err != nil {
 				out.Close()
 				return fmt.Errorf("extract %s: %w", destPath, err)
 			}
@@ -363,7 +303,7 @@ func importBlobs(ctx context.Context, bundle *Bundle, bs blobstore.Store) (archi
 			}
 
 			// Verify blob integrity before ingesting
-			actualSha, err := hashFile(path)
+			actualSha, err := fsutil.HashFile(ctx, path)
 			if err != nil {
 				return fmt.Errorf("hash blob %s: %w", expectedSha, err)
 			}
@@ -395,11 +335,4 @@ func importBlobs(ctx context.Context, bundle *Bundle, bs blobstore.Store) (archi
 		}
 	}
 	return archiveCount, backupCount, overrideCount, nil
-}
-
-func isSQLiteUniqueConstraint(err error) bool {
-	var se sqlite3.Error
-	return errors.As(err, &se) &&
-		se.Code == sqlite3.ErrConstraint &&
-		se.ExtendedCode == sqlite3.ErrConstraintUnique
 }

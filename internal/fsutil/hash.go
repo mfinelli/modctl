@@ -16,19 +16,26 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package planner
+package fsutil
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"os"
 )
 
-// hashFile computes the sha256 digest of the file at path and returns it as
-// a lowercase hex string.
-func hashFile(path string) (string, error) {
+// HashFile computes the sha256 digest of the file at path and returns it as
+// a lowercase hex string. It stops early if ctx is canceled, which matters
+// when hashing very large files (such as archives) in a command that has to
+// stay interruptible.
+//
+// HashFile is safe to call from several goroutines at once: every call reads
+// through a buffer of its own, sized to the file, and shares no state with any
+// other call. Please keep it that way (for instance, don't cache a buffer
+// between calls to save allocations).
+func HashFile(ctx context.Context, path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", fmt.Errorf("open file for hashing: %w", err)
@@ -36,7 +43,8 @@ func hashFile(path string) (string, error) {
 	defer f.Close()
 
 	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
+	buf := make([]byte, bufferSizeOf(f))
+	if _, err := CopyWithContext(ctx, h, f, buf); err != nil {
 		return "", fmt.Errorf("hash file contents: %w", err)
 	}
 

@@ -25,10 +25,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/mfinelli/modctl/dbq"
+	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/remap"
 )
 
@@ -384,7 +384,10 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 		op.WriteOnce = isWriteOnce
 
 		existingInstall, isInstalled := installed[pf.DestPath]
-		_, existsOnDisk := diskStat(absPath)
+		existsOnDisk, err := fsutil.Exists(absPath)
+		if err != nil {
+			return Plan{}, fmt.Errorf("stat %q: %w", pf.DestPath, err)
+		}
 
 		switch {
 		case isInstalled && existsOnDisk:
@@ -393,10 +396,12 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 				op.Kind = PlanOpOverwrite
 			} else if hasOverride && !skipRecheck {
 				// Full-file override noop check
-				onDiskHash, err := hashFile(absPath)
+				onDiskHash, warning, err := recheckHash(ctx, absPath, pf.DestPath)
 				if err != nil {
-					plan.Warnings = append(plan.Warnings,
-						fmt.Sprintf("recheck: could not hash %q: %v", pf.DestPath, err))
+					return Plan{}, err
+				}
+				if warning != "" {
+					plan.Warnings = append(plan.Warnings, warning)
 					// Fall through to plain overwrite if we can't hash
 					op.Kind = PlanOpOverwrite
 				} else if onDiskHash == existingInstall.ContentSha256 &&
@@ -416,10 +421,12 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 				// act on it.
 				op.Kind = PlanOpNoop
 				if !skipRecheck {
-					onDiskHash, err := hashFile(absPath)
+					onDiskHash, warning, err := recheckHash(ctx, absPath, pf.DestPath)
 					if err != nil {
-						plan.Warnings = append(plan.Warnings,
-							fmt.Sprintf("recheck: could not hash %q: %v", pf.DestPath, err))
+						return Plan{}, err
+					}
+					if warning != "" {
+						plan.Warnings = append(plan.Warnings, warning)
 					} else if onDiskHash != existingInstall.ContentSha256 {
 						plan.Warnings = append(plan.Warnings,
 							fmt.Sprintf("write-once: %q has been modified since last deploy (write-once rule active, leaving as-is)",
@@ -428,10 +435,12 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 				}
 			} else if !skipRecheck {
 				// Normal mod-owned file recheck
-				onDiskHash, err := hashFile(absPath)
+				onDiskHash, warning, err := recheckHash(ctx, absPath, pf.DestPath)
 				if err != nil {
-					plan.Warnings = append(plan.Warnings,
-						fmt.Sprintf("recheck: could not hash %q: %v", pf.DestPath, err))
+					return Plan{}, err
+				}
+				if warning != "" {
+					plan.Warnings = append(plan.Warnings, warning)
 					op.Kind = PlanOpOverwrite
 				} else if onDiskHash == existingInstall.ContentSha256 &&
 					existingInstall.OwnerModFileVersionID.Int64 == pf.Winner().ModFileVersionID {
@@ -505,7 +514,10 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 		// a path not in winners means no enabled mod provides it anymore.
 		// So we always remove or restore.
 		absPath := filepath.Join(target.RootPath, relpath)
-		_, existsOnDisk := diskStat(absPath)
+		existsOnDisk, err := fsutil.Exists(absPath)
+		if err != nil {
+			return Plan{}, fmt.Errorf("stat %q: %w", relpath, err)
+		}
 
 		if !existsOnDisk {
 			// Already gone: just clean up the DB record, no disk op needed
@@ -567,7 +579,10 @@ func BuildUnapplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID int64, 
 
 	for _, f := range installedFiles {
 		absPath := filepath.Join(target.RootPath, f.Relpath)
-		_, existsOnDisk := diskStat(absPath)
+		existsOnDisk, err := fsutil.Exists(absPath)
+		if err != nil {
+			return Plan{}, fmt.Errorf("stat %q: %w", f.Relpath, err)
+		}
 
 		if !existsOnDisk {
 			// Already gone - emit remove to clean up DB record, add warning.
@@ -602,16 +617,6 @@ func BuildUnapplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID int64, 
 	return plan, nil
 }
 
-// diskStat checks whether a path exists on disk.
-// Returns (info, true) if it exists, (nil, false) if it does not.
-func diskStat(path string) (os.FileInfo, bool) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil, false
-	}
-	return info, true
-}
-
 // matchesAny reports whether path matches any of the given glob patterns.
 // Malformed patterns are silently skipped.
 func matchesAny(patterns []string, path string) bool {
@@ -625,4 +630,23 @@ func matchesAny(patterns []string, path string) bool {
 		}
 	}
 	return false
+}
+
+// recheckHash hashes the file at absPath so that it can be compared with what
+// was recorded when it was installed. Not being able to hash the file is
+// normally only worth a warning (the caller then plans as if the file had
+// changed), so that comes back as a warning and not as an error. The exception
+// is being told to stop: nothing planned after that could be trusted, since it
+// would be built on files that were never hashed, so the plan is abandoned.
+func recheckHash(ctx context.Context, absPath, destPath string) (sha, warning string, err error) {
+	sha, err = fsutil.HashFile(ctx, absPath)
+	if err == nil {
+		return sha, "", nil
+	}
+	if ctx.Err() != nil {
+		// report that we were told to stop, not whatever the hash ran into
+		return "", "", fmt.Errorf("recheck %q: %w", destPath, ctx.Err())
+	}
+
+	return "", fmt.Sprintf("recheck: could not hash %q: %v", destPath, err), nil
 }

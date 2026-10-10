@@ -589,6 +589,11 @@ When a pre-existing non-tool-owned file would be overwritten, it is backed
 up to the backup blob store before being replaced. Backups are restored
 automatically during unapply or when no mod claims the path.
 
+A path that can't be examined for any reason other than not being there (for
+example because a parent directory can't be searched) is an error, and is not
+taken to be missing: planning stops instead of going on to overwrite or remove
+a file whose state is unknown.
+
 Apply detects four filesystem states for each planned path:
 
 1. Tool-owned and present on disk -> overwrite, no backup needed
@@ -766,7 +771,10 @@ state permanently.
 
 Restore requires `--force` if the on-disk file has drifted from what modctl
 last installed, since this indicates an external modification that the user
-should be aware of before overwriting.
+should be aware of before overwriting. The same applies when the on-disk file
+can't be read to make that check (for example because of its permissions):
+modctl can't tell whether it has drifted, so it asks for `--force` instead of
+skipping the check.
 
 No operation record is created for out-of-band restores. The next apply will
 surface the path as drifted, providing an implicit audit trail.

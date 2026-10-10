@@ -28,6 +28,8 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+
+	"github.com/mfinelli/modctl/internal/fsutil"
 )
 
 type Kind string
@@ -114,7 +116,7 @@ func (s Store) IngestFile(ctx context.Context, kind Kind, srcPath string) (Inges
 	w := io.MultiWriter(tmp, h)
 
 	buf := make([]byte, 1024*1024) // 1MiB buffer; fine for big archives
-	n, err := CopyWithContext(ctx, w, src, buf)
+	n, err := fsutil.CopyWithContext(ctx, w, src, buf)
 	if err != nil {
 		return res, fmt.Errorf("copy: %w", err)
 	}
@@ -156,7 +158,7 @@ func (s Store) IngestFile(ctx context.Context, kind Kind, srcPath string) (Inges
 	}
 
 	// Move into place.
-	if err := replaceFile(tmpName, finalPath); err != nil {
+	if err := replaceFile(ctx, tmpName, finalPath); err != nil {
 		// If we raced and it appeared, treat as dedupe.
 		if st, statErr := os.Stat(finalPath); statErr == nil {
 			if st.Size() != n {
@@ -174,62 +176,6 @@ func (s Store) IngestFile(ctx context.Context, kind Kind, srcPath string) (Inges
 	_ = fsyncDir(finalDir)
 
 	return IngestResult{SHA256Hex: shaHex, SizeBytes: n, Existed: false}, nil
-}
-
-// CopyWithContext copies bytes from src to dst using the provided buffer,
-// periodically checking ctx for cancellation.
-//
-// It behaves similarly to io.CopyBuffer, but allows the caller to cancel
-// long-running copy operations (e.g., very large archives) via context.
-//
-// The function:
-//   - Reads into the provided reusable buffer (no allocations inside the loop)
-//   - Writes each chunk fully before proceeding
-//   - Returns the total number of bytes successfully written
-//   - Stops early if ctx is canceled
-//
-// This is useful when ingesting large blobs where we want the CLI to remain
-// interruptible (Ctrl+C, timeouts, etc.) without relying on OS-level signals
-// to interrupt a blocking read.
-func CopyWithContext(ctx context.Context, dst io.Writer, src io.Reader, buf []byte) (int64, error) {
-	var total int64
-
-	for {
-		// Allow cancellation between read iterations.
-		// We intentionally check before reading to avoid unnecessary work.
-		select {
-		case <-ctx.Done():
-			return total, ctx.Err()
-		default:
-		}
-
-		// Read up to len(buf) bytes.
-		nr, er := src.Read(buf)
-		if nr > 0 {
-			// Write exactly what was read.
-			nw, ew := dst.Write(buf[:nr])
-			if nw > 0 {
-				total += int64(nw)
-			}
-			if ew != nil {
-				return total, ew
-			}
-			// Defensive check: partial writes should not happen for
-			// well-behaved writers; treat as error.
-			if nw != nr {
-				return total, io.ErrShortWrite
-			}
-		}
-
-		// Handle read result
-		if er != nil {
-			if errors.Is(er, io.EOF) {
-				// Normal termination
-				return total, nil
-			}
-			return total, er
-		}
-	}
 }
 
 // fsyncDir calls fsync(2) on a directory to ensure that metadata changes
@@ -261,8 +207,9 @@ func fsyncDir(dir string) error {
 }
 
 // replaceFile atomically moves src to dst using rename. If src and dst are on
-// different filesystems (EXDEV), it falls back to a copy-then-delete.
-func replaceFile(src, dst string) error {
+// different filesystems (EXDEV), it falls back to an atomic copy (so a partly
+// copied blob never shows up under its final name) and then deletes src.
+func replaceFile(ctx context.Context, src, dst string) error {
 	err := os.Rename(src, dst)
 	if err == nil {
 		return nil
@@ -271,7 +218,7 @@ func replaceFile(src, dst string) error {
 		return err
 	}
 	// Cross-device fallback: copy then remove src.
-	if err := copyFile(src, dst); err != nil {
+	if err := fsutil.CopyFile(ctx, src, dst); err != nil {
 		return err
 	}
 	return os.Remove(src)
@@ -283,24 +230,4 @@ func isExdev(err error) bool {
 		return errors.Is(linkErr.Err, syscall.EXDEV)
 	}
 	return false
-}
-
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("open src: %w", err)
-	}
-	defer in.Close()
-
-	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
-	if err != nil {
-		return fmt.Errorf("create dst: %w", err)
-	}
-	defer out.Close()
-
-	if _, err := io.Copy(out, in); err != nil {
-		os.Remove(dst) // best-effort cleanup
-		return fmt.Errorf("copy: %w", err)
-	}
-	return out.Sync()
 }

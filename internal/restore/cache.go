@@ -26,6 +26,7 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/exporter"
+	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/nexusclient/dbc"
 )
@@ -33,7 +34,7 @@ import (
 // importFullCache copies the nexus cache database from the bundle into place,
 // initializing it if it does not already exist.
 func importFullCache(ctx context.Context, bundleCachePath, destCachePath string) error {
-	if err := copyFile(bundleCachePath, destCachePath); err != nil {
+	if err := fsutil.CopyFile(ctx, bundleCachePath, destCachePath); err != nil {
 		return fmt.Errorf("copy nexus cache: %w", err)
 	}
 

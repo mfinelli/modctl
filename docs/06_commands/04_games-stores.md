@@ -258,8 +258,8 @@ again will overwrite this path. If you want the restored file to be
 preserved across future applies, add a write-once or skip-backup rule for
 this path.
 
-If the on-disk file has drifted from what modctl last installed, `--force`
-is required to proceed.
+If the on-disk file has drifted from what modctl last installed, or can't be
+read to check, `--force` is required to proceed.
 
 | Flag              | Description                                                             |
 |-------------------|-------------------------------------------------------------------------|

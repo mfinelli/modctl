@@ -20,9 +20,7 @@ package cmd
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -35,6 +33,7 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -628,7 +627,6 @@ func rehashBlobs(
 	}
 
 	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
-	buf := make([]byte, 1024*1024) // 1MiB
 
 	var hashed int
 	var skippedMissing int
@@ -671,21 +669,12 @@ func rehashBlobs(
 			)
 		}
 
-		f, err := os.Open(path)
+		sumHex, err := fsutil.HashFile(ctx, path)
 		if err != nil {
 			style.Print("\n")
-			return fmt.Errorf("open blob kind=%s sha=%s path=%s: %w", kind, b.Sha256, path, err)
+			return fmt.Errorf("hash blob kind=%s sha=%s path=%s: %w", kind, b.Sha256, path, err)
 		}
 
-		h := sha256.New()
-		_, cerr := blobstore.CopyWithContext(ctx, h, f, buf)
-		_ = f.Close()
-		if cerr != nil {
-			style.Print("\n")
-			return fmt.Errorf("hash blob kind=%s sha=%s path=%s: %w", kind, b.Sha256, path, cerr)
-		}
-
-		sumHex := hex.EncodeToString(h.Sum(nil))
 		if sumHex != b.Sha256 {
 			style.Print("\n")
 			return fmt.Errorf(
@@ -746,8 +735,6 @@ func checkInstalledFiles(ctx context.Context) error {
 		style.Println()
 		return nil
 	}
-
-	buf := make([]byte, 1024*1024)
 
 	for _, gi := range installs {
 		label := fmt.Sprintf("%s (%s:%s)", gi.DisplayName, gi.StoreID, gi.StoreGameID)
@@ -832,19 +819,11 @@ func checkInstalledFiles(ctx context.Context) error {
 				continue
 			}
 
-			file, err := os.Open(fullPath)
+			actual, err := fsutil.HashFile(ctx, fullPath)
 			if err != nil {
-				return fmt.Errorf("open %s: %w", fullPath, err)
+				return fmt.Errorf("hash %s: %w", fullPath, err)
 			}
 
-			h := sha256.New()
-			_, cerr := blobstore.CopyWithContext(ctx, h, file, buf)
-			_ = file.Close()
-			if cerr != nil {
-				return fmt.Errorf("hash %s: %w", fullPath, cerr)
-			}
-
-			actual := hex.EncodeToString(h.Sum(nil))
 			if actual != f.ContentSha256 {
 				mismatched++
 				style.Println(style.Warning.Render(fmt.Sprintf(

@@ -20,9 +20,7 @@ package cmd
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -31,6 +29,7 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/restore"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -99,20 +98,19 @@ Exits non-zero if any integrity issues are found. Version warnings
 			)))
 		}
 
-		// get current schema version for comparison
-		// TODO: i'm not actually doing this yet... I'm not sure that
-		//       i want to require a databse to verify a bundle
-		// var currentSchema int64
-		// if db, err := internal.SetupDB(); err == nil {
-		// 	currentSchema, _ = restore.CurrentSchemaVersion(ctx, db)
-		// 	db.Close()
-		// }
-		// if currentSchema > 0 && bundle.Manifest.SchemaVersion > currentSchema {
-		// 	fmt.Println(warnStyle.Render(fmt.Sprintf(
-		// 		"  ⚠ bundle schema version %d is newer than current %d - upgrade modctl before importing",
-		// 		bundle.Manifest.SchemaVersion, currentSchema,
-		// 	)))
-		// }
+		// The bundle's schema has to be one that this version of modctl knows
+		// about. We compare against the migrations built into the binary and
+		// not against the database on disk: that one is a stand-in for the
+		// same thing (every command migrates it), but it may not exist yet, or
+		// may not have been migrated since an upgrade. An older schema is not
+		// worth a warning since import migrates it.
+		if latest, err := internal.LatestSchemaVersion(); err == nil &&
+			bundle.Manifest.SchemaVersion > latest {
+			style.Println(style.Warning.Render(fmt.Sprintf(
+				"  ⚠ bundle schema version %d is newer than the latest this version of modctl supports (%d) - upgrade modctl before importing",
+				bundle.Manifest.SchemaVersion, latest,
+			)))
+		}
 
 		// collect all integrity issues
 		var issues []string
@@ -269,7 +267,6 @@ func checkBundleBlobs(ctx context.Context, bundle *restore.Bundle, bq *dbq.Queri
 	}
 
 	fileBlobs := make(map[string]struct{})
-	buf := make([]byte, 1024*1024)
 	total := len(dbBlobs)
 	checked := 0
 
@@ -309,19 +306,11 @@ func checkBundleBlobs(ctx context.Context, bundle *restore.Bundle, bq *dbq.Queri
 			}
 
 			// hash and verify
-			f, err := os.Open(path)
+			actual, err := fsutil.HashFile(ctx, path)
 			if err != nil {
-				issues = append(issues, fmt.Sprintf("open blob %s: %s", style.ShortSha(name), err))
+				issues = append(issues, fmt.Sprintf("hash blob %s: %s", style.ShortSha(name), err))
 				return nil
 			}
-			h := sha256.New()
-			_, cerr := blobstore.CopyWithContext(ctx, h, f, buf)
-			f.Close()
-			if cerr != nil {
-				issues = append(issues, fmt.Sprintf("hash blob %s: %s", style.ShortSha(name), cerr))
-				return nil
-			}
-			actual := hex.EncodeToString(h.Sum(nil))
 			if actual != name {
 				issues = append(issues, fmt.Sprintf(
 					"hash mismatch: filename=%s actual=%s", name, actual,

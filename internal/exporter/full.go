@@ -30,6 +30,7 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/fsutil"
 )
 
 // Full performs a full export of the entire modctl state.
@@ -108,7 +109,7 @@ func Full(
 	}
 
 	// 2. Get schema version
-	schemaVersion, err := currentSchemaVersion(ctx, db)
+	schemaVersion, err := internal.CurrentSchemaVersion(ctx, db)
 	if err != nil {
 		return Result{}, fmt.Errorf("get schema version: %w", err)
 	}
@@ -222,7 +223,7 @@ func snapshotDB(ctx context.Context, db *sql.DB) (path string, sha256hex string,
 		return "", "", fmt.Errorf("vacuum into: %w", err)
 	}
 
-	sha, err := hashFile(tmpPath)
+	sha, err := fsutil.HashFile(ctx, tmpPath)
 	if err != nil {
 		os.Remove(tmpPath)
 		return "", "", fmt.Errorf("hash snapshot: %w", err)
@@ -258,7 +259,7 @@ func snapshotCacheDB(ctx context.Context, cacheDBPath string) (path string, sha2
 		return "", "", fmt.Errorf("vacuum cache db: %w", err)
 	}
 
-	sha, err := hashFile(tmpPath)
+	sha, err := fsutil.HashFile(ctx, tmpPath)
 	if err != nil {
 		os.Remove(tmpPath)
 		return "", "", fmt.Errorf("hash cache snapshot: %w", err)

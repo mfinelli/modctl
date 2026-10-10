@@ -30,6 +30,18 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 - Import, `verify` and `extract` now work with bundles exported by older
   versions: the bundle's database is migrated to the current schema in a
   temporary copy before it is read.
+- `verify` now warns when a bundle's database schema is newer than this
+  version of modctl supports, instead of only comparing modctl versions.
+- `games backups restore` now requires `--force` when the file on disk can't
+  be read to check it for drift, instead of silently skipping the check.
+- `apply`, `unapply`, `profiles preview` and `games backups diff` now stop
+  with an error when a file can't be examined (for example because of its
+  permissions), instead of treating it as missing.
+- Fix files restored from backups by `apply` and `unapply` being written with
+  mode `0600`; they now get `0644`.
+- `extract`, `import` and `games backups restore` now write their files
+  atomically: a failure or Ctrl-C no longer leaves a partly written file
+  behind, and an existing file is only replaced once the copy is complete.
 
 ## v0.7.1 - 2026-10-03
 
