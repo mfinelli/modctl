@@ -41,7 +41,7 @@ var gamesListCmd = &cobra.Command{
 By default, only the active store is included. Use --store to filter by a
 specific store. Or use --all to include games from all stores.
 
-(TODO) The active game install (if any) is highlighted.`,
+The active game install (if any) is marked with an asterisk (*).`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -63,6 +63,13 @@ specific store. Or use --all to include games from all stores.
 			return fmt.Errorf("error migrating database: %w", err)
 		}
 
+		// the active selection is what is marked in the list (and, without
+		// --all or --store, what decides which store to list)
+		active, err := state.LoadActive()
+		if err != nil {
+			return fmt.Errorf("load active selection: %w", err)
+		}
+
 		q := dbq.New(db)
 		var games []dbq.GameInstall
 
@@ -71,13 +78,8 @@ specific store. Or use --all to include games from all stores.
 		} else if gamesListStore != "" {
 			games, err = q.ListGameInstallsByStore(ctx, gamesListStore)
 		} else {
-			a, aerr := state.LoadActive()
-			if aerr != nil {
-				return fmt.Errorf("error getting active store: %w", err)
-			}
-
-			if a.ActiveStoreID != "" {
-				games, err = q.ListGameInstallsByStore(ctx, a.ActiveStoreID)
+			if active.ActiveStoreID != "" {
+				games, err = q.ListGameInstallsByStore(ctx, active.ActiveStoreID)
 			} else {
 				// we default to steam for now since it's the only
 				// store that we support (TODO when we add more stores)
@@ -100,7 +102,13 @@ specific store. Or use --all to include games from all stores.
 				lastSeen = game.LastSeenAt.String
 			}
 
+			mark := "   "
+			if game.ID == active.ActiveGameInstallID {
+				mark = " " + style.Active.Render("*") + " "
+			}
+
 			rows = append(rows, []string{
+				mark,
 				fmt.Sprintf(" %d ", game.ID),
 				fmt.Sprintf(" %s ", internal.FullSelector(game.StoreID, game.StoreGameID, game.InstanceID)),
 				fmt.Sprintf(" %s ", game.DisplayName),
@@ -110,7 +118,7 @@ specific store. Or use --all to include games from all stores.
 			})
 		}
 
-		style.Println(style.Table([]string{" ID ", " Selector ", " Name ", " Path ", " Present ", " Last Seen "}, rows))
+		style.Println(style.Table([]string{"   ", " ID ", " Selector ", " Name ", " Path ", " Present ", " Last Seen "}, rows))
 
 		return nil
 	},
