@@ -215,15 +215,3 @@ func init() {
 	gamesBackupsRestoreCmd.Flags().BoolVar(&gamesBackupsRestoreForce, "force", false,
 		"Restore even if the on-disk file has drifted from what modctl installed")
 }
-
-// TODO copied from the internal/planner package, let's either export it from
-//
-//	there or copy it somewhere else and export it and use it in both
-//	places
-func diskStat(path string) (os.FileInfo, bool) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil, false
-	}
-	return info, true
-}

@@ -30,6 +30,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/pmezard/go-difflib/difflib"
@@ -147,7 +148,11 @@ is passed.`,
 		var onDiskData []byte
 		var missingFromDisk bool
 
-		if _, exists := diskStat(absPath); exists {
+		exists, err := fsutil.Exists(absPath)
+		if err != nil {
+			return fmt.Errorf("stat on-disk file: %w", err)
+		}
+		if exists {
 			onDiskData, err = os.ReadFile(absPath)
 			if err != nil {
 				return fmt.Errorf("read on-disk file: %w", err)

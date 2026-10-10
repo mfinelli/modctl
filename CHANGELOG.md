@@ -34,6 +34,9 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
   version of modctl supports, instead of only comparing modctl versions.
 - `games backups restore` now requires `--force` when the file on disk can't
   be read to check it for drift, instead of silently skipping the check.
+- `apply`, `unapply`, `profiles preview` and `games backups diff` now stop
+  with an error when a file can't be examined (for example because of its
+  permissions), instead of treating it as missing.
 - Fix files restored from backups by `apply` and `unapply` being written with
   mode `0600`; they now get `0644`.
 - `extract`, `import` and `games backups restore` now write their files

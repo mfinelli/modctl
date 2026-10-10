@@ -589,6 +589,11 @@ When a pre-existing non-tool-owned file would be overwritten, it is backed
 up to the backup blob store before being replaced. Backups are restored
 automatically during unapply or when no mod claims the path.
 
+A path that can't be examined for any reason other than not being there (for
+example because a parent directory can't be searched) is an error, and is not
+taken to be missing: planning stops instead of going on to overwrite or remove
+a file whose state is unknown.
+
 Apply detects four filesystem states for each planned path:
 
 1. Tool-owned and present on disk -> overwrite, no backup needed

@@ -32,6 +32,7 @@ import (
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/extractor"
+	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/planner"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
@@ -178,7 +179,11 @@ Binary files are detected automatically and refused unless --force is passed.`,
 
 		absPath := filepath.Join(target.RootPath, relpath)
 		var onDiskData []byte
-		if _, exists := diskStat(absPath); exists {
+		exists, err := fsutil.Exists(absPath)
+		if err != nil {
+			return fmt.Errorf("stat on-disk file: %w", err)
+		}
+		if exists {
 			onDiskData, err = os.ReadFile(absPath)
 			if err != nil {
 				return fmt.Errorf("read on-disk file: %w", err)

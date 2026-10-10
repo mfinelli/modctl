@@ -25,7 +25,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/mfinelli/modctl/dbq"
@@ -385,7 +384,10 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 		op.WriteOnce = isWriteOnce
 
 		existingInstall, isInstalled := installed[pf.DestPath]
-		_, existsOnDisk := diskStat(absPath)
+		existsOnDisk, err := fsutil.Exists(absPath)
+		if err != nil {
+			return Plan{}, fmt.Errorf("stat %q: %w", pf.DestPath, err)
+		}
 
 		switch {
 		case isInstalled && existsOnDisk:
@@ -512,7 +514,10 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 		// a path not in winners means no enabled mod provides it anymore.
 		// So we always remove or restore.
 		absPath := filepath.Join(target.RootPath, relpath)
-		_, existsOnDisk := diskStat(absPath)
+		existsOnDisk, err := fsutil.Exists(absPath)
+		if err != nil {
+			return Plan{}, fmt.Errorf("stat %q: %w", relpath, err)
+		}
 
 		if !existsOnDisk {
 			// Already gone: just clean up the DB record, no disk op needed
@@ -574,7 +579,10 @@ func BuildUnapplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID int64, 
 
 	for _, f := range installedFiles {
 		absPath := filepath.Join(target.RootPath, f.Relpath)
-		_, existsOnDisk := diskStat(absPath)
+		existsOnDisk, err := fsutil.Exists(absPath)
+		if err != nil {
+			return Plan{}, fmt.Errorf("stat %q: %w", f.Relpath, err)
+		}
 
 		if !existsOnDisk {
 			// Already gone - emit remove to clean up DB record, add warning.
@@ -607,16 +615,6 @@ func BuildUnapplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID int64, 
 	}
 
 	return plan, nil
-}
-
-// diskStat checks whether a path exists on disk.
-// Returns (info, true) if it exists, (nil, false) if it does not.
-func diskStat(path string) (os.FileInfo, bool) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil, false
-	}
-	return info, true
 }
 
 // matchesAny reports whether path matches any of the given glob patterns.
