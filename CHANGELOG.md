@@ -5,7 +5,16 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 
 `modctl` adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## unreleased
+## v0.8.0 - 2026-10-10
+
+This is another pre-release that adds a few new features. It's also a very
+large release with a lot of internal refactoring to increase code quality,
+increase test coverage, and resolve lingering tasks.
+
+**BREAKING CHANGE**: if you have more than one steam library you could be
+affected by the last item in the changes list below, please read it carefully.
+If you only have a single, default steam library then you are **NOT**
+affected.
 
 ### Changes
 
