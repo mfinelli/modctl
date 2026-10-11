@@ -77,28 +77,29 @@ Use --multiple to assign priorities as N, 2N, 3N, ... (for example, --multiple
 			return err
 		}
 
-		tx, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("error starting transaction: %w", err)
-		}
-		defer tx.Rollback()
-		qtx := q.WithTx(tx)
+		empty := false
+		err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+			items, err := qtx.ListProfileItemsForOrder(ctx, p.ID)
+			if err != nil {
+				return fmt.Errorf("list profile items: %w", err)
+			}
+			if len(items) == 0 {
+				empty = true
+				return nil
+			}
 
-		items, err := qtx.ListProfileItemsForOrder(ctx, p.ID)
-		if err != nil {
-			return fmt.Errorf("list profile items: %w", err)
-		}
-		if len(items) == 0 {
-			style.Printf("Profile %q has no items\n", p.Name)
+			if err := internal.RewriteProfilePriorities(ctx, qtx, p.ID, items, 1, step); err != nil {
+				return err
+			}
+
 			return nil
-		}
-
-		if err := internal.RewriteProfilePriorities(ctx, qtx, p.ID, items, 1, step); err != nil {
+		})
+		if err != nil {
 			return err
 		}
-
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit: %w", err)
+		if empty {
+			style.Printf("Profile %q has no items\n", p.Name)
+			return nil
 		}
 
 		if profilesOrderCompactMultiple > 0 {

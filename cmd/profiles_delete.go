@@ -122,19 +122,15 @@ Safety checks:
 			)
 		}
 
-		tx, err := db.BeginTx(ctx, nil)
+		err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+			if err := qtx.DeleteProfileByID(ctx, p.ID); err != nil {
+				return fmt.Errorf("delete profile: %w", err)
+			}
+
+			return nil
+		})
 		if err != nil {
-			return fmt.Errorf("error starting transaction: %w", err)
-		}
-		defer tx.Rollback()
-		qtx := q.WithTx(tx)
-
-		if err := qtx.DeleteProfileByID(ctx, p.ID); err != nil {
-			return fmt.Errorf("delete profile: %w", err)
-		}
-
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit: %w", err)
+			return err
 		}
 
 		style.Printf("Deleted profile %q\n", p.Name)

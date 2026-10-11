@@ -189,52 +189,48 @@ removing the node entirely.`,
 			unsetPatchType = overrideType[:len(overrideType)-len("_patch")] + "_unset"
 		}
 
-		tx, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("begin transaction: %w", err)
-		}
-		defer tx.Rollback()
-		qtx := q.WithTx(tx)
-
-		existingEntry, entryErr := qtx.GetOverridePatchEntryByKey(ctx, dbq.GetOverridePatchEntryByKeyParams{
-			OverrideID:   overrideID,
-			EntryKey:     entryKey,
-			EntrySection: entrySection,
-		})
-
-		if entryErr != nil {
-			// no existing entry: append new unset entry
-			maxPos, err := qtx.GetMaxOverridePatchPosition(ctx, overrideID)
-			if err != nil {
-				return fmt.Errorf("get max position: %w", err)
-			}
-			if _, err := qtx.InsertOverridePatchEntry(ctx, dbq.InsertOverridePatchEntryParams{
+		err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+			existingEntry, entryErr := qtx.GetOverridePatchEntryByKey(ctx, dbq.GetOverridePatchEntryByKeyParams{
 				OverrideID:   overrideID,
-				Position:     maxPos + 1,
-				PatchType:    unsetPatchType,
-				EntrySection: entrySection,
 				EntryKey:     entryKey,
-				EntryValue:   sql.NullString{},
-			}); err != nil {
-				return fmt.Errorf("insert unset patch entry: %w", err)
-			}
-			style.Printf("marked key %q for removal in override for %q in profile %q\n",
-				entryKey, relpath, p.Name)
-		} else {
-			// existing entry: update type to unset and clear value
-			if err := qtx.UpdateOverridePatchEntryTypeAndValue(ctx, dbq.UpdateOverridePatchEntryTypeAndValueParams{
-				PatchType:  unsetPatchType,
-				EntryValue: sql.NullString{},
-				ID:         existingEntry.ID,
-			}); err != nil {
-				return fmt.Errorf("update patch entry: %w", err)
-			}
-			style.Printf("converted patch entry %q to unset in override for %q in profile %q\n",
-				entryKey, relpath, p.Name)
-		}
+				EntrySection: entrySection,
+			})
 
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit: %w", err)
+			if entryErr != nil {
+				// no existing entry: append new unset entry
+				maxPos, err := qtx.GetMaxOverridePatchPosition(ctx, overrideID)
+				if err != nil {
+					return fmt.Errorf("get max position: %w", err)
+				}
+				if _, err := qtx.InsertOverridePatchEntry(ctx, dbq.InsertOverridePatchEntryParams{
+					OverrideID:   overrideID,
+					Position:     maxPos + 1,
+					PatchType:    unsetPatchType,
+					EntrySection: entrySection,
+					EntryKey:     entryKey,
+					EntryValue:   sql.NullString{},
+				}); err != nil {
+					return fmt.Errorf("insert unset patch entry: %w", err)
+				}
+				style.Printf("marked key %q for removal in override for %q in profile %q\n",
+					entryKey, relpath, p.Name)
+			} else {
+				// existing entry: update type to unset and clear value
+				if err := qtx.UpdateOverridePatchEntryTypeAndValue(ctx, dbq.UpdateOverridePatchEntryTypeAndValueParams{
+					PatchType:  unsetPatchType,
+					EntryValue: sql.NullString{},
+					ID:         existingEntry.ID,
+				}); err != nil {
+					return fmt.Errorf("update patch entry: %w", err)
+				}
+				style.Printf("converted patch entry %q to unset in override for %q in profile %q\n",
+					entryKey, relpath, p.Name)
+			}
+
+			return nil
+		})
+		if err != nil {
+			return err
 		}
 
 		return nil

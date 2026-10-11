@@ -254,40 +254,36 @@ archives.`,
 		}
 
 		originalName := filepath.Base(relpath)
-		tx, err := db.BeginTx(ctx, nil)
+		err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+			if err := blobstore.EnsureBlobRecorded(
+				ctx,
+				qtx,
+				ingestResult.SHA256Hex,
+				string(blobstore.KindOverride),
+				ingestResult.SizeBytes,
+				&originalName,
+			); err != nil {
+				return fmt.Errorf("record override blob: %w", err)
+			}
+
+			if _, err = qtx.UpsertOverride(ctx, dbq.UpsertOverrideParams{
+				ProfileID:           p.ID,
+				TargetID:            target.ID,
+				Relpath:             relpath,
+				BlobSha256:          sql.NullString{String: ingestResult.SHA256Hex, Valid: true},
+				OverrideType:        "full_file",
+				SourceArchiveSha256: srcArchiveSha256,
+				SourceRawPath:       srcRawPath,
+				SourceContentSha256: srcContentSha256,
+				Notes:               sql.NullString{},
+			}); err != nil {
+				return fmt.Errorf("upsert override: %w", err)
+			}
+
+			return nil
+		})
 		if err != nil {
-			return fmt.Errorf("begin transaction: %w", err)
-		}
-		defer tx.Rollback()
-		qtx := q.WithTx(tx)
-
-		if err := blobstore.EnsureBlobRecorded(
-			ctx,
-			qtx,
-			ingestResult.SHA256Hex,
-			string(blobstore.KindOverride),
-			ingestResult.SizeBytes,
-			&originalName,
-		); err != nil {
-			return fmt.Errorf("record override blob: %w", err)
-		}
-
-		if _, err = qtx.UpsertOverride(ctx, dbq.UpsertOverrideParams{
-			ProfileID:           p.ID,
-			TargetID:            target.ID,
-			Relpath:             relpath,
-			BlobSha256:          sql.NullString{String: ingestResult.SHA256Hex, Valid: true},
-			OverrideType:        "full_file",
-			SourceArchiveSha256: srcArchiveSha256,
-			SourceRawPath:       srcRawPath,
-			SourceContentSha256: srcContentSha256,
-			Notes:               sql.NullString{},
-		}); err != nil {
-			return fmt.Errorf("upsert override: %w", err)
-		}
-
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit: %w", err)
+			return err
 		}
 
 		if isNew {

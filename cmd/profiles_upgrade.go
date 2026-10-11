@@ -153,22 +153,18 @@ preserved.`,
 			newOriginalName = candidate.OriginalName
 		}
 
-		tx, err := db.BeginTx(ctx, nil)
+		err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+			if err := qtx.UpdateProfileItemModFileVersion(ctx, dbq.UpdateProfileItemModFileVersionParams{
+				ModFileVersionID: newVersionID,
+				ID:               item.ID,
+			}); err != nil {
+				return fmt.Errorf("update profile item: %w", err)
+			}
+
+			return nil
+		})
 		if err != nil {
-			return fmt.Errorf("begin transaction: %w", err)
-		}
-		defer tx.Rollback()
-		qtx := q.WithTx(tx)
-
-		if err := qtx.UpdateProfileItemModFileVersion(ctx, dbq.UpdateProfileItemModFileVersionParams{
-			ModFileVersionID: newVersionID,
-			ID:               item.ID,
-		}); err != nil {
-			return fmt.Errorf("update profile item: %w", err)
-		}
-
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit: %w", err)
+			return err
 		}
 
 		oldDesc := fmt.Sprintf("version %d", item.ModFileVersionID)

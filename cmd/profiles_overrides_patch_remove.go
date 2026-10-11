@@ -125,41 +125,38 @@ For ini patches, use --section to identify entries in a specific section.`,
 				entryKey, relpath)
 		}
 
-		tx, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("begin transaction: %w", err)
-		}
-		defer tx.Rollback()
-		qtx := q.WithTx(tx)
-
-		if err := qtx.DeleteOverridePatchEntry(ctx, dbq.DeleteOverridePatchEntryParams{
-			OverrideID: override.ID,
-			Position:   entry.Position,
-		}); err != nil {
-			return fmt.Errorf("delete patch entry: %w", err)
-		}
-
-		// remove override row if no entries remain
-		remaining, err := qtx.GetMaxOverridePatchPosition(ctx, override.ID)
-		if err != nil {
-			return fmt.Errorf("check remaining entries: %w", err)
-		}
-
-		overrideRemoved := false
-		if remaining == -1 {
-			// GetMaxOverridePatchPosition returns -1 via COALESCE when no rows exist
-			if err := qtx.DeleteOverride(ctx, dbq.DeleteOverrideParams{
-				ProfileID: p.ID,
-				TargetID:  target.ID,
-				Relpath:   relpath,
+		var overrideRemoved bool
+		err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+			if err := qtx.DeleteOverridePatchEntry(ctx, dbq.DeleteOverridePatchEntryParams{
+				OverrideID: override.ID,
+				Position:   entry.Position,
 			}); err != nil {
-				return fmt.Errorf("delete empty override: %w", err)
+				return fmt.Errorf("delete patch entry: %w", err)
 			}
-			overrideRemoved = true
-		}
 
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit: %w", err)
+			// remove override row if no entries remain
+			remaining, err := qtx.GetMaxOverridePatchPosition(ctx, override.ID)
+			if err != nil {
+				return fmt.Errorf("check remaining entries: %w", err)
+			}
+
+			overrideRemoved = false
+			if remaining == -1 {
+				// GetMaxOverridePatchPosition returns -1 via COALESCE when no rows exist
+				if err := qtx.DeleteOverride(ctx, dbq.DeleteOverrideParams{
+					ProfileID: p.ID,
+					TargetID:  target.ID,
+					Relpath:   relpath,
+				}); err != nil {
+					return fmt.Errorf("delete empty override: %w", err)
+				}
+				overrideRemoved = true
+			}
+
+			return nil
+		})
+		if err != nil {
+			return err
 		}
 
 		style.Printf("removed patch entry %q from override for %q in profile %q\n",

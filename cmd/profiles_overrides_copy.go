@@ -121,29 +121,25 @@ are replaced.`,
 			}
 		}
 
-		tx, err := db.BeginTx(ctx, nil)
+		err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+			if err := qtx.CopyOverridesToProfile(ctx, dbq.CopyOverridesToProfileParams{
+				ProfileID:   src.ID,
+				ProfileID_2: dst.ID,
+			}); err != nil {
+				return fmt.Errorf("copy overrides: %w", err)
+			}
+
+			if err := qtx.CopyOverridePatchEntriesToProfile(ctx, dbq.CopyOverridePatchEntriesToProfileParams{
+				ProfileID:   src.ID,
+				ProfileID_2: dst.ID,
+			}); err != nil {
+				return fmt.Errorf("copy patch entries: %w", err)
+			}
+
+			return nil
+		})
 		if err != nil {
-			return fmt.Errorf("begin transaction: %w", err)
-		}
-		defer tx.Rollback()
-		qtx := q.WithTx(tx)
-
-		if err := qtx.CopyOverridesToProfile(ctx, dbq.CopyOverridesToProfileParams{
-			ProfileID:   src.ID,
-			ProfileID_2: dst.ID,
-		}); err != nil {
-			return fmt.Errorf("copy overrides: %w", err)
-		}
-
-		if err := qtx.CopyOverridePatchEntriesToProfile(ctx, dbq.CopyOverridePatchEntriesToProfileParams{
-			ProfileID:   src.ID,
-			ProfileID_2: dst.ID,
-		}); err != nil {
-			return fmt.Errorf("copy patch entries: %w", err)
-		}
-
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit: %w", err)
+			return err
 		}
 
 		style.Printf("copied %d override(s) from profile %q to %q\n",

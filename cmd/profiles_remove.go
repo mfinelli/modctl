@@ -91,19 +91,15 @@ It does not change files on disk; changes take effect the next time you apply.`,
 			return fmt.Errorf("lookup profile item: %w", err)
 		}
 
-		tx, err := db.BeginTx(ctx, nil)
+		err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+			if err := qtx.DeleteProfileItemByID(ctx, id); err != nil {
+				return fmt.Errorf("remove from profile: %w", err)
+			}
+
+			return nil
+		})
 		if err != nil {
-			return fmt.Errorf("error starting transaction: %w", err)
-		}
-		defer tx.Rollback()
-		qtx := q.WithTx(tx)
-
-		if err := qtx.DeleteProfileItemByID(ctx, id); err != nil {
-			return fmt.Errorf("remove from profile: %w", err)
-		}
-
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit: %w", err)
+			return err
 		}
 
 		style.Printf("Removed version %d from profile %q\n", mfv.ID, p.Name)

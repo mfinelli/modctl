@@ -87,74 +87,71 @@ without having to choose unused priority numbers.`,
 			return fmt.Errorf("swap requires two different mod file version ids")
 		}
 
-		tx, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("error starting transaction: %w", err)
-		}
-		defer tx.Rollback()
-		qtx := q.WithTx(tx)
+		var a, b dbq.GetProfileItemByVersionForOrderRow
+		err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+			// Look up both items in the profile.
+			a, err = qtx.GetProfileItemByVersionForOrder(ctx, dbq.GetProfileItemByVersionForOrderParams{
+				ProfileID:        p.ID,
+				ModFileVersionID: mfvA.ID,
+			})
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return fmt.Errorf("version %d is not in profile %q", mfvA.ID, p.Name)
+				}
+				return fmt.Errorf("lookup version %d: %w", mfvA.ID, err)
+			}
 
-		// Look up both items in the profile.
-		a, err := qtx.GetProfileItemByVersionForOrder(ctx, dbq.GetProfileItemByVersionForOrderParams{
-			ProfileID:        p.ID,
-			ModFileVersionID: mfvA.ID,
+			b, err = qtx.GetProfileItemByVersionForOrder(ctx, dbq.GetProfileItemByVersionForOrderParams{
+				ProfileID:        p.ID,
+				ModFileVersionID: mfvB.ID,
+			})
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return fmt.Errorf("version %d is not in profile %q", mfvB.ID, p.Name)
+				}
+				return fmt.Errorf("lookup version %d: %w", mfvB.ID, err)
+			}
+
+			if a.Priority == b.Priority {
+				// Should be impossible with the unique index, but just in case...
+				return fmt.Errorf("cannot swap: both versions have the same priority (%d)", a.Priority)
+			}
+
+			// Use a sentinel priority that is guaranteed free.
+			maxPrio, err := qtx.GetMaxPriorityForProfile(ctx, p.ID)
+			if err != nil {
+				return fmt.Errorf("get max priority: %w", err)
+			}
+			sentinel := maxPrio + 1
+
+			// A -> sentinel
+			if err := qtx.SetProfileItemPriorityByID(ctx, dbq.SetProfileItemPriorityByIDParams{
+				Priority: sentinel,
+				ID:       a.ID,
+			}); err != nil {
+				return fmt.Errorf("swap (step 1): %w", err)
+			}
+
+			// B -> old A
+			if err := qtx.SetProfileItemPriorityByID(ctx, dbq.SetProfileItemPriorityByIDParams{
+				Priority: a.Priority,
+				ID:       b.ID,
+			}); err != nil {
+				return fmt.Errorf("swap (step 2): %w", err)
+			}
+
+			// A -> old B
+			if err := qtx.SetProfileItemPriorityByID(ctx, dbq.SetProfileItemPriorityByIDParams{
+				Priority: b.Priority,
+				ID:       a.ID,
+			}); err != nil {
+				return fmt.Errorf("swap (step 3): %w", err)
+			}
+
+			return nil
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("version %d is not in profile %q", mfvA.ID, p.Name)
-			}
-			return fmt.Errorf("lookup version %d: %w", mfvA.ID, err)
-		}
-
-		b, err := qtx.GetProfileItemByVersionForOrder(ctx, dbq.GetProfileItemByVersionForOrderParams{
-			ProfileID:        p.ID,
-			ModFileVersionID: mfvB.ID,
-		})
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("version %d is not in profile %q", mfvB.ID, p.Name)
-			}
-			return fmt.Errorf("lookup version %d: %w", mfvB.ID, err)
-		}
-
-		if a.Priority == b.Priority {
-			// Should be impossible with the unique index, but just in case...
-			return fmt.Errorf("cannot swap: both versions have the same priority (%d)", a.Priority)
-		}
-
-		// Use a sentinel priority that is guaranteed free.
-		maxPrio, err := qtx.GetMaxPriorityForProfile(ctx, p.ID)
-		if err != nil {
-			return fmt.Errorf("get max priority: %w", err)
-		}
-		sentinel := maxPrio + 1
-
-		// A -> sentinel
-		if err := qtx.SetProfileItemPriorityByID(ctx, dbq.SetProfileItemPriorityByIDParams{
-			Priority: sentinel,
-			ID:       a.ID,
-		}); err != nil {
-			return fmt.Errorf("swap (step 1): %w", err)
-		}
-
-		// B -> old A
-		if err := qtx.SetProfileItemPriorityByID(ctx, dbq.SetProfileItemPriorityByIDParams{
-			Priority: a.Priority,
-			ID:       b.ID,
-		}); err != nil {
-			return fmt.Errorf("swap (step 2): %w", err)
-		}
-
-		// A -> old B
-		if err := qtx.SetProfileItemPriorityByID(ctx, dbq.SetProfileItemPriorityByIDParams{
-			Priority: b.Priority,
-			ID:       a.ID,
-		}); err != nil {
-			return fmt.Errorf("swap (step 3): %w", err)
-		}
-
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit: %w", err)
+			return err
 		}
 
 		style.Printf("Swapped priorities in profile %q: %d(%d) <-> %d(%d)\n",

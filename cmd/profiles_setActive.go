@@ -86,27 +86,22 @@ The current active game is used unless --game is provided.`,
 			return nil
 		}
 
-		tx, err := db.BeginTx(ctx, nil)
+		err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+			if err := qtx.DeactivateProfilesForGame(ctx, gi.ID); err != nil {
+				return fmt.Errorf("deactivate existing active profile: %w", err)
+			}
+
+			if err := qtx.ActivateProfileByName(ctx, dbq.ActivateProfileByNameParams{
+				GameInstallID: gi.ID,
+				Name:          profileName,
+			}); err != nil {
+				return fmt.Errorf("activate profile: %w", err)
+			}
+
+			return nil
+		})
 		if err != nil {
-			return fmt.Errorf("error starting transaction: %w", err)
-		}
-		defer tx.Rollback()
-
-		qtx := q.WithTx(tx)
-
-		if err := qtx.DeactivateProfilesForGame(ctx, gi.ID); err != nil {
-			return fmt.Errorf("deactivate existing active profile: %w", err)
-		}
-
-		if err := qtx.ActivateProfileByName(ctx, dbq.ActivateProfileByNameParams{
-			GameInstallID: gi.ID,
-			Name:          profileName,
-		}); err != nil {
-			return fmt.Errorf("activate profile: %w", err)
-		}
-
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit: %w", err)
+			return err
 		}
 
 		style.Printf("Active profile set to %q\n", profileName)
