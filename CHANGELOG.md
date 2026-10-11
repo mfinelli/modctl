@@ -40,6 +40,9 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
   game directory (and, for a full restore on the same machine, backups or
   installed files with such a path), before anything is changed, and `verify`
   reports it.
+- Importing a game bundle is now all or nothing: a bundle that can't be imported
+  to the end leaves the database as it was. Before, the game that `--force`
+  replaces was already deleted, and what had been imported of the bundle stayed.
 
 ## v0.8.0 - 2026-10-10
 

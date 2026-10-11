@@ -26,6 +26,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/mfinelli/modctl/dbq"
@@ -46,7 +47,6 @@ type bundleGame struct {
 	game      dbq.GameInstall
 	profileID int64
 	target    dbq.Target
-	n         int
 }
 
 func newBundleGame(t *testing.T, db *sql.DB, storeGameID string) *bundleGame {
@@ -66,13 +66,27 @@ func newBundleGame(t *testing.T, db *sql.DB, storeGameID string) *bundleGame {
 	return &bundleGame{t: t, db: db, q: q, game: game, profileID: profile.ID, target: target}
 }
 
+// blobSeq makes the blobs of all the games different from each other, which a
+// game that is in a bundle and in the database that it is imported into is
+// otherwise not: they would be the same blob.
+var blobSeq atomic.Int64
+
 func (g *bundleGame) blob(kind string) string {
 	g.t.Helper()
 
-	g.n++
-	sha := fmt.Sprintf("%064x", int64(g.game.ID)*1000+int64(g.n))
+	sha := fmt.Sprintf("%064x", blobSeq.Add(1))
 	require.NoError(g.t, g.q.InsertBlob(context.Background(), dbq.InsertBlobParams{Sha256: sha, Kind: kind, SizeBytes: 1}))
 	return sha
+}
+
+// rename gives the game another name, which tells it from another game that is
+// the same as it in everything else.
+func (g *bundleGame) rename(name string) {
+	g.t.Helper()
+
+	_, err := g.db.Exec(`UPDATE game_installs SET display_name = ? WHERE id = ?`, name, g.game.ID)
+	require.NoError(g.t, err)
+	g.game.DisplayName = name
 }
 
 func (g *bundleGame) override(relpath string) {
