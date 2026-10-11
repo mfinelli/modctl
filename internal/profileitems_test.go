@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package internal_test
+package internal
 
 import (
 	"context"
@@ -25,7 +25,6 @@ import (
 	"testing"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/testbuilder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -84,19 +83,19 @@ func TestSetProfileItemEnabled(t *testing.T) {
 		p := newProfileItems(t)
 
 		// the item starts out disabled
-		changed, err := internal.SetProfileItemEnabled(ctx, &p.profile, p.q, p.versionA, false)
+		changed, err := SetProfileItemEnabled(ctx, &p.profile, p.q, p.versionA, false)
 		require.NoError(t, err)
 		assert.False(t, changed, "already disabled")
 
-		changed, err = internal.SetProfileItemEnabled(ctx, &p.profile, p.q, p.versionA, true)
+		changed, err = SetProfileItemEnabled(ctx, &p.profile, p.q, p.versionA, true)
 		require.NoError(t, err)
 		assert.True(t, changed)
 
-		changed, err = internal.SetProfileItemEnabled(ctx, &p.profile, p.q, p.versionA, true)
+		changed, err = SetProfileItemEnabled(ctx, &p.profile, p.q, p.versionA, true)
 		require.NoError(t, err)
 		assert.False(t, changed, "already enabled")
 
-		changed, err = internal.SetProfileItemEnabled(ctx, &p.profile, p.q, p.versionA, false)
+		changed, err = SetProfileItemEnabled(ctx, &p.profile, p.q, p.versionA, false)
 		require.NoError(t, err)
 		assert.True(t, changed)
 	})
@@ -105,7 +104,7 @@ func TestSetProfileItemEnabled(t *testing.T) {
 		t.Parallel()
 		p := newProfileItems(t)
 
-		_, err := internal.SetProfileItemEnabled(ctx, &p.profile, p.q, p.versionA, true)
+		_, err := SetProfileItemEnabled(ctx, &p.profile, p.q, p.versionA, true)
 		require.NoError(t, err)
 
 		var a, b int64
@@ -119,7 +118,7 @@ func TestSetProfileItemEnabled(t *testing.T) {
 		t.Parallel()
 		p := newProfileItems(t)
 
-		changed, err := internal.SetProfileItemEnabled(ctx, &p.profile, p.q, 999999, true)
+		changed, err := SetProfileItemEnabled(ctx, &p.profile, p.q, 999999, true)
 		require.Error(t, err)
 		assert.False(t, changed)
 		assert.Contains(t, err.Error(), "is not in profile")
@@ -137,13 +136,13 @@ func TestRemapHelpers(t *testing.T) {
 		t.Parallel()
 		p := newProfileItems(t)
 
-		first, err := internal.AddRemapRule(ctx, p.db, p.q, p.itemA, "strip_components", stripOne, sql.NullString{}, -1)
+		first, err := AddRemapRule(ctx, p.db, p.q, p.itemA, "strip_components", stripOne, sql.NullString{}, -1)
 		require.NoError(t, err)
-		second, err := internal.AddRemapRule(ctx, p.db, p.q, p.itemA, "select_subdir", sql.NullInt64{}, subdir, -1)
+		second, err := AddRemapRule(ctx, p.db, p.q, p.itemA, "select_subdir", sql.NullInt64{}, subdir, -1)
 		require.NoError(t, err)
 		assert.Equal(t, first+1, second, "positions are assigned one after the other")
 
-		explicit, err := internal.AddRemapRule(ctx, p.db, p.q, p.itemA, "dest_prefix", sql.NullInt64{}, sql.NullString{String: "Mods", Valid: true}, 10)
+		explicit, err := AddRemapRule(ctx, p.db, p.q, p.itemA, "dest_prefix", sql.NullInt64{}, sql.NullString{String: "Mods", Valid: true}, 10)
 		require.NoError(t, err)
 		assert.EqualValues(t, 10, explicit, "an explicit position is used as given")
 	})
@@ -152,7 +151,7 @@ func TestRemapHelpers(t *testing.T) {
 		t.Parallel()
 		p := newProfileItems(t)
 
-		pos, err := internal.AddRemapRule(ctx, p.db, p.q, p.itemA, "strip_components", sql.NullInt64{}, sql.NullString{}, -1)
+		pos, err := AddRemapRule(ctx, p.db, p.q, p.itemA, "strip_components", sql.NullInt64{}, sql.NullString{}, -1)
 		require.Error(t, err)
 		assert.Zero(t, pos)
 	})
@@ -161,14 +160,14 @@ func TestRemapHelpers(t *testing.T) {
 		t.Parallel()
 		p := newProfileItems(t)
 
-		cleared, err := internal.ClearRemapConfig(ctx, p.db, p.q, p.itemA)
+		cleared, err := ClearRemapConfig(ctx, p.db, p.q, p.itemA)
 		require.NoError(t, err)
 		assert.False(t, cleared, "no config yet")
 
-		_, err = internal.AddRemapRule(ctx, p.db, p.q, p.itemA, "strip_components", stripOne, sql.NullString{}, -1)
+		_, err = AddRemapRule(ctx, p.db, p.q, p.itemA, "strip_components", stripOne, sql.NullString{}, -1)
 		require.NoError(t, err)
 
-		cleared, err = internal.ClearRemapConfig(ctx, p.db, p.q, p.itemA)
+		cleared, err = ClearRemapConfig(ctx, p.db, p.q, p.itemA)
 		require.NoError(t, err)
 		assert.True(t, cleared)
 
@@ -176,7 +175,7 @@ func TestRemapHelpers(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, rules)
 
-		cleared, err = internal.ClearRemapConfig(ctx, p.db, p.q, p.itemA)
+		cleared, err = ClearRemapConfig(ctx, p.db, p.q, p.itemA)
 		require.NoError(t, err)
 		assert.False(t, cleared, "already cleared")
 	})
@@ -185,16 +184,16 @@ func TestRemapHelpers(t *testing.T) {
 		t.Parallel()
 		p := newProfileItems(t)
 
-		copied, err := internal.CopyRemapConfig(ctx, p.db, p.q, p.itemA, p.itemB)
+		copied, err := CopyRemapConfig(ctx, p.db, p.q, p.itemA, p.itemB)
 		require.NoError(t, err)
 		assert.Zero(t, copied, "nothing to copy from an item without rules")
 
-		_, err = internal.AddRemapRule(ctx, p.db, p.q, p.itemA, "strip_components", stripOne, sql.NullString{}, -1)
+		_, err = AddRemapRule(ctx, p.db, p.q, p.itemA, "strip_components", stripOne, sql.NullString{}, -1)
 		require.NoError(t, err)
-		_, err = internal.AddRemapRule(ctx, p.db, p.q, p.itemA, "select_subdir", sql.NullInt64{}, subdir, -1)
+		_, err = AddRemapRule(ctx, p.db, p.q, p.itemA, "select_subdir", sql.NullInt64{}, subdir, -1)
 		require.NoError(t, err)
 
-		copied, err = internal.CopyRemapConfig(ctx, p.db, p.q, p.itemA, p.itemB)
+		copied, err = CopyRemapConfig(ctx, p.db, p.q, p.itemA, p.itemB)
 		require.NoError(t, err)
 		assert.Equal(t, 2, copied)
 
@@ -225,14 +224,14 @@ func TestDeployRuleCopies(t *testing.T) {
 		t.Parallel()
 		p := newProfileItems(t)
 
-		copied, err := internal.CopySkipBackupPatterns(ctx, p.db, p.q, p.itemA, p.itemB)
+		copied, err := CopySkipBackupPatterns(ctx, p.db, p.q, p.itemA, p.itemB)
 		require.NoError(t, err)
 		assert.Zero(t, copied)
 
 		addSkip(t, p, p.itemA, "*.ini", "*.cfg", "saves/*")
 		addSkip(t, p, p.itemB, "old/*") // replaced by the copy
 
-		copied, err = internal.CopySkipBackupPatterns(ctx, p.db, p.q, p.itemA, p.itemB)
+		copied, err = CopySkipBackupPatterns(ctx, p.db, p.q, p.itemA, p.itemB)
 		require.NoError(t, err)
 		assert.Equal(t, 3, copied)
 
@@ -245,13 +244,13 @@ func TestDeployRuleCopies(t *testing.T) {
 		t.Parallel()
 		p := newProfileItems(t)
 
-		copied, err := internal.CopyWriteOncePatterns(ctx, p.db, p.q, p.itemA, p.itemB)
+		copied, err := CopyWriteOncePatterns(ctx, p.db, p.q, p.itemA, p.itemB)
 		require.NoError(t, err)
 		assert.Zero(t, copied)
 
 		addOnce(t, p, p.itemA, "*.cfg", "user/*")
 
-		copied, err = internal.CopyWriteOncePatterns(ctx, p.db, p.q, p.itemA, p.itemB)
+		copied, err = CopyWriteOncePatterns(ctx, p.db, p.q, p.itemA, p.itemB)
 		require.NoError(t, err)
 		assert.Equal(t, 2, copied)
 
@@ -264,7 +263,7 @@ func TestDeployRuleCopies(t *testing.T) {
 		t.Parallel()
 		p := newProfileItems(t)
 
-		skip, once, err := internal.CopyDeployRules(ctx, p.db, p.q, p.itemA, p.itemB)
+		skip, once, err := CopyDeployRules(ctx, p.db, p.q, p.itemA, p.itemB)
 		require.NoError(t, err)
 		assert.Zero(t, skip)
 		assert.Zero(t, once)
@@ -272,7 +271,7 @@ func TestDeployRuleCopies(t *testing.T) {
 		addSkip(t, p, p.itemA, "*.ini")
 		addOnce(t, p, p.itemA, "*.cfg", "user/*")
 
-		skip, once, err = internal.CopyDeployRules(ctx, p.db, p.q, p.itemA, p.itemB)
+		skip, once, err = CopyDeployRules(ctx, p.db, p.q, p.itemA, p.itemB)
 		require.NoError(t, err)
 		assert.Equal(t, 1, skip)
 		assert.Equal(t, 2, once)

@@ -32,7 +32,7 @@ import (
 	"github.com/andygrunwald/vdf"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/pressly/goose/v3"
+	"github.com/mfinelli/modctl/internal/testbuilder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -751,24 +751,6 @@ func TestLibraryOfInstall(t *testing.T) {
 	}
 }
 
-// migratedDB is an empty database with all of the migrations applied.
-func migratedDB(t *testing.T) *sql.DB {
-	t.Helper()
-
-	db, err := sql.Open("sqlite3", ":memory:?_foreign_keys=ON")
-	require.NoError(t, err)
-	// every connection to :memory: is its own database
-	db.SetMaxOpenConns(1)
-	t.Cleanup(func() { db.Close() })
-
-	p, err := goose.NewProvider(goose.DialectSQLite3, db, os.DirFS("../migrations"))
-	require.NoError(t, err)
-	_, err = p.Up(context.Background())
-	require.NoError(t, err)
-
-	return db
-}
-
 // writeSteamGame puts a game in a Steam library, with the manifest that Steam
 // writes for it.
 func writeSteamGame(t *testing.T, lib, appid, name string) {
@@ -833,7 +815,7 @@ func TestRefreshSteamLibraries(t *testing.T) {
 		writeSteamGame(t, root, "100", "Root Game")
 		writeSteamGame(t, ext, "200", "Ext Game")
 		writeSteamGame(t, added, "300", "Added Game")
-		db := migratedDB(t)
+		db := testbuilder.SetupDB(t)
 
 		first := refresh(t, db, libs(root, ext))
 		require.Equal(t, "default", first["100"].InstanceID)
@@ -859,7 +841,7 @@ func TestRefreshSteamLibraries(t *testing.T) {
 		writeSteamGame(t, root, "100", "Root Game")
 		writeSteamGame(t, ext, "200", "Ext Game")
 		writeSteamGame(t, other, "400", "Other Game")
-		db := migratedDB(t)
+		db := testbuilder.SetupDB(t)
 
 		first := refresh(t, db, libs(root, ext))
 		require.Equal(t, "library_2", first["200"].InstanceID)
@@ -891,7 +873,7 @@ func TestRefreshSteamLibraries(t *testing.T) {
 		root := filepath.Join(dir, "Steam")
 		writeSteamGame(t, first, "100", "A Game")
 		writeSteamGame(t, root, "200", "Steam Game")
-		db := migratedDB(t)
+		db := testbuilder.SetupDB(t)
 
 		// as it was when the default was the first library in order of
 		// path: no Steam installation among them
@@ -920,7 +902,7 @@ func TestRefreshSteamLibraries(t *testing.T) {
 		root := filepath.Join(dir, "Steam")
 		writeSteamGame(t, first, "100", "A Game")
 		writeSteamGame(t, root, "200", "Steam Game")
-		db := migratedDB(t)
+		db := testbuilder.SetupDB(t)
 
 		got := refresh(t, db, libs(root, first))
 
@@ -936,7 +918,7 @@ func TestRefreshSteamLibraries(t *testing.T) {
 		ext := filepath.Join(dir, "games")
 		writeSteamGame(t, root, "100", "Root Game")
 		writeSteamGame(t, ext, "200", "Ext Game")
-		db := migratedDB(t)
+		db := testbuilder.SetupDB(t)
 
 		first := refresh(t, db, libs(root, ext))
 		second := refresh(t, db, libs(root, ext))
@@ -954,7 +936,7 @@ func TestRefreshSteamLibraries(t *testing.T) {
 		dir := t.TempDir()
 		root := filepath.Join(dir, "Steam")
 		writeSteamGame(t, root, "100", "Root Game")
-		db := migratedDB(t)
+		db := testbuilder.SetupDB(t)
 
 		first := refresh(t, db, libs(root))
 		second := refresh(t, db, steamLibraries{DidScan: false})
@@ -1438,7 +1420,7 @@ func TestRefreshSteamLibrariesContentIDs(t *testing.T) {
 		writeSteamGame(t, root, "100", "Root Game")
 		writeSteamGame(t, before, "200", "Ext Game")
 		writeSteamGame(t, after, "200", "Ext Game") // where the disk is mounted now
-		db := migratedDB(t)
+		db := testbuilder.SetupDB(t)
 
 		first, _ := refresh(t, db, libs(map[string]string{root: "11", before: "22"}, root, before))
 		require.Equal(t, "library_2", first["200"].InstanceID)
@@ -1469,7 +1451,7 @@ func TestRefreshSteamLibrariesContentIDs(t *testing.T) {
 		writeSteamGame(t, root, "100", "Root Game")
 		writeSteamGame(t, path, "200", "Old Disk Game")
 		writeSteamGame(t, elsewhere, "200", "Old Disk Game")
-		db := migratedDB(t)
+		db := testbuilder.SetupDB(t)
 
 		first, _ := refresh(t, db, libs(map[string]string{root: "11", path: "22"}, root, path))
 		require.Equal(t, "library_2", first["200"].InstanceID)
@@ -1495,7 +1477,7 @@ func TestRefreshSteamLibrariesContentIDs(t *testing.T) {
 		writeSteamGame(t, root, "100", "Root Game")
 		writeSteamGame(t, before, "200", "Ext Game")
 		writeSteamGame(t, after, "200", "Ext Game")
-		db := migratedDB(t)
+		db := testbuilder.SetupDB(t)
 
 		legacy, _ := refresh(t, db, libs(nil, root, before))
 		_, contentID := libraryOfInstall(legacy["200"].Metadata)
@@ -1525,7 +1507,7 @@ func TestRefreshSteamLibrariesContentIDs(t *testing.T) {
 		ext := filepath.Join(dir, "games")
 		writeSteamGame(t, root, "100", "Root Game")
 		writeSteamGame(t, ext, "200", "Ext Game")
-		db := migratedDB(t)
+		db := testbuilder.SetupDB(t)
 
 		first, _ := refresh(t, db, libs(map[string]string{root: "11"}, root, ext))
 		second, _ := refresh(t, db, libs(map[string]string{root: "11"}, root, ext))
@@ -1548,7 +1530,7 @@ func TestRefreshSteamLibrariesContentIDs(t *testing.T) {
 		writeSteamGame(t, root, "100", "Root Game")
 		writeSteamGame(t, a, "200", "A Game")
 		writeSteamGame(t, b, "300", "B Game")
-		db := migratedDB(t)
+		db := testbuilder.SetupDB(t)
 		ids := map[string]string{root: "11", a: "77", b: "77"}
 
 		first, result := refresh(t, db, libs(ids, root, a, b))
@@ -1570,7 +1552,7 @@ func TestRefreshSteamLibrariesContentIDs(t *testing.T) {
 		dir := t.TempDir()
 		root := filepath.Join(dir, "Steam")
 		writeSteamGame(t, root, "100", "Root Game")
-		db := migratedDB(t)
+		db := testbuilder.SetupDB(t)
 
 		got, _ := refresh(t, db, libs(map[string]string{root: "-7695053421422003000"}, root))
 
