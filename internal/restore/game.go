@@ -108,6 +108,12 @@ func Game(
 	}
 	oldGameInstallID := matchedInstall.ID
 
+	// Nothing is changed (not even a dry run is let through) for a bundle that
+	// would have something written outside of the game directory
+	if err := validateGamePaths(ctx, bq, oldGameInstallID); err != nil {
+		return res, err
+	}
+
 	// Resolve display name from bundle if not set from manifest
 	if displayName == "" {
 		displayName = matchedInstall.DisplayName

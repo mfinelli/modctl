@@ -531,6 +531,12 @@ or unapplied): they are checked with `fsutil.ValidateRelPath` when a plan is mad
 An override with a path that is not valid is rejected with a warning, and a file
 that is recorded as installed at such a path is left alone, with a warning.
 
+A bundle is checked the same way before anything is restored from it: a bundle
+that has an override with a path that is not valid is refused (as is one that has
+backups or installed files like that, when a full restore keeps them, which is
+only the case on the same machine), and this is done before the existing database
+or game is changed, and also for a dry run. `verify` reports it as an issue.
+
 ### Drift detection on overwrite
 
 During apply, before overwriting any tool-owned file the planner hashes the

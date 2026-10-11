@@ -60,6 +60,14 @@ func Full(
 		)
 	}
 
+	// Nothing is changed (not even a dry run is let through) for a bundle that
+	// would have something written outside of the game directory. This is
+	// before the database is replaced, which cannot be undone.
+	bq := dbq.New(bundle.BundleDB)
+	if err := validateFullPaths(ctx, bq, opts.SameMachine); err != nil {
+		return res, err
+	}
+
 	if opts.DryRun {
 		return dryRunFull(ctx, bundle)
 	}
@@ -121,7 +129,6 @@ func Full(
 	}
 
 	// Scan missing inventories against the restored DB
-	bq := dbq.New(bundle.BundleDB)
 	allVersions, err := bq.ListAllModFileVersions(ctx)
 	if err != nil {
 		return res, fmt.Errorf("list mod file versions: %w", err)

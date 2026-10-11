@@ -36,6 +36,10 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 - The commands that take the path of a file in the game directory (for backups
   and overrides) now also reject a path that goes out of it with `..`, and `.`,
   instead of only a path that is absolute.
+- `import` refuses a bundle that has an override with a path that goes out of the
+  game directory (and, for a full restore on the same machine, backups or
+  installed files with such a path), before anything is changed, and `verify`
+  reports it.
 
 ## v0.8.0 - 2026-10-10
 

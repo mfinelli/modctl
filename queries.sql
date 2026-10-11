@@ -2008,6 +2008,18 @@ JOIN profiles p ON p.id = o.profile_id
 WHERE p.game_install_id = ?
 ORDER BY o.id ASC;
 
+-- The paths of what a bundle would have written to disk, to check them before
+-- anything is restored.
+
+-- name: ListAllOverrideRelpaths :many
+SELECT relpath FROM overrides ORDER BY id ASC;
+
+-- name: ListAllBackupRelpaths :many
+SELECT relpath FROM backups ORDER BY relpath ASC;
+
+-- name: ListAllInstalledFileRelpaths :many
+SELECT relpath FROM installed_files ORDER BY relpath ASC;
+
 -- name: ExportInsertOverride :exec
 INSERT INTO overrides (
     id, profile_id, target_id, relpath, blob_sha256, override_type,

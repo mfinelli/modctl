@@ -47,6 +47,8 @@ Performs a full integrity check without importing anything:
   - Verifies every blob file hashes correctly against its filename
   - Checks that every blob referenced in the database is present in the bundle
   - Checks that every blob file in the bundle has a corresponding database row
+  - Checks that no path in the bundle would be written to outside of the game's
+    directory
   - Warns about version compatibility issues
 
 Exits non-zero if any integrity issues are found. Version warnings
@@ -161,6 +163,17 @@ Exits non-zero if any integrity issues are found. Version warnings
 				style.Println(style.Failure.Render("  ✗ " + iss))
 				issues = append(issues, iss)
 			}
+		}
+		style.Println()
+
+		// paths: a restore refuses a bundle that would have something written
+		// outside of a game's directory, so this is where that is found out
+		style.Println(style.Bold.Render("Paths"))
+		if err := restore.CheckPaths(ctx, bundle); err != nil {
+			style.Println(style.Failure.Render("  ✗ " + err.Error()))
+			issues = append(issues, err.Error())
+		} else {
+			style.Println(style.Success.Render("  ✓ all paths are inside of the directories they are for"))
 		}
 		style.Println()
 
