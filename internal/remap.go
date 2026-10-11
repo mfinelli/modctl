@@ -21,28 +21,11 @@ package internal
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/database"
 )
-
-// ResolveProfileItemByVersion looks up a profile item by mod file version ID
-// within a profile, returning a clean error if the version is not in the profile.
-func ResolveProfileItemByVersion(ctx context.Context, profile *dbq.Profile, q *dbq.Queries, versionID int64) (int64, error) {
-	itemID, err := q.GetProfileItemIDByVersion(ctx, dbq.GetProfileItemIDByVersionParams{
-		ProfileID:        profile.ID,
-		ModFileVersionID: versionID,
-	})
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, fmt.Errorf("version %d is not in profile %q", versionID, profile.Name)
-		}
-		return 0, fmt.Errorf("lookup profile item: %w", err)
-	}
-	return itemID, nil
-}
 
 // EnsureRemapConfig returns the existing remap_config_id for a profile item,
 // or creates a new one and links it to the profile item within the provided

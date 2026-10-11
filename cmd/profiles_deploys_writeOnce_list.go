@@ -22,7 +22,6 @@ import (
 	"fmt"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
@@ -73,7 +72,7 @@ var profilesDeploysWriteOnceListCmd = &cobra.Command{
 			return err
 		}
 
-		itemID, err := internal.ResolveProfileItemByVersion(ctx, &p, q, mfv.ID)
+		itemID, err := argresolver.ResolveProfileItemByVersion(ctx, q, p, mfv.ID)
 		if err != nil {
 			return err
 		}

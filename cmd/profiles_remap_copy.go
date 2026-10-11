@@ -84,12 +84,12 @@ version to the new version before removing the old version from the profile.`,
 			return err
 		}
 
-		srcItemID, err := internal.ResolveProfileItemByVersion(ctx, &p, q, mfvSrc.ID)
+		srcItemID, err := argresolver.ResolveProfileItemByVersion(ctx, q, p, mfvSrc.ID)
 		if err != nil {
 			return fmt.Errorf("source: %w", err)
 		}
 
-		dstItemID, err := internal.ResolveProfileItemByVersion(ctx, &p, q, mfvDst.ID)
+		dstItemID, err := argresolver.ResolveProfileItemByVersion(ctx, q, p, mfvDst.ID)
 		if err != nil {
 			return fmt.Errorf("destination: %w", err)
 		}

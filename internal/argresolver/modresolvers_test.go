@@ -81,8 +81,8 @@ func (f modFixture) version(fileID int64, versionString string) int64 {
 	return f.exec(`INSERT INTO mod_file_versions (mod_file_id, archive_sha256, version_string) VALUES (?, ?, ?)`, fileID, sha, v)
 }
 
-// item puts a version in a profile.
-func (f modFixture) item(profile dbq.Profile, versionID int64, priority int64, enabled bool) {
+// item puts a version in a profile, and returns the id of the item.
+func (f modFixture) item(profile dbq.Profile, versionID int64, priority int64, enabled bool) int64 {
 	f.t.Helper()
 
 	target, err := f.q.UpsertDiscoveredTarget(context.Background(), dbq.UpsertDiscoveredTargetParams{
@@ -93,7 +93,7 @@ func (f modFixture) item(profile dbq.Profile, versionID int64, priority int64, e
 	if enabled {
 		on = 1
 	}
-	f.exec(`INSERT INTO profile_items (profile_id, mod_file_version_id, target_id, priority, enabled) VALUES (?, ?, ?, ?, ?)`,
+	return f.exec(`INSERT INTO profile_items (profile_id, mod_file_version_id, target_id, priority, enabled) VALUES (?, ?, ?, ?, ?)`,
 		profile.ID, versionID, target.ID, priority, on)
 }
 

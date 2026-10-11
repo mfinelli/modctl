@@ -124,7 +124,7 @@ Examples:
 			return err
 		}
 
-		itemID, err := internal.ResolveProfileItemByVersion(ctx, &p, q, mfv.ID)
+		itemID, err := argresolver.ResolveProfileItemByVersion(ctx, q, p, mfv.ID)
 		if err != nil {
 			return err
 		}
