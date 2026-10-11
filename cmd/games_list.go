@@ -24,6 +24,7 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -47,7 +48,7 @@ The active game install (if any) is marked with an asterisk (*).`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := internal.OpenDB(ctx)
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}

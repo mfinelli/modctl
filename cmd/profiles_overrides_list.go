@@ -23,9 +23,9 @@ import (
 	"strings"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -49,7 +49,7 @@ Run 'profiles overrides status' for full staleness detail.`,
 
 		ctx := cmd.Context()
 
-		db, err := internal.OpenDB(ctx)
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}

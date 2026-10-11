@@ -27,6 +27,7 @@ import (
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -66,7 +67,7 @@ items are removed automatically via cascade.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := internal.OpenDB(ctx)
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}

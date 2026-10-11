@@ -16,14 +16,14 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package internal_test
+package database_test
 
 import (
 	"context"
 	"database/sql"
 	"testing"
 
-	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/testbuilder"
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/assert"
@@ -52,7 +52,7 @@ func TestSchemaVersion(t *testing.T) {
 
 		p := newUnmigratedDB(t)
 
-		got, err := internal.SchemaVersion(context.Background(), p)
+		got, err := database.SchemaVersion(context.Background(), p)
 		require.NoError(t, err)
 		assert.Equal(t, int64(0), got)
 	})
@@ -70,7 +70,7 @@ func TestSchemaVersion(t *testing.T) {
 		require.NoError(t, err)
 		require.Greater(t, latest, int64(0))
 
-		got, err := internal.SchemaVersion(ctx, p)
+		got, err := database.SchemaVersion(ctx, p)
 		require.NoError(t, err)
 		assert.Equal(t, latest, got)
 	})
@@ -92,7 +92,7 @@ func TestSchemaVersion(t *testing.T) {
 		require.NoError(t, err)
 		require.Greater(t, latest, first)
 
-		got, err := internal.SchemaVersion(ctx, p)
+		got, err := database.SchemaVersion(ctx, p)
 		require.NoError(t, err)
 		assert.Equal(t, first, got)
 	})

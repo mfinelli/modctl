@@ -23,12 +23,12 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/pressly/goose/v3"
 )
 
 // providerFunc builds a goose provider (and so the set of known migrations)
-// for a database. Production code uses internal.GooseProvider; tests supply
+// for a database. Production code uses database.GooseProvider; tests supply
 // one that reads migrations from the filesystem because the embedded copy is
 // only populated in the real binary.
 type providerFunc func(*sql.DB) (*goose.Provider, error)
@@ -42,7 +42,7 @@ func openBundleDB(ctx context.Context, dbPath string, newProvider providerFunc) 
 	if err := migrateBundleDB(ctx, dbPath, newProvider); err != nil {
 		return nil, err
 	}
-	return sql.Open("sqlite3", internal.DSN(dbPath, true))
+	return sql.Open("sqlite3", database.DSN(dbPath, true))
 }
 
 // migrateBundleDB brings the bundle database at dbPath up to the latest
@@ -51,7 +51,7 @@ func openBundleDB(ctx context.Context, dbPath string, newProvider providerFunc) 
 // nothing to migrate it to, and it is up to the caller to decide what to do
 // (import refuses it, verify just reports on it).
 func migrateBundleDB(ctx context.Context, dbPath string, newProvider providerFunc) error {
-	db, err := sql.Open("sqlite3", internal.DSN(dbPath, false))
+	db, err := sql.Open("sqlite3", database.DSN(dbPath, false))
 	if err != nil {
 		return fmt.Errorf("open bundle database for migration: %w", err)
 	}

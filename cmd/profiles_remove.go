@@ -27,6 +27,7 @@ import (
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -54,7 +55,7 @@ It does not change files on disk; changes take effect the next time you apply.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := internal.OpenDB(ctx)
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}

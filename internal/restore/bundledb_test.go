@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/testbuilder"
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/assert"
@@ -48,7 +48,7 @@ func newBundleDBFile(t *testing.T, behind int64) (string, int64) {
 	ctx := context.Background()
 
 	path := filepath.Join(t.TempDir(), "modctl.db")
-	db, err := sql.Open("sqlite3", internal.DSN(path, false))
+	db, err := sql.Open("sqlite3", database.DSN(path, false))
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -104,7 +104,7 @@ func TestOpenBundleDB(t *testing.T) {
 				path, latest := newBundleDBFile(t, behind)
 
 				// before: really is behind
-				raw, err := sql.Open("sqlite3", internal.DSN(path, false))
+				raw, err := sql.Open("sqlite3", database.DSN(path, false))
 				require.NoError(t, err)
 				assert.Equal(t, latest-behind, schemaVersion(t, raw))
 				raw.Close()
@@ -137,7 +137,7 @@ func TestOpenBundleDB(t *testing.T) {
 
 		path, latest := newBundleDBFile(t, 0)
 
-		raw, err := sql.Open("sqlite3", internal.DSN(path, false))
+		raw, err := sql.Open("sqlite3", database.DSN(path, false))
 		require.NoError(t, err)
 		_, err = raw.Exec(`INSERT INTO schema_migrations (version_id, is_applied) VALUES (?, TRUE)`, latest+1)
 		require.NoError(t, err)

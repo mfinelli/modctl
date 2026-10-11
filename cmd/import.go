@@ -25,8 +25,8 @@ import (
 	"path/filepath"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/restore"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -105,16 +105,16 @@ Use --dry-run to preview what would be imported without making any changes.`,
 		style.Println(style.Success.Render("  ✓ bundle integrity OK"))
 		style.Println()
 
-		if err := internal.EnsureDBExists(); err != nil {
+		if err := database.EnsureExists(); err != nil {
 			return err
 		}
-		db, err := internal.SetupDB()
+		db, err := database.Setup()
 		if err != nil {
 			return fmt.Errorf("error setting up database: %w", err)
 		}
 		defer db.Close() // NB if we do a full restore we'll close this
 		//    twice, but it shouldn't be a problem
-		if err := internal.MigrateDB(ctx, db); err != nil {
+		if err := database.Migrate(ctx, db); err != nil {
 			return fmt.Errorf("error migrating database: %w", err)
 		}
 

@@ -28,8 +28,8 @@ import (
 	"strings"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/database"
 )
 
 // idRemap holds old -> new ID mappings built during game-scoped import
@@ -76,7 +76,7 @@ func Game(
 	}
 
 	// Validate schema version
-	currentSchema, err := internal.CurrentSchemaVersion(ctx, db)
+	currentSchema, err := database.CurrentSchemaVersion(ctx, db)
 	if err != nil {
 		return res, fmt.Errorf("get current schema version: %w", err)
 	}
@@ -606,7 +606,7 @@ func importInventory(ctx context.Context, dst, src *dbq.Queries, oldGameInstallI
 		})
 		if err != nil {
 			// skip duplicate entries (same archive already imported)
-			if internal.IsUniqueConstraint(err) {
+			if database.IsUniqueConstraint(err) {
 				continue
 			}
 			return fmt.Errorf("insert inventory entry: %w", err)

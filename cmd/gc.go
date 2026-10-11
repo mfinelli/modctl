@@ -29,8 +29,8 @@ import (
 	"time"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -75,7 +75,7 @@ Use --dry-run to preview what would be removed without making any changes.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := internal.OpenDB(ctx)
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}
@@ -295,7 +295,7 @@ func runGC(
 				if opts.cleanMissing {
 					if !opts.dryRun {
 						if err := q.DeleteBlob(ctx, b.Sha256); err != nil {
-							if internal.IsForeignKeyConstraint(err) {
+							if database.IsForeignKeyConstraint(err) {
 								return res, fmt.Errorf("blob %s is still referenced by another row; skipping", b.Sha256)
 							}
 							return res, fmt.Errorf("delete missing blob row %s: %w", b.Sha256, err)
@@ -328,7 +328,7 @@ func runGC(
 			// best-effort: remove fan-out dir if now empty; ignore error
 			_ = os.Remove(filepath.Dir(path))
 			if err := q.DeleteBlob(ctx, b.Sha256); err != nil {
-				if internal.IsForeignKeyConstraint(err) {
+				if database.IsForeignKeyConstraint(err) {
 					return res, fmt.Errorf("blob %s is still referenced by another row; skipping", b.Sha256)
 				}
 				return res, fmt.Errorf("delete blob row %s: %w", b.Sha256, err)

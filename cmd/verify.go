@@ -27,8 +27,8 @@ import (
 	"path/filepath"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/restore"
 	"github.com/mfinelli/modctl/internal/style"
@@ -104,7 +104,7 @@ Exits non-zero if any integrity issues are found. Version warnings
 		// same thing (every command migrates it), but it may not exist yet, or
 		// may not have been migrated since an upgrade. An older schema is not
 		// worth a warning since import migrates it.
-		if latest, err := internal.LatestSchemaVersion(); err == nil &&
+		if latest, err := database.LatestSchemaVersion(); err == nil &&
 			bundle.Manifest.SchemaVersion > latest {
 			style.Println(style.Warning.Render(fmt.Sprintf(
 				"  ⚠ bundle schema version %d is newer than the latest this version of modctl supports (%d) - upgrade modctl before importing",
@@ -355,7 +355,7 @@ func checkBundleBlobs(ctx context.Context, bundle *restore.Bundle, bq *dbq.Queri
 
 // checkBundleCacheDB runs quick_check on the nexus cache database.
 func checkBundleCacheDB(ctx context.Context, cachePath string) []string {
-	cacheDB, err := sql.Open("sqlite3", internal.DSN(cachePath, true))
+	cacheDB, err := sql.Open("sqlite3", database.DSN(cachePath, true))
 	if err != nil {
 		return []string{"open nexus cache db: " + err.Error()}
 	}

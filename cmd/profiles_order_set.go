@@ -28,6 +28,7 @@ import (
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -59,7 +60,7 @@ Higher priority wins conflicts. Priorities must be unique within a profile.`,
 			return fmt.Errorf("invalid priority %q (expected a positive integer)", args[1])
 		}
 
-		db, err := internal.OpenDB(ctx)
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}
@@ -124,7 +125,7 @@ Higher priority wins conflicts. Priorities must be unique within a profile.`,
 			ID:       item.ID,
 		}); err != nil {
 			// Race-proof fallback: unique constraint could still trip
-			if internal.IsUniqueConstraint(err) {
+			if database.IsUniqueConstraint(err) {
 				return fmt.Errorf("priority %d is already used in profile %q", newPrio, p.Name)
 			}
 			return fmt.Errorf("set priority: %w", err)

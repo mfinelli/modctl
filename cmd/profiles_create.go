@@ -23,9 +23,9 @@ import (
 	"fmt"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
@@ -52,7 +52,7 @@ Note: modctl automatically creates a "default" profile during game refresh.`,
 
 		name := args[0]
 
-		db, err := internal.OpenDB(ctx)
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}
@@ -78,7 +78,7 @@ Note: modctl automatically creates a "default" profile during game refresh.`,
 			IsActive:      util.SqliteBoolToInt(false),
 		})
 		if err != nil {
-			if internal.IsUniqueConstraint(err) {
+			if database.IsUniqueConstraint(err) {
 				return fmt.Errorf("profile %q already exists for this game", name)
 			}
 			return fmt.Errorf("create profile: %w", err)

@@ -27,6 +27,7 @@ import (
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
@@ -67,7 +68,7 @@ targets cannot be used.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := internal.OpenDB(ctx)
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}
@@ -154,7 +155,7 @@ targets cannot be used.`,
 		if err != nil {
 			// NOTE: This tells us it was a UNIQUE constraint, but not which one.
 			// We rely on the explicit IsPriorityTaken check for a clear duplicate-priority message.
-			if internal.IsUniqueConstraint(err) {
+			if database.IsUniqueConstraint(err) {
 				// Most common case: duplicate version in profile
 				// (UNIQUE(profile_id, mod_file_version_id)).
 				// If user provided a priority on the command line
@@ -165,7 +166,7 @@ targets cannot be used.`,
 				}
 				return fmt.Errorf("version %d is already in profile %q", mfv.ID, p.Name)
 			}
-			if internal.IsForeignKeyConstraint(err) {
+			if database.IsForeignKeyConstraint(err) {
 				// Should be prevented by ExistsModFileVersion,
 				// but keep a friendly message anyway.
 				return fmt.Errorf("invalid reference while adding version %d to profile %q", mfv.ID, p.Name)

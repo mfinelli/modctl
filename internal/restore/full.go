@@ -27,9 +27,9 @@ import (
 	"path/filepath"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/archivescanner"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/exporter"
 	"github.com/mfinelli/modctl/internal/fsutil"
 )
@@ -49,7 +49,7 @@ func Full(
 	var res Result
 
 	// Validate schema version
-	currentSchema, err := internal.CurrentSchemaVersion(ctx, db)
+	currentSchema, err := database.CurrentSchemaVersion(ctx, db)
 	if err != nil {
 		return res, fmt.Errorf("get current schema version: %w", err)
 	}
@@ -96,11 +96,11 @@ func Full(
 	}
 
 	// Reopen and migrate (handles case where bundle schema is older than binary)
-	newDB, err := internal.SetupDB()
+	newDB, err := database.Setup()
 	if err != nil {
 		return res, fmt.Errorf("reopen database: %w", err)
 	}
-	if err := internal.MigrateDB(ctx, newDB); err != nil {
+	if err := database.Migrate(ctx, newDB); err != nil {
 		return res, fmt.Errorf("migrate restored database: %w", err)
 	}
 	newQ := dbq.New(newDB)

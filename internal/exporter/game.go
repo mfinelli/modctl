@@ -29,8 +29,8 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/nexusclient/dbc"
@@ -111,7 +111,7 @@ func Game(
 	}
 
 	// 2. Get schema version from source DB
-	schemaVersion, err := internal.CurrentSchemaVersion(ctx, db)
+	schemaVersion, err := database.CurrentSchemaVersion(ctx, db)
 	if err != nil {
 		return Result{}, fmt.Errorf("get schema version: %w", err)
 	}
@@ -215,14 +215,14 @@ func buildGameScopedDB(
 	tmpPath := tmp.Name()
 	tmp.Close()
 
-	scopedDB, err := sql.Open("sqlite3", internal.DSN(tmpPath, false))
+	scopedDB, err := sql.Open("sqlite3", database.DSN(tmpPath, false))
 	if err != nil {
 		os.Remove(tmpPath)
 		return "", "", 0, 0, 0, fmt.Errorf("open scoped db: %w", err)
 	}
 	defer scopedDB.Close()
 
-	if err := internal.MigrateDB(ctx, scopedDB); err != nil {
+	if err := database.Migrate(ctx, scopedDB); err != nil {
 		os.Remove(tmpPath)
 		return "", "", 0, 0, 0, fmt.Errorf("migrate scoped db: %w", err)
 	}
@@ -620,7 +620,7 @@ func buildGameScopedCacheDB(
 	}
 
 	// Open source cache DB
-	srcCacheDB, err := sql.Open("sqlite3", internal.DSN(cacheDBPath, false))
+	srcCacheDB, err := sql.Open("sqlite3", database.DSN(cacheDBPath, false))
 	if err != nil {
 		return "", "", fmt.Errorf("open cache db: %w", err)
 	}
@@ -634,7 +634,7 @@ func buildGameScopedCacheDB(
 	tmpPath := tmp.Name()
 	tmp.Close()
 
-	dstCacheDB, err := sql.Open("sqlite3", internal.DSN(tmpPath, false))
+	dstCacheDB, err := sql.Open("sqlite3", database.DSN(tmpPath, false))
 	if err != nil {
 		os.Remove(tmpPath)
 		return "", "", fmt.Errorf("open scoped cache db: %w", err)

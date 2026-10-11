@@ -25,6 +25,7 @@ import (
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
@@ -61,7 +62,7 @@ versions are ignored when computing the applied mod set.`,
 			return fmt.Errorf("must specify a mod file version ID or pass --all")
 		}
 
-		db, err := internal.OpenDB(ctx)
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}

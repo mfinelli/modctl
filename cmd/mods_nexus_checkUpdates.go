@@ -29,9 +29,9 @@ import (
 	"time"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/mfinelli/modctl/internal/updatechain"
@@ -75,7 +75,7 @@ to proceed even if the operation would exhaust your API quota.`,
 			return fmt.Errorf("nexus api key not configured; set nexus.apikey in your config file")
 		}
 
-		db, err := internal.OpenDB(ctx)
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}

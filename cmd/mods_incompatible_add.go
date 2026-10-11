@@ -26,6 +26,7 @@ import (
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -57,7 +58,7 @@ known crashes, conflicting game mechanics, or anything else.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := internal.OpenDB(ctx)
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}
@@ -108,11 +109,11 @@ known crashes, conflicting game mechanics, or anything else.`,
 			ModPageIDB: mpB.ID,
 			Reason:     nullReason,
 		}); err != nil {
-			if internal.IsUniqueConstraint(err) {
+			if database.IsUniqueConstraint(err) {
 				return fmt.Errorf("mods %q (id: %d) and %q (id: %d) are already flagged as incompatible",
 					pageA.Name, pageA.ID, pageB.Name, pageB.ID)
 			}
-			if internal.IsTriggerConstraint(err) {
+			if database.IsTriggerConstraint(err) {
 				// Fired by trg_mod_incompatibilities_same_game_ins - shouldn't be
 				// reachable in normal use since we verify game_install_id above,
 				// but handle it gracefully in case of a race or direct DB access.

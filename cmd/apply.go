@@ -31,6 +31,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/extractor"
 	"github.com/mfinelli/modctl/internal/lock"
 	"github.com/mfinelli/modctl/internal/patchapply"
@@ -76,7 +77,7 @@ Use --dry-run to preview the plan without making any changes. Add the
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := internal.OpenDB(ctx)
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}

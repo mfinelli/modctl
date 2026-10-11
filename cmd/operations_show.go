@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -49,7 +49,7 @@ action taken, content hashes before and after, and backup references.`,
 			return fmt.Errorf("invalid operation id %q (expected a positive integer)", args[0])
 		}
 
-		db, err := internal.OpenDB(ctx)
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}

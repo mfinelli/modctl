@@ -25,6 +25,7 @@ import (
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -63,7 +64,7 @@ Examples:
 
 		pattern := args[1]
 
-		db, err := internal.OpenDB(ctx)
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}
@@ -95,7 +96,7 @@ Examples:
 			ProfileItemID: itemID,
 			Pattern:       pattern,
 		}); err != nil {
-			if internal.IsUniqueConstraint(err) {
+			if database.IsUniqueConstraint(err) {
 				return fmt.Errorf("pattern %q already exists for version %d in profile %q", pattern, mfv.ID, p.Name)
 			}
 			return fmt.Errorf("add skip-backup pattern: %w", err)

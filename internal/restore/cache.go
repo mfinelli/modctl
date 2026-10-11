@@ -24,7 +24,7 @@ import (
 	"fmt"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/exporter"
 	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/nexusclient"
@@ -39,7 +39,7 @@ func importFullCache(ctx context.Context, bundleCachePath, destCachePath string)
 	}
 
 	// Open and initialize to handle schema version check / reset if stale
-	db, err := sql.Open("sqlite3", internal.DSN(destCachePath, false))
+	db, err := sql.Open("sqlite3", database.DSN(destCachePath, false))
 	if err != nil {
 		return fmt.Errorf("open nexus cache: %w", err)
 	}
@@ -79,7 +79,7 @@ func importGameCache(
 	}
 
 	// Open bundle cache DB
-	srcDB, err := sql.Open("sqlite3", internal.DSN(bundleCachePath, true))
+	srcDB, err := sql.Open("sqlite3", database.DSN(bundleCachePath, true))
 	if err != nil {
 		return fmt.Errorf("open bundle nexus cache: %w", err)
 	}
@@ -87,7 +87,7 @@ func importGameCache(
 	src := dbc.New(srcDB)
 
 	// Open or create live cache DB
-	destDB, err := sql.Open("sqlite3", internal.DSN(destCachePath, false))
+	destDB, err := sql.Open("sqlite3", database.DSN(destCachePath, false))
 	if err != nil {
 		return fmt.Errorf("open live nexus cache: %w", err)
 	}

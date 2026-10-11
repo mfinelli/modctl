@@ -33,6 +33,7 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -155,7 +156,7 @@ func checkDb(ctx context.Context) error {
 	defer cancel()
 
 	// 2) Open DB + trivial query
-	db, err := internal.SetupDB()
+	db, err := database.Setup()
 	if err != nil {
 		style.Println(style.Failure.Render("  ✗ could not open database"))
 		style.Println(style.Subtle.Render("    " + err.Error()))
@@ -176,7 +177,7 @@ func checkDb(ctx context.Context) error {
 	style.Println(style.Success.Render("  ✓ basic query OK (SELECT 1)"))
 
 	// 3) migrations status
-	p, err := internal.GooseProvider(db)
+	p, err := database.GooseProvider(db)
 	if err != nil {
 		// if we can't determine migration state treat it as fatal
 		style.Println(style.Failure.Render("  ✗ could not determine migration status"))
@@ -416,7 +417,7 @@ func checkGameInstalls(ctx context.Context) error {
 	style.Println(style.Header.Render("Game Install Checks"))
 	style.Println()
 
-	db, err := internal.SetupDB()
+	db, err := database.Setup()
 	if err != nil {
 		style.Println(style.Failure.Render("  ✗ could not open database"))
 		style.Println(style.Subtle.Render("    " + err.Error()))
@@ -494,7 +495,7 @@ func checkBlobs(ctx context.Context) error {
 	style.Println(style.Subtle.Render("  overrides: " + viper.GetString("overrides_dir")))
 	style.Println()
 
-	db, err := internal.SetupDB()
+	db, err := database.Setup()
 	if err != nil {
 		style.Println(style.Failure.Render("  ✗ could not open database"))
 		style.Println(style.Subtle.Render("    " + err.Error()))
@@ -711,7 +712,7 @@ func checkInstalledFiles(ctx context.Context) error {
 	style.Println(style.Header.Render("Installed File Checks"))
 	style.Println()
 
-	db, err := internal.SetupDB()
+	db, err := database.Setup()
 	if err != nil {
 		style.Println(style.Failure.Render("  ✗ could not open database"))
 		style.Println(style.Subtle.Render("    " + err.Error()))

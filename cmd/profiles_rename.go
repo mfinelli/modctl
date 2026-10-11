@@ -24,9 +24,9 @@ import (
 	"fmt"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -54,7 +54,7 @@ Profile names must be unique per game.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := internal.OpenDB(ctx)
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}
@@ -88,7 +88,7 @@ Profile names must be unique per game.`,
 			Name: newName,
 			ID:   p.ID,
 		}); err != nil {
-			if internal.IsUniqueConstraint(err) {
+			if database.IsUniqueConstraint(err) {
 				return fmt.Errorf("profile %q already exists for this game", newName)
 			}
 			return fmt.Errorf("rename profile: %w", err)

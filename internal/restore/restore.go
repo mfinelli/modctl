@@ -33,9 +33,9 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/archivescanner"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/exporter"
 	"github.com/mfinelli/modctl/internal/fsutil"
 )
@@ -146,7 +146,7 @@ func OpenAndValidate(ctx context.Context, bundlePath string) (*Bundle, error) {
 
 	// Open bundle DB, migrating it to the current schema first if the bundle
 	// was exported by an older version (this only touches the extracted copy)
-	bundleDB, err := openBundleDB(ctx, dbPath, internal.GooseProvider)
+	bundleDB, err := openBundleDB(ctx, dbPath, database.GooseProvider)
 	if err != nil {
 		os.RemoveAll(tmpDir)
 		return nil, fmt.Errorf("open bundle database: %w", err)

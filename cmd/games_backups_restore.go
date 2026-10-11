@@ -24,10 +24,10 @@ import (
 	"path/filepath"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/planner"
 	"github.com/mfinelli/modctl/internal/style"
@@ -67,7 +67,7 @@ that can't be read to check it.`,
 			return fmt.Errorf("path must be relative, got %q", relpath)
 		}
 
-		db, err := internal.OpenDB(ctx)
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}

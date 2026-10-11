@@ -29,7 +29,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/nexusclient/dbc"
 	"github.com/spf13/viper"
 	"golang.org/x/time/rate"
@@ -92,7 +92,7 @@ func buildUserAgent(version string) string {
 func openCacheDB(ctx context.Context) (*sql.DB, error) {
 	path := filepath.Join(viper.GetString("cache_dir"), "nexus_cache.db")
 
-	db, err := sql.Open("sqlite3", internal.DSN(path, false))
+	db, err := sql.Open("sqlite3", database.DSN(path, false))
 	if err != nil {
 		return nil, fmt.Errorf("opening cache db: %w", err)
 	}

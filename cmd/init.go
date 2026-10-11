@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/database"
 )
 
 // initCmd represents the init command
@@ -72,13 +72,13 @@ multiple times and will not overwrite existing data.`,
 			return fmt.Errorf("error creating tmp directory: %w", err)
 		}
 
-		db, err := internal.SetupDB()
+		db, err := database.Setup()
 		if err != nil {
 			return fmt.Errorf("error opening database: %w", err)
 		}
 		defer db.Close()
 
-		err = internal.MigrateDB(ctx, db)
+		err = database.Migrate(ctx, db)
 		if err != nil {
 			return fmt.Errorf("error migrating database: %w", err)
 		}

@@ -26,6 +26,7 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -35,7 +36,7 @@ import (
 // a "Mod Page › File Label (version)" description.
 func ModFileVersionIDs(cmd *cobra.Command, toComplete string) ([]string, cobra.ShellCompDirective) {
 	ctx := context.Background()
-	db, err := internal.SetupDBReadOnly()
+	db, err := database.SetupReadOnly()
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -70,7 +71,7 @@ func ModFileVersionIDs(cmd *cobra.Command, toComplete string) ([]string, cobra.S
 // Returns candidates as numeric IDs with a "File Label (version)" description.
 func ModFileVersionIDsForPage(cmd *cobra.Command, modPageArg string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	ctx := context.Background()
-	db, err := internal.SetupDBReadOnly()
+	db, err := database.SetupReadOnly()
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}

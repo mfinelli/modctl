@@ -30,6 +30,7 @@ import (
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/mfinelli/modctl/internal/updatechain"
@@ -61,7 +62,7 @@ on the same path - run 'modctl apply --dry-run' for a precise diff.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := internal.OpenDB(ctx)
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}
