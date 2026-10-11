@@ -20,7 +20,6 @@ package cmd
 
 import (
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
@@ -56,7 +55,7 @@ var modsNotesClearCmd = &cobra.Command{
 			return err
 		}
 
-		mp, err := internal.ResolveModPageArg(ctx, q, gi, args[0])
+		mp, err := argresolver.ResolveModPageArg(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}

@@ -88,7 +88,7 @@ versions are ignored when computing the applied mod set.`,
 			})
 		}
 
-		mfvID, err := internal.ResolveEnabledProfileVersionArg(ctx, q, gi, &p, args[0])
+		mfvID, err := argresolver.ResolveEnabledProfileVersionArg(ctx, q, gi, p, args[0])
 		if err != nil {
 			return err
 		}

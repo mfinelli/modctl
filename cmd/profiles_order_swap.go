@@ -24,7 +24,6 @@ import (
 	"fmt"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
@@ -74,12 +73,12 @@ without having to choose unused priority numbers.`,
 			return err
 		}
 
-		mfvA, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfvA, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}
 
-		mfvB, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[1])
+		mfvB, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[1])
 		if err != nil {
 			return err
 		}

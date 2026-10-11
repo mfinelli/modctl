@@ -25,7 +25,6 @@ import (
 	"strconv"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
@@ -79,7 +78,7 @@ Higher priority wins conflicts. Priorities must be unique within a profile.`,
 			return err
 		}
 
-		mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfv, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}

@@ -25,7 +25,6 @@ import (
 	"fmt"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
@@ -86,7 +85,7 @@ version for manual linking.`,
 		}
 
 		if modsNexusLinkVersionID != "" {
-			mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, modsNexusLinkVersionID)
+			mfv, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, modsNexusLinkVersionID)
 			if err != nil {
 				return err
 			}

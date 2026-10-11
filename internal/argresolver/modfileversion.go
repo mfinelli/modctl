@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package internal
+package argresolver
 
 import (
 	"context"
@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"github.com/mfinelli/modctl/dbq"
+	"github.com/mfinelli/modctl/internal"
 )
 
 // ResolveModFileVersionArg resolves a mod file version argument for the given
@@ -35,7 +36,7 @@ import (
 //     candidates with their numeric IDs)
 func ResolveModFileVersionArg(ctx context.Context, q *dbq.Queries, gi dbq.GameInstall, arg string) (dbq.GetModFileVersionByIDRow, error) {
 	// Fast path: numeric ID
-	if id, ok := ParseInt64(arg); ok {
+	if id, ok := internal.ParseInt64(arg); ok {
 		row, err := q.GetModFileVersionByID(ctx, dbq.GetModFileVersionByIDParams{
 			ID:            id,
 			GameInstallID: gi.ID,
@@ -74,7 +75,7 @@ func ResolveModFileVersionArg(ctx context.Context, q *dbq.Queries, gi dbq.GameIn
 		var b strings.Builder
 		fmt.Fprintf(&b, "Multiple mod file versions found for %q. Specify a numeric ID:\n\n", arg)
 		for _, r := range rows {
-			version := "(no version)"
+			version := "no version"
 			if r.VersionString.Valid && r.VersionString.String != "" {
 				version = r.VersionString.String
 			}
@@ -93,8 +94,8 @@ func ResolveModFileVersionArg(ctx context.Context, q *dbq.Queries, gi dbq.GameIn
 //   - several enabled versions: an error listing only those is returned
 //   - none enabled: resolution falls back to ResolveModFileVersionArg so the
 //     usual not-in-profile/already-disabled/ambiguity handling applies
-func ResolveEnabledProfileVersionArg(ctx context.Context, q *dbq.Queries, gi dbq.GameInstall, profile *dbq.Profile, arg string) (int64, error) {
-	if _, ok := ParseInt64(arg); !ok {
+func ResolveEnabledProfileVersionArg(ctx context.Context, q *dbq.Queries, gi dbq.GameInstall, profile dbq.Profile, arg string) (int64, error) {
+	if _, ok := internal.ParseInt64(arg); !ok {
 		rows, err := q.ListProfileVersionsByModPageName(ctx, dbq.ListProfileVersionsByModPageNameParams{
 			ProfileID:     profile.ID,
 			GameInstallID: gi.ID,
@@ -120,7 +121,7 @@ func ResolveEnabledProfileVersionArg(ctx context.Context, q *dbq.Queries, gi dbq
 			var b strings.Builder
 			fmt.Fprintf(&b, "Multiple enabled versions of %q in profile %q. Specify a numeric ID:\n\n", arg, profile.Name)
 			for _, r := range enabled {
-				version := "(no version)"
+				version := "no version"
 				if r.VersionString.Valid && r.VersionString.String != "" {
 					version = r.VersionString.String
 				}

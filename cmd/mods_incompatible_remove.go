@@ -22,7 +22,6 @@ import (
 	"fmt"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
@@ -63,12 +62,12 @@ The order of the two IDs does not matter.`,
 			return err
 		}
 
-		mpA, err := internal.ResolveModPageArg(ctx, q, gi, args[0])
+		mpA, err := argresolver.ResolveModPageArg(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}
 
-		mpB, err := internal.ResolveModPageArg(ctx, q, gi, args[1])
+		mpB, err := argresolver.ResolveModPageArg(ctx, q, gi, args[1])
 		if err != nil {
 			return err
 		}

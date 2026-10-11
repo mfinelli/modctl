@@ -24,7 +24,6 @@ import (
 	"fmt"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
@@ -81,7 +80,7 @@ preserved.`,
 			return err
 		}
 
-		mp, err := internal.ResolveModPageArg(ctx, q, gi, args[0])
+		mp, err := argresolver.ResolveModPageArg(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}
@@ -111,7 +110,7 @@ preserved.`,
 		var newOriginalName sql.NullString
 
 		if profilesUpgradeTo != "" {
-			mfvID, err := internal.ResolveModFileVersionArg(ctx, q, gi, profilesUpgradeTo)
+			mfvID, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, profilesUpgradeTo)
 			if err != nil {
 				return err
 			}

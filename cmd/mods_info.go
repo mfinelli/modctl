@@ -77,7 +77,7 @@ to refresh cached data.`,
 			return err
 		}
 
-		mp, err := internal.ResolveModPageArg(ctx, q, gi, args[0])
+		mp, err := argresolver.ResolveModPageArg(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}

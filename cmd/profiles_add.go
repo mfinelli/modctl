@@ -87,7 +87,7 @@ targets cannot be used.`,
 			return err
 		}
 
-		mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfv, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}

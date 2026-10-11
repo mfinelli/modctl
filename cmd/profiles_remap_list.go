@@ -70,7 +70,7 @@ Rules are shown in the order they will be applied during planning.`,
 			return err
 		}
 
-		mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfv, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}

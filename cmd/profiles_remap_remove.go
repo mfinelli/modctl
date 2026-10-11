@@ -76,7 +76,7 @@ Use 'remap list' to see current rules and their positions.`,
 			return err
 		}
 
-		mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfv, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}

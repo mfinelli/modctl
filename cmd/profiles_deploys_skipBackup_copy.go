@@ -74,12 +74,12 @@ the skip-backup configuration from the old version.`,
 			return err
 		}
 
-		mfvSrc, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfvSrc, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}
 
-		mfvDst, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[1])
+		mfvDst, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[1])
 		if err != nil {
 			return err
 		}
