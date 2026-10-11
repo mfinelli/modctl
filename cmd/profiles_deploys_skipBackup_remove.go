@@ -67,7 +67,7 @@ Use 'skip-backup list' to see current patterns.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesDeploysSkipBackupRemoveProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesDeploysSkipBackupRemoveProfile)
 		if err != nil {
 			return err
 		}

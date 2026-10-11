@@ -72,7 +72,7 @@ For ini patches, use --section to identify entries in a specific section.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesOverridesPatchRemoveProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesPatchRemoveProfile)
 		if err != nil {
 			return err
 		}

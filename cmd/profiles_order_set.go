@@ -74,7 +74,7 @@ Higher priority wins conflicts. Priorities must be unique within a profile.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesOrderSetProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOrderSetProfile)
 		if err != nil {
 			return err
 		}

@@ -85,7 +85,7 @@ archives.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesOverridesEditProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesEditProfile)
 		if err != nil {
 			return err
 		}

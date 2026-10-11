@@ -69,7 +69,7 @@ the write-once configuration from the old version.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesDeploysWriteOnceCopyProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesDeploysWriteOnceCopyProfile)
 		if err != nil {
 			return err
 		}

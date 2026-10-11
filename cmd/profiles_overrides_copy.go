@@ -71,13 +71,13 @@ are replaced.`,
 		}
 
 		// dst is the active profile
-		dst, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesOverridesCopyProfile)
+		dst, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesCopyProfile)
 		if err != nil {
 			return err
 		}
 
 		// src is the named argument
-		src, err := argresolver.ResolveProfileArg(ctx, q, &gi, args[0])
+		src, err := argresolver.ResolveProfileArg(ctx, q, gi, args[0])
 		if err != nil {
 			return fmt.Errorf("source profile: %w", err)
 		}

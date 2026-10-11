@@ -77,7 +77,7 @@ Examples:
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesDeploysSkipBackupAddProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesDeploysSkipBackupAddProfile)
 		if err != nil {
 			return err
 		}

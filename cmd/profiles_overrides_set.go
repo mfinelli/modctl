@@ -75,7 +75,7 @@ winner for this path in the active profile.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesOverridesSetProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesSetProfile)
 		if err != nil {
 			return err
 		}

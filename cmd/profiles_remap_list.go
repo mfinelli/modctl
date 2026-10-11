@@ -65,7 +65,7 @@ Rules are shown in the order they will be applied during planning.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesRemapListProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesRemapListProfile)
 		if err != nil {
 			return err
 		}

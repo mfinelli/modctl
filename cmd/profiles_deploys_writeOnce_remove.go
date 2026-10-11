@@ -67,7 +67,7 @@ Use 'write-once list' to see current patterns.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesDeploysWriteOnceRemoveProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesDeploysWriteOnceRemoveProfile)
 		if err != nil {
 			return err
 		}

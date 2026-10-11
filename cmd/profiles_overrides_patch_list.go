@@ -63,7 +63,7 @@ Entries are shown in the order they will be applied.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesOverridesPatchListProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesPatchListProfile)
 		if err != nil {
 			return err
 		}

@@ -63,7 +63,7 @@ var profilesDeploysWriteOnceListCmd = &cobra.Command{
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesDeploysWriteOnceListProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesDeploysWriteOnceListProfile)
 		if err != nil {
 			return err
 		}

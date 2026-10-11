@@ -80,7 +80,7 @@ Examples:
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesOverridesPatchSetProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesPatchSetProfile)
 		if err != nil {
 			return err
 		}

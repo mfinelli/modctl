@@ -72,7 +72,7 @@ Use --multiple to assign priorities as N, 2N, 3N, ... (for example, --multiple
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesOrderCompactProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOrderCompactProfile)
 		if err != nil {
 			return err
 		}

@@ -76,7 +76,7 @@ priority or position in the load order.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesEnableProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesEnableProfile)
 		if err != nil {
 			return err
 		}

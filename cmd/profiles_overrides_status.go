@@ -64,7 +64,7 @@ Pass a path argument to show detail for a single override only.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesOverridesStatusProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesStatusProfile)
 		if err != nil {
 			return err
 		}

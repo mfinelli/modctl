@@ -76,7 +76,7 @@ preserved.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesUpgradeProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesUpgradeProfile)
 		if err != nil {
 			return err
 		}

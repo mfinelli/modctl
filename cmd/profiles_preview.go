@@ -86,7 +86,7 @@ Binary files are detected automatically and refused unless --force is passed.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesPreviewProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesPreviewProfile)
 		if err != nil {
 			return err
 		}

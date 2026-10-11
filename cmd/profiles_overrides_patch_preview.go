@@ -77,7 +77,7 @@ Note: requires archive extraction which may be slow for large archives.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesOverridesPatchPreviewProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesPatchPreviewProfile)
 		if err != nil {
 			return err
 		}

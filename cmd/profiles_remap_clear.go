@@ -65,7 +65,7 @@ recreating rules in a different order.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesRemapClearProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesRemapClearProfile)
 		if err != nil {
 			return err
 		}

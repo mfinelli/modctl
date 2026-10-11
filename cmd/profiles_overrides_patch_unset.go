@@ -79,7 +79,7 @@ removing the node entirely.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesOverridesPatchUnsetProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesPatchUnsetProfile)
 		if err != nil {
 			return err
 		}

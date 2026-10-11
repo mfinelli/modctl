@@ -114,7 +114,7 @@ Examples:
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesRemapAddProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesRemapAddProfile)
 		if err != nil {
 			return err
 		}

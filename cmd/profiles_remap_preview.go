@@ -73,7 +73,7 @@ if needed.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesRemapPreviewProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesRemapPreviewProfile)
 		if err != nil {
 			return err
 		}

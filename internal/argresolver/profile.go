@@ -27,7 +27,10 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 )
 
-func ResolveProfileArg(ctx context.Context, q *dbq.Queries, gi *dbq.GameInstall, arg string) (dbq.Profile, error) {
+// ResolveProfileArg resolves the profile that a command is for: the one of the
+// game install that arg names, or its active profile when arg is empty (which is
+// what leaving out --profile means).
+func ResolveProfileArg(ctx context.Context, q *dbq.Queries, gi dbq.GameInstall, arg string) (dbq.Profile, error) {
 	if arg != "" {
 		p, err := q.GetProfileByName(ctx, dbq.GetProfileByNameParams{
 			GameInstallID: gi.ID,
@@ -40,14 +43,14 @@ func ResolveProfileArg(ctx context.Context, q *dbq.Queries, gi *dbq.GameInstall,
 			return dbq.Profile{}, fmt.Errorf("lookup profile: %w", err)
 		}
 		return p, nil
-	} else {
-		p, err := q.GetActiveProfileForGame(ctx, gi.ID)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return dbq.Profile{}, fmt.Errorf("no active profile set; run `modctl profiles set-active <name>` or pass --profile")
-			}
-			return dbq.Profile{}, fmt.Errorf("get active profile: %w", err)
-		}
-		return p, nil
 	}
+
+	p, err := q.GetActiveProfileForGame(ctx, gi.ID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return dbq.Profile{}, errors.New("no active profile set; run `modctl profiles set-active <name>` or pass --profile")
+		}
+		return dbq.Profile{}, fmt.Errorf("get active profile: %w", err)
+	}
+	return p, nil
 }

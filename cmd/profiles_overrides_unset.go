@@ -64,7 +64,7 @@ path back to the mod winner or remove it if no mod provides it.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesOverridesUnsetProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesUnsetProfile)
 		if err != nil {
 			return err
 		}

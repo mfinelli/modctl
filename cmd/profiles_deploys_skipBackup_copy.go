@@ -69,7 +69,7 @@ the skip-backup configuration from the old version.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesDeploysSkipBackupCopyProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesDeploysSkipBackupCopyProfile)
 		if err != nil {
 			return err
 		}

@@ -63,7 +63,7 @@ var profilesDeploysSkipBackupListCmd = &cobra.Command{
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesDeploysSkipBackupListProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesDeploysSkipBackupListProfile)
 		if err != nil {
 			return err
 		}

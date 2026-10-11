@@ -70,7 +70,7 @@ Exactly one of --before or --after is required.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesOrderMoveProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOrderMoveProfile)
 		if err != nil {
 			return err
 		}

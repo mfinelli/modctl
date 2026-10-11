@@ -91,7 +91,7 @@ Use --dry-run to preview the plan without making any changes. Add the
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, applyProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, applyProfile)
 		if err != nil {
 			return err
 		}

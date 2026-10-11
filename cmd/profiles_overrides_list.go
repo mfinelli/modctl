@@ -62,7 +62,7 @@ Run 'profiles overrides status' for full staleness detail.`,
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesOverridesListProfile)
+		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesListProfile)
 		if err != nil {
 			return err
 		}
