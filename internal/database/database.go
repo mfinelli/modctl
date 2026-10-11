@@ -21,7 +21,6 @@ package database
 import (
 	"context"
 	"database/sql"
-	"embed"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -48,7 +47,20 @@ const DB_PRAGMAS = "?_foreign_keys=ON&_journal_mode=WAL&_synchronous=NORMAL"
 // that way.
 const DB_PRAGMAS_READONLY = "?_foreign_keys=ON&mode=ro"
 
-var Migrations embed.FS
+// Migrations is where the migrations are read from, in a directory called
+// "migrations": the ones that are embedded in the binary, which main sets. A
+// test has none unless it sets some, which is what lets it have the ones of the
+// repository.
+var Migrations fs.FS
+
+// migrationsFS is the "migrations" directory of Migrations.
+func migrationsFS() (fs.FS, error) {
+	if Migrations == nil {
+		return nil, errors.New("no migrations are embedded")
+	}
+
+	return fs.Sub(Migrations, "migrations")
+}
 
 // DSN returns the connection string for the SQLite database at path, which
 // every database open in modctl should use rather than building its own.
@@ -74,8 +86,8 @@ func SetupReadOnly() (*sql.DB, error) {
 }
 
 func GooseProvider(db *sql.DB) (*goose.Provider, error) {
-	// Make the provider FS point at the "migrations" directory within the embed.FS.
-	fsys, err := fs.Sub(Migrations, "migrations")
+	// Make the provider FS point at the "migrations" directory within Migrations.
+	fsys, err := migrationsFS()
 	if err != nil {
 		return nil, fmt.Errorf("error preparing migrations fs: %w", err)
 	}
@@ -136,7 +148,7 @@ func SchemaVersion(ctx context.Context, p *goose.Provider) (int64, error) {
 // once it has been fully migrated, and what a bundle's schema version has to
 // be compared against to tell whether this build can import it.
 func LatestSchemaVersion() (int64, error) {
-	fsys, err := fs.Sub(Migrations, "migrations")
+	fsys, err := migrationsFS()
 	if err != nil {
 		return 0, fmt.Errorf("error preparing migrations fs: %w", err)
 	}
