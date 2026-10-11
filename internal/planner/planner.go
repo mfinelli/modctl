@@ -241,7 +241,7 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 
 			destPath := result.Path
 
-			if err := validateDestPath(destPath); err != nil {
+			if err := fsutil.ValidateRelPath(destPath); err != nil {
 				plan.Warnings = append(plan.Warnings,
 					fmt.Sprintf("rejected %q -> %q: %v", rawPath, destPath, err))
 				continue
