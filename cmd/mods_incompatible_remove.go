@@ -57,17 +57,17 @@ The order of the two IDs does not matter.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, modsIncompatibleRemoveGame)
+		gi, err := argresolver.GameInstall(ctx, q, modsIncompatibleRemoveGame)
 		if err != nil {
 			return err
 		}
 
-		mpA, err := argresolver.ResolveModPageArg(ctx, q, gi, args[0])
+		mpA, err := argresolver.ModPage(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}
 
-		mpB, err := argresolver.ResolveModPageArg(ctx, q, gi, args[1])
+		mpB, err := argresolver.ModPage(ctx, q, gi, args[1])
 		if err != nil {
 			return err
 		}

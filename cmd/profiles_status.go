@@ -79,12 +79,12 @@ on the same path - run 'modctl apply --dry-run' for a precise diff.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesStatusGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesStatusGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesStatusProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesStatusProfile)
 		if err != nil {
 			return err
 		}

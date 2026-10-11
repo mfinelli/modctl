@@ -72,12 +72,12 @@ to refresh cached data.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, modsInfoGame)
+		gi, err := argresolver.GameInstall(ctx, q, modsInfoGame)
 		if err != nil {
 			return err
 		}
 
-		mp, err := argresolver.ResolveModPageArg(ctx, q, gi, args[0])
+		mp, err := argresolver.ModPage(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}

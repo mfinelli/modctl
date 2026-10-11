@@ -153,5 +153,5 @@ func resolveGameInstallForCompletion(cmd *cobra.Command, ctx context.Context, q 
 		}
 		gameArg = strconv.FormatInt(active.ActiveGameInstallID, 10)
 	}
-	return argresolver.ResolveGameInstallArg(ctx, q, gameArg)
+	return argresolver.ExplicitGameInstall(ctx, q, gameArg)
 }

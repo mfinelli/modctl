@@ -90,7 +90,7 @@ to proceed even if the operation would exhaust your API quota.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, modsNexusCheckUpdatesGame)
+		gi, err := argresolver.GameInstall(ctx, q, modsNexusCheckUpdatesGame)
 		if err != nil {
 			return err
 		}

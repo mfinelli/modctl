@@ -79,13 +79,13 @@ version for manual linking.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, modsNexusLinkGame)
+		gi, err := argresolver.GameInstall(ctx, q, modsNexusLinkGame)
 		if err != nil {
 			return err
 		}
 
 		if modsNexusLinkVersionID != "" {
-			mfv, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, modsNexusLinkVersionID)
+			mfv, err := argresolver.ModFileVersion(ctx, q, gi, modsNexusLinkVersionID)
 			if err != nil {
 				return err
 			}

@@ -53,7 +53,7 @@ of which profiles they appear in.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, modsIncompatibleListGame)
+		gi, err := argresolver.GameInstall(ctx, q, modsIncompatibleListGame)
 		if err != nil {
 			return err
 		}

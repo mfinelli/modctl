@@ -59,7 +59,7 @@ var gamesTargetsEnableCmd = &cobra.Command{
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, gamesTargetsEnableGame)
+		gi, err := argresolver.GameInstall(ctx, q, gamesTargetsEnableGame)
 		if err != nil {
 			return err
 		}

@@ -71,12 +71,12 @@ priority or position in the load order.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesEnableGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesEnableGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesEnableProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesEnableProfile)
 		if err != nil {
 			return err
 		}
@@ -88,7 +88,7 @@ priority or position in the load order.`,
 			})
 		}
 
-		mfv, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfv, err := argresolver.ModFileVersion(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}

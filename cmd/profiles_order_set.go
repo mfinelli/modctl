@@ -68,17 +68,17 @@ Higher priority wins conflicts. Priorities must be unique within a profile.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesOrderSetGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesOrderSetGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOrderSetProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesOrderSetProfile)
 		if err != nil {
 			return err
 		}
 
-		mfv, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfv, err := argresolver.ModFileVersion(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}

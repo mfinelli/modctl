@@ -67,12 +67,12 @@ Use --multiple to assign priorities as N, 2N, 3N, ... (for example, --multiple
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesOrderCompactGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesOrderCompactGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOrderCompactProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesOrderCompactProfile)
 		if err != nil {
 			return err
 		}

@@ -56,7 +56,7 @@ winner for this path in the active profile.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		relpath, err := argresolver.ResolveRelpathArg(args[0])
+		relpath, err := argresolver.Relpath(args[0])
 		if err != nil {
 			return err
 		}
@@ -70,12 +70,12 @@ winner for this path in the active profile.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesOverridesSetGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesSetGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesSetProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesOverridesSetProfile)
 		if err != nil {
 			return err
 		}

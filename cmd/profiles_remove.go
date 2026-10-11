@@ -63,17 +63,17 @@ It does not change files on disk; changes take effect the next time you apply.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesRenameGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesRenameGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesAddProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesAddProfile)
 		if err != nil {
 			return err
 		}
 
-		mfv, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfv, err := argresolver.ModFileVersion(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}

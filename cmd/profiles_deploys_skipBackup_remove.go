@@ -61,22 +61,22 @@ Use 'skip-backup list' to see current patterns.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesDeploysSkipBackupRemoveGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesDeploysSkipBackupRemoveGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesDeploysSkipBackupRemoveProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesDeploysSkipBackupRemoveProfile)
 		if err != nil {
 			return err
 		}
 
-		mfv, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfv, err := argresolver.ModFileVersion(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}
 
-		itemID, err := argresolver.ResolveProfileItemByVersion(ctx, q, p, mfv.ID)
+		itemID, err := argresolver.ProfileItemByVersion(ctx, q, p, mfv.ID)
 		if err != nil {
 			return err
 		}

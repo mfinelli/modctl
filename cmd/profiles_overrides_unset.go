@@ -46,7 +46,7 @@ path back to the mod winner or remove it if no mod provides it.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		relpath, err := argresolver.ResolveRelpathArg(args[0])
+		relpath, err := argresolver.Relpath(args[0])
 		if err != nil {
 			return err
 		}
@@ -59,12 +59,12 @@ path back to the mod winner or remove it if no mod provides it.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesOverridesUnsetGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesUnsetGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesUnsetProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesOverridesUnsetProfile)
 		if err != nil {
 			return err
 		}

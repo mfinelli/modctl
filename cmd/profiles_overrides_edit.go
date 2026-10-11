@@ -67,7 +67,7 @@ archives.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		relpath, err := argresolver.ResolveRelpathArg(args[0])
+		relpath, err := argresolver.Relpath(args[0])
 		if err != nil {
 			return err
 		}
@@ -80,12 +80,12 @@ archives.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesOverridesEditGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesEditGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesEditProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesOverridesEditProfile)
 		if err != nil {
 			return err
 		}

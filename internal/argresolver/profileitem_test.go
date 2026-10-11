@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestResolveProfileItemByVersion(t *testing.T) {
+func TestProfileItemByVersion(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -42,9 +42,9 @@ func TestResolveProfileItemByVersion(t *testing.T) {
 		item1 := f.item(profile, v1, 1, true)
 		item2 := f.item(profile, v2, 2, true)
 
-		got1, err := ResolveProfileItemByVersion(ctx, f.q, profile, v1)
+		got1, err := ProfileItemByVersion(ctx, f.q, profile, v1)
 		require.NoError(t, err)
-		got2, err := ResolveProfileItemByVersion(ctx, f.q, profile, v2)
+		got2, err := ProfileItemByVersion(ctx, f.q, profile, v2)
 		require.NoError(t, err)
 
 		assert.Equal(t, item1, got1)
@@ -59,7 +59,7 @@ func TestResolveProfileItemByVersion(t *testing.T) {
 		v := f.version(file, "1.0")
 		item := f.item(profile, v, 1, false)
 
-		got, err := ResolveProfileItemByVersion(ctx, f.q, profile, v)
+		got, err := ProfileItemByVersion(ctx, f.q, profile, v)
 
 		require.NoError(t, err)
 		assert.Equal(t, item, got)
@@ -72,7 +72,7 @@ func TestResolveProfileItemByVersion(t *testing.T) {
 		_, file := f.page(f.game, "Big Mod", "local")
 		v := f.version(file, "1.0")
 
-		_, err := ResolveProfileItemByVersion(ctx, f.q, profile, v)
+		_, err := ProfileItemByVersion(ctx, f.q, profile, v)
 
 		require.Error(t, err)
 		assert.EqualError(t, err, fmt.Sprintf("version %d is not in profile %q", v, "Mine"))
@@ -83,7 +83,7 @@ func TestResolveProfileItemByVersion(t *testing.T) {
 		f := newModFixture(t)
 		profile := testbuilder.NewProfile(t, f.db).WithGame(f.game).WithName("Mine").Build()
 
-		_, err := ResolveProfileItemByVersion(ctx, f.q, profile, 424242)
+		_, err := ProfileItemByVersion(ctx, f.q, profile, 424242)
 
 		assert.EqualError(t, err, `version 424242 is not in profile "Mine"`)
 	})
@@ -97,11 +97,11 @@ func TestResolveProfileItemByVersion(t *testing.T) {
 		v := f.version(file, "1.0")
 		theirs := f.item(other, v, 1, true)
 
-		_, err := ResolveProfileItemByVersion(ctx, f.q, mine, v)
+		_, err := ProfileItemByVersion(ctx, f.q, mine, v)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), `in profile "Mine"`)
 
-		got, err := ResolveProfileItemByVersion(ctx, f.q, other, v)
+		got, err := ProfileItemByVersion(ctx, f.q, other, v)
 		require.NoError(t, err)
 		assert.Equal(t, theirs, got)
 	})

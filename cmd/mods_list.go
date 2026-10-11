@@ -69,7 +69,7 @@ only reads the cache: use ` + "`modctl mods nexus check-updates`" + ` to refresh
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, modsListGame)
+		gi, err := argresolver.GameInstall(ctx, q, modsListGame)
 		if err != nil {
 			return err
 		}

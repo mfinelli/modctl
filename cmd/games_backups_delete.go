@@ -49,7 +49,7 @@ not immediately removed from disk; run 'modctl gc' to reclaim space.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		relpath, err := argresolver.ResolveRelpathArg(args[0])
+		relpath, err := argresolver.Relpath(args[0])
 		if err != nil {
 			return err
 		}
@@ -62,7 +62,7 @@ not immediately removed from disk; run 'modctl gc' to reclaim space.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, gamesBackupsDeleteGame)
+		gi, err := argresolver.GameInstall(ctx, q, gamesBackupsDeleteGame)
 		if err != nil {
 			return err
 		}

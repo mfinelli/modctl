@@ -33,13 +33,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestResolveGameInstallArg(t *testing.T) {
+func TestExplicitGameInstall(t *testing.T) {
 	t.Run("numeric id", func(t *testing.T) {
 		db := testbuilder.SetupDB(t)
 		gi := testbuilder.NewGame(t, db).WithName("Cyberpunk 2077").Build()
 		q := dbq.New(db)
 
-		result, err := ResolveGameInstallArg(context.Background(), q, fmt.Sprintf("%d", gi.ID))
+		result, err := ExplicitGameInstall(context.Background(), q, fmt.Sprintf("%d", gi.ID))
 		require.NoError(t, err)
 		assert.Equal(t, gi.ID, result.ID)
 		assert.Equal(t, "Cyberpunk 2077", result.DisplayName)
@@ -49,7 +49,7 @@ func TestResolveGameInstallArg(t *testing.T) {
 		db := testbuilder.SetupDB(t)
 		q := dbq.New(db)
 
-		_, err := ResolveGameInstallArg(context.Background(), q, "99999")
+		_, err := ExplicitGameInstall(context.Background(), q, "99999")
 		assert.ErrorContains(t, err, "99999")
 	})
 
@@ -61,7 +61,7 @@ func TestResolveGameInstallArg(t *testing.T) {
 			Build()
 		q := dbq.New(db)
 
-		result, err := ResolveGameInstallArg(context.Background(), q, "steam:1091500#default")
+		result, err := ExplicitGameInstall(context.Background(), q, "steam:1091500#default")
 		require.NoError(t, err)
 		assert.Equal(t, gi.ID, result.ID)
 	})
@@ -71,7 +71,7 @@ func TestResolveGameInstallArg(t *testing.T) {
 		gi := testbuilder.NewGame(t, db).WithStoreGameID("1091500").Build()
 		q := dbq.New(db)
 
-		result, err := ResolveGameInstallArg(context.Background(), q, "steam:1091500")
+		result, err := ExplicitGameInstall(context.Background(), q, "steam:1091500")
 		require.NoError(t, err)
 		assert.Equal(t, gi.ID, result.ID)
 	})
@@ -80,7 +80,7 @@ func TestResolveGameInstallArg(t *testing.T) {
 		db := testbuilder.SetupDB(t)
 		q := dbq.New(db)
 
-		_, err := ResolveGameInstallArg(context.Background(), q, "steam:1091500#library_2")
+		_, err := ExplicitGameInstall(context.Background(), q, "steam:1091500#library_2")
 		assert.ErrorContains(t, err, "steam:1091500#library_2")
 	})
 
@@ -91,7 +91,7 @@ func TestResolveGameInstallArg(t *testing.T) {
 		testbuilder.NewGame(t, db).WithStoreGameID("1091500").WithInstanceID("library_3").Build()
 		q := dbq.New(db)
 
-		_, err := ResolveGameInstallArg(context.Background(), q, "steam:1091500")
+		_, err := ExplicitGameInstall(context.Background(), q, "steam:1091500")
 		assert.ErrorContains(t, err, "Multiple installs found")
 		assert.ErrorContains(t, err, "steam:1091500#library_2")
 		assert.ErrorContains(t, err, "steam:1091500#library_3")
@@ -102,7 +102,7 @@ func TestResolveGameInstallArg(t *testing.T) {
 		gi := testbuilder.NewGame(t, db).WithName("Cyberpunk 2077").Build()
 		q := dbq.New(db)
 
-		result, err := ResolveGameInstallArg(context.Background(), q, "Cyberpunk 2077")
+		result, err := ExplicitGameInstall(context.Background(), q, "Cyberpunk 2077")
 		require.NoError(t, err)
 		assert.Equal(t, gi.ID, result.ID)
 	})
@@ -112,7 +112,7 @@ func TestResolveGameInstallArg(t *testing.T) {
 		gi := testbuilder.NewGame(t, db).WithName("Cyberpunk 2077").Build()
 		q := dbq.New(db)
 
-		result, err := ResolveGameInstallArg(context.Background(), q, "cyberpunk 2077")
+		result, err := ExplicitGameInstall(context.Background(), q, "cyberpunk 2077")
 		require.NoError(t, err)
 		assert.Equal(t, gi.ID, result.ID)
 	})
@@ -122,7 +122,7 @@ func TestResolveGameInstallArg(t *testing.T) {
 		gi := testbuilder.NewGame(t, db).WithName("My Game: The Sequel").Build()
 		q := dbq.New(db)
 
-		result, err := ResolveGameInstallArg(context.Background(), q, "My Game: The Sequel")
+		result, err := ExplicitGameInstall(context.Background(), q, "My Game: The Sequel")
 		require.NoError(t, err)
 		assert.Equal(t, gi.ID, result.ID)
 	})
@@ -131,7 +131,7 @@ func TestResolveGameInstallArg(t *testing.T) {
 		db := testbuilder.SetupDB(t)
 		q := dbq.New(db)
 
-		_, err := ResolveGameInstallArg(context.Background(), q, "Nonexistent Game")
+		_, err := ExplicitGameInstall(context.Background(), q, "Nonexistent Game")
 		assert.ErrorContains(t, err, "Nonexistent Game")
 	})
 
@@ -142,7 +142,7 @@ func TestResolveGameInstallArg(t *testing.T) {
 		testbuilder.NewGame(t, db).WithName("Cyberpunk 2077").WithStoreGameID("9999999").Build()
 		q := dbq.New(db)
 
-		_, err := ResolveGameInstallArg(context.Background(), q, "Cyberpunk 2077")
+		_, err := ExplicitGameInstall(context.Background(), q, "Cyberpunk 2077")
 		assert.ErrorContains(t, err, "Multiple installs found")
 	})
 
@@ -151,7 +151,7 @@ func TestResolveGameInstallArg(t *testing.T) {
 		gi := testbuilder.NewGame(t, db).WithName("Cyberpunk 2077").NotPresent().Build()
 		q := dbq.New(db)
 
-		result, err := ResolveGameInstallArg(context.Background(), q, "Cyberpunk 2077")
+		result, err := ExplicitGameInstall(context.Background(), q, "Cyberpunk 2077")
 		require.NoError(t, err)
 		assert.Equal(t, gi.ID, result.ID)
 	})
@@ -162,7 +162,7 @@ func TestResolveGameInstallArg(t *testing.T) {
 		gi := testbuilder.NewGame(t, db).WithName("モンスターハンター").Build()
 		q := dbq.New(db)
 
-		result, err := ResolveGameInstallArg(context.Background(), q, "モンスターハンター")
+		result, err := ExplicitGameInstall(context.Background(), q, "モンスターハンター")
 		require.NoError(t, err)
 		assert.Equal(t, gi.ID, result.ID)
 	})
@@ -183,7 +183,7 @@ func useStateDir(t *testing.T) string {
 	return dir
 }
 
-func TestResolveGameInstall(t *testing.T) {
+func TestGameInstall(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("a game that is asked for is the one that is resolved", func(t *testing.T) {
@@ -194,11 +194,11 @@ func TestResolveGameInstall(t *testing.T) {
 		active := testbuilder.NewGame(t, db).WithName("Skyrim").WithStoreGameID("2").Build()
 		require.NoError(t, state.SaveActive(state.Active{ActiveGameInstallID: active.ID}))
 
-		byID, err := ResolveGameInstall(ctx, q, fmt.Sprintf("%d", asked.ID))
+		byID, err := GameInstall(ctx, q, fmt.Sprintf("%d", asked.ID))
 		require.NoError(t, err)
 		assert.Equal(t, asked.ID, byID.ID, "not the active one")
 
-		byName, err := ResolveGameInstall(ctx, q, "Cyberpunk 2077")
+		byName, err := GameInstall(ctx, q, "Cyberpunk 2077")
 		require.NoError(t, err)
 		assert.Equal(t, asked.ID, byName.ID)
 	})
@@ -209,7 +209,7 @@ func TestResolveGameInstall(t *testing.T) {
 		active := testbuilder.NewGame(t, db).Build()
 		require.NoError(t, state.SaveActive(state.Active{ActiveGameInstallID: active.ID}))
 
-		_, err := ResolveGameInstall(ctx, dbq.New(db), "999999")
+		_, err := GameInstall(ctx, dbq.New(db), "999999")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no game install with id 999999")
@@ -223,7 +223,7 @@ func TestResolveGameInstall(t *testing.T) {
 		active := testbuilder.NewGame(t, db).WithName("Active").WithStoreGameID("2").Build()
 		require.NoError(t, state.SaveActive(state.Active{ActiveGameInstallID: active.ID}))
 
-		got, err := ResolveGameInstall(ctx, q, "")
+		got, err := GameInstall(ctx, q, "")
 
 		require.NoError(t, err)
 		assert.Equal(t, active.ID, got.ID)
@@ -235,7 +235,7 @@ func TestResolveGameInstall(t *testing.T) {
 		db := testbuilder.SetupDB(t)
 		testbuilder.NewGame(t, db).Build()
 
-		_, err := ResolveGameInstall(ctx, dbq.New(db), "")
+		_, err := GameInstall(ctx, dbq.New(db), "")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no active game selected")
@@ -249,7 +249,7 @@ func TestResolveGameInstall(t *testing.T) {
 		// a store has been chosen, but not a game
 		require.NoError(t, state.SaveActive(state.Active{ActiveStoreID: "steam"}))
 
-		_, err := ResolveGameInstall(ctx, dbq.New(db), "")
+		_, err := GameInstall(ctx, dbq.New(db), "")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no active game selected")
@@ -260,7 +260,7 @@ func TestResolveGameInstall(t *testing.T) {
 		db := testbuilder.SetupDB(t)
 		require.NoError(t, state.SaveActive(state.Active{ActiveGameInstallID: 424242}))
 
-		_, err := ResolveGameInstall(ctx, dbq.New(db), "")
+		_, err := GameInstall(ctx, dbq.New(db), "")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no game install with id 424242")
@@ -274,7 +274,7 @@ func TestResolveGameInstall(t *testing.T) {
 		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
 		require.NoError(t, os.WriteFile(path, []byte("{ not json"), 0o644))
 
-		_, err := ResolveGameInstall(ctx, dbq.New(db), "")
+		_, err := GameInstall(ctx, dbq.New(db), "")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "load active selection")
@@ -289,7 +289,7 @@ func TestResolveGameInstall(t *testing.T) {
 		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
 		require.NoError(t, os.WriteFile(path, []byte("{ not json"), 0o644))
 
-		got, err := ResolveGameInstall(ctx, dbq.New(db), fmt.Sprintf("%d", gi.ID))
+		got, err := GameInstall(ctx, dbq.New(db), fmt.Sprintf("%d", gi.ID))
 
 		require.NoError(t, err)
 		assert.Equal(t, gi.ID, got.ID)

@@ -65,17 +65,17 @@ Exactly one of --before or --after is required.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesOrderMoveGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesOrderMoveGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOrderMoveProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesOrderMoveProfile)
 		if err != nil {
 			return err
 		}
 
-		mfv, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfv, err := argresolver.ModFileVersion(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}

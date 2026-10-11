@@ -75,19 +75,19 @@ items are removed automatically via cascade.`,
 		q := dbq.New(db)
 
 		// Resolve game install
-		gi, err := argresolver.ResolveGameInstall(ctx, q, modsRemoveGame)
+		gi, err := argresolver.GameInstall(ctx, q, modsRemoveGame)
 		if err != nil {
 			return err
 		}
 
-		page, err := argresolver.ResolveModPageArg(ctx, q, gi, args[0])
+		page, err := argresolver.ModPage(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}
 
 		// Version-scoped removal
 		if modsRemoveFileVersion != "" {
-			mfv, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, modsRemoveFileVersion)
+			mfv, err := argresolver.ModFileVersion(ctx, q, gi, modsRemoveFileVersion)
 			if err != nil {
 				return fmt.Errorf("resolve mod file version: %w", err)
 			}

@@ -64,32 +64,32 @@ the skip-backup configuration from the old version.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesDeploysSkipBackupCopyGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesDeploysSkipBackupCopyGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesDeploysSkipBackupCopyProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesDeploysSkipBackupCopyProfile)
 		if err != nil {
 			return err
 		}
 
-		mfvSrc, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfvSrc, err := argresolver.ModFileVersion(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}
 
-		mfvDst, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[1])
+		mfvDst, err := argresolver.ModFileVersion(ctx, q, gi, args[1])
 		if err != nil {
 			return err
 		}
 
-		srcItemID, err := argresolver.ResolveProfileItemByVersion(ctx, q, p, mfvSrc.ID)
+		srcItemID, err := argresolver.ProfileItemByVersion(ctx, q, p, mfvSrc.ID)
 		if err != nil {
 			return fmt.Errorf("source: %w", err)
 		}
 
-		dstItemID, err := argresolver.ResolveProfileItemByVersion(ctx, q, p, mfvDst.ID)
+		dstItemID, err := argresolver.ProfileItemByVersion(ctx, q, p, mfvDst.ID)
 		if err != nil {
 			return fmt.Errorf("destination: %w", err)
 		}

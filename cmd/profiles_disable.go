@@ -71,12 +71,12 @@ versions are ignored when computing the applied mod set.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesDisableGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesDisableGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesDisableProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesDisableProfile)
 		if err != nil {
 			return err
 		}
@@ -88,7 +88,7 @@ versions are ignored when computing the applied mod set.`,
 			})
 		}
 
-		mfvID, err := argresolver.ResolveEnabledProfileVersionArg(ctx, q, gi, p, args[0])
+		mfvID, err := argresolver.EnabledProfileVersion(ctx, q, gi, p, args[0])
 		if err != nil {
 			return err
 		}

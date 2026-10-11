@@ -66,17 +66,17 @@ known crashes, conflicting game mechanics, or anything else.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, modsIncompatibleAddGame)
+		gi, err := argresolver.GameInstall(ctx, q, modsIncompatibleAddGame)
 		if err != nil {
 			return err
 		}
 
-		mpA, err := argresolver.ResolveModPageArg(ctx, q, gi, args[0])
+		mpA, err := argresolver.ModPage(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}
 
-		mpB, err := argresolver.ResolveModPageArg(ctx, q, gi, args[1])
+		mpB, err := argresolver.ModPage(ctx, q, gi, args[1])
 		if err != nil {
 			return err
 		}

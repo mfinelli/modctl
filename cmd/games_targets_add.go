@@ -67,7 +67,7 @@ moves later, this target will not be updated automatically.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, gamesTargetsAddGame)
+		gi, err := argresolver.GameInstall(ctx, q, gamesTargetsAddGame)
 		if err != nil {
 			return err
 		}

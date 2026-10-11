@@ -53,7 +53,7 @@ For ini patches, use --section to identify entries in a specific section.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		relpath, err := argresolver.ResolveRelpathArg(args[0])
+		relpath, err := argresolver.Relpath(args[0])
 		if err != nil {
 			return err
 		}
@@ -67,12 +67,12 @@ For ini patches, use --section to identify entries in a specific section.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesOverridesPatchRemoveGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesPatchRemoveGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesPatchRemoveProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesOverridesPatchRemoveProfile)
 		if err != nil {
 			return err
 		}

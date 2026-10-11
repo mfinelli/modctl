@@ -70,17 +70,17 @@ preserved.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesUpgradeGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesUpgradeGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesUpgradeProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesUpgradeProfile)
 		if err != nil {
 			return err
 		}
 
-		mp, err := argresolver.ResolveModPageArg(ctx, q, gi, args[0])
+		mp, err := argresolver.ModPage(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}
@@ -110,7 +110,7 @@ preserved.`,
 		var newOriginalName sql.NullString
 
 		if profilesUpgradeTo != "" {
-			mfvID, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, profilesUpgradeTo)
+			mfvID, err := argresolver.ModFileVersion(ctx, q, gi, profilesUpgradeTo)
 			if err != nil {
 				return err
 			}

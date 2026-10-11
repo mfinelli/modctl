@@ -27,9 +27,9 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 )
 
-// ResolveProfileItemByVersion looks up a profile item by mod file version ID
+// ProfileItemByVersion looks up a profile item by mod file version ID
 // within a profile, returning a clean error if the version is not in the profile.
-func ResolveProfileItemByVersion(ctx context.Context, q *dbq.Queries, profile dbq.Profile, versionID int64) (int64, error) {
+func ProfileItemByVersion(ctx context.Context, q *dbq.Queries, profile dbq.Profile, versionID int64) (int64, error) {
 	itemID, err := q.GetProfileItemIDByVersion(ctx, dbq.GetProfileItemIDByVersionParams{
 		ProfileID:        profile.ID,
 		ModFileVersionID: versionID,

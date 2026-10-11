@@ -69,7 +69,7 @@ the only enabled target.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, gamesTargetsDisableGame)
+		gi, err := argresolver.GameInstall(ctx, q, gamesTargetsDisableGame)
 		if err != nil {
 			return err
 		}

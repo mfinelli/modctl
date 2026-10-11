@@ -63,12 +63,12 @@ Pass - as the text to read it from stdin:
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, modsNotesSetGame)
+		gi, err := argresolver.GameInstall(ctx, q, modsNotesSetGame)
 		if err != nil {
 			return err
 		}
 
-		mp, err := argresolver.ResolveModPageArg(ctx, q, gi, args[0])
+		mp, err := argresolver.ModPage(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}

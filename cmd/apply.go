@@ -86,12 +86,12 @@ Use --dry-run to preview the plan without making any changes. Add the
 		q := dbq.New(db)
 
 		// Resolve game install
-		gi, err := argresolver.ResolveGameInstall(ctx, q, applyGame)
+		gi, err := argresolver.GameInstall(ctx, q, applyGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, applyProfile)
+		p, err := argresolver.Profile(ctx, q, gi, applyProfile)
 		if err != nil {
 			return err
 		}

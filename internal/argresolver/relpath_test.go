@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestResolveRelpathArg(t *testing.T) {
+func TestRelpath(t *testing.T) {
 	t.Parallel()
 
 	valid := []struct {
@@ -47,7 +47,7 @@ func TestResolveRelpathArg(t *testing.T) {
 		t.Run("valid/"+tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := ResolveRelpathArg(tc.arg)
+			got, err := Relpath(tc.arg)
 
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, got)
@@ -75,7 +75,7 @@ func TestResolveRelpathArg(t *testing.T) {
 		t.Run("invalid/"+tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := ResolveRelpathArg(tc.arg)
+			got, err := Relpath(tc.arg)
 
 			require.Error(t, err)
 			assert.Empty(t, got)

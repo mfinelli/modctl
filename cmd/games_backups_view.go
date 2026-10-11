@@ -52,7 +52,7 @@ Binary files are detected automatically and refused unless --force is passed.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		relpath, err := argresolver.ResolveRelpathArg(args[0])
+		relpath, err := argresolver.Relpath(args[0])
 		if err != nil {
 			return err
 		}
@@ -65,7 +65,7 @@ Binary files are detected automatically and refused unless --force is passed.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, gamesBackupsViewGame)
+		gi, err := argresolver.GameInstall(ctx, q, gamesBackupsViewGame)
 		if err != nil {
 			return err
 		}

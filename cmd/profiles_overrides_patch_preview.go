@@ -59,7 +59,7 @@ Note: requires archive extraction which may be slow for large archives.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		relpath, err := argresolver.ResolveRelpathArg(args[0])
+		relpath, err := argresolver.Relpath(args[0])
 		if err != nil {
 			return err
 		}
@@ -72,12 +72,12 @@ Note: requires archive extraction which may be slow for large archives.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesOverridesPatchPreviewGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesPatchPreviewGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesPatchPreviewProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesOverridesPatchPreviewProfile)
 		if err != nil {
 			return err
 		}

@@ -61,7 +61,7 @@ Note: modctl automatically creates a "default" profile during game refresh.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesCreateGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesCreateGame)
 		if err != nil {
 			return err
 		}

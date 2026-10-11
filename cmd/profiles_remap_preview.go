@@ -67,17 +67,17 @@ if needed.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesRemapPreviewGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesRemapPreviewGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesRemapPreviewProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesRemapPreviewProfile)
 		if err != nil {
 			return err
 		}
 
-		mfv, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfv, err := argresolver.ModFileVersion(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}
@@ -90,7 +90,7 @@ if needed.`,
 			)
 		}
 
-		itemID, err := argresolver.ResolveProfileItemByVersion(ctx, q, p, mfv.ID)
+		itemID, err := argresolver.ProfileItemByVersion(ctx, q, p, mfv.ID)
 		if err != nil {
 			return err
 		}

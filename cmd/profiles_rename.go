@@ -63,7 +63,7 @@ Profile names must be unique per game.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesRenameGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesRenameGame)
 		if err != nil {
 			return err
 		}

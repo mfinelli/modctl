@@ -56,12 +56,12 @@ var modsNexusUnlinkCmd = &cobra.Command{
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, modsNexusUnlinkGame)
+		gi, err := argresolver.GameInstall(ctx, q, modsNexusUnlinkGame)
 		if err != nil {
 			return err
 		}
 
-		mfv, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfv, err := argresolver.ModFileVersion(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}

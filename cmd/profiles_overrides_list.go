@@ -57,12 +57,12 @@ Run 'profiles overrides status' for full staleness detail.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesOverridesListGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesListGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesListProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesOverridesListProfile)
 		if err != nil {
 			return err
 		}

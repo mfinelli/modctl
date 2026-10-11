@@ -27,10 +27,10 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 )
 
-// ResolveProfileArg resolves the profile that a command is for: the one of the
+// Profile resolves the profile that a command is for: the one of the
 // game install that arg names, or its active profile when arg is empty (which is
 // what leaving out --profile means).
-func ResolveProfileArg(ctx context.Context, q *dbq.Queries, gi dbq.GameInstall, arg string) (dbq.Profile, error) {
+func Profile(ctx context.Context, q *dbq.Queries, gi dbq.GameInstall, arg string) (dbq.Profile, error) {
 	if arg != "" {
 		p, err := q.GetProfileByName(ctx, dbq.GetProfileByNameParams{
 			GameInstallID: gi.ID,

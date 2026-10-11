@@ -29,12 +29,12 @@ import (
 	"github.com/mfinelli/modctl/internal"
 )
 
-// ResolveModFileVersionArg resolves a mod file version argument for the given
+// ModFileVersion resolves a mod file version argument for the given
 // game install. Accepts:
 //   - a numeric ID (fast path, unambiguous)
 //   - a mod page name (case-insensitive; errors if ambiguous, listing all
 //     candidates with their numeric IDs)
-func ResolveModFileVersionArg(ctx context.Context, q *dbq.Queries, gi dbq.GameInstall, arg string) (dbq.GetModFileVersionByIDRow, error) {
+func ModFileVersion(ctx context.Context, q *dbq.Queries, gi dbq.GameInstall, arg string) (dbq.GetModFileVersionByIDRow, error) {
 	// Fast path: numeric ID
 	if id, ok := internal.ParseInt64(arg); ok {
 		row, err := q.GetModFileVersionByID(ctx, dbq.GetModFileVersionByIDParams{
@@ -85,16 +85,16 @@ func ResolveModFileVersionArg(ctx context.Context, q *dbq.Queries, gi dbq.GameIn
 	}
 }
 
-// ResolveEnabledProfileVersionArg resolves a mod file version argument for a
+// EnabledProfileVersion resolves a mod file version argument for a
 // command that acts on the enabled version of a mod in a profile (e.g.,
-// disable). It behaves like ResolveModFileVersionArg except that when the
+// disable). It behaves like ModFileVersion except that when the
 // argument is a mod page name matching several versions, the candidates are
 // narrowed to the versions that are enabled in the given profile:
 //   - exactly one enabled version: that version is returned
 //   - several enabled versions: an error listing only those is returned
-//   - none enabled: resolution falls back to ResolveModFileVersionArg so the
+//   - none enabled: resolution falls back to ModFileVersion so the
 //     usual not-in-profile/already-disabled/ambiguity handling applies
-func ResolveEnabledProfileVersionArg(ctx context.Context, q *dbq.Queries, gi dbq.GameInstall, profile dbq.Profile, arg string) (int64, error) {
+func EnabledProfileVersion(ctx context.Context, q *dbq.Queries, gi dbq.GameInstall, profile dbq.Profile, arg string) (int64, error) {
 	if _, ok := internal.ParseInt64(arg); !ok {
 		rows, err := q.ListProfileVersionsByModPageName(ctx, dbq.ListProfileVersionsByModPageNameParams{
 			ProfileID:     profile.ID,
@@ -131,7 +131,7 @@ func ResolveEnabledProfileVersionArg(ctx context.Context, q *dbq.Queries, gi dbq
 		}
 	}
 
-	mfv, err := ResolveModFileVersionArg(ctx, q, gi, arg)
+	mfv, err := ModFileVersion(ctx, q, gi, arg)
 	if err != nil {
 		return 0, err
 	}

@@ -159,7 +159,7 @@ has been safely stored and the database has been updated successfully.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, modsImportGame)
+		gi, err := argresolver.GameInstall(ctx, q, modsImportGame)
 		if err != nil {
 			return err
 		}

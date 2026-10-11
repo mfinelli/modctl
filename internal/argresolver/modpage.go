@@ -29,12 +29,12 @@ import (
 	"github.com/mfinelli/modctl/internal"
 )
 
-// ResolveModPageArg resolves a mod page argument for the given game install.
+// ModPage resolves a mod page argument for the given game install.
 // Accepts:
 //   - a numeric ID (fast path, unambiguous)
 //   - a mod page name (case-insensitive; errors if ambiguous, listing all
 //     candidates with their numeric IDs)
-func ResolveModPageArg(ctx context.Context, q *dbq.Queries, gi dbq.GameInstall, arg string) (dbq.GetModPageByIDForGameRow, error) {
+func ModPage(ctx context.Context, q *dbq.Queries, gi dbq.GameInstall, arg string) (dbq.GetModPageByIDForGameRow, error) {
 	if id, ok := internal.ParseInt64(arg); ok {
 		row, err := q.GetModPageByIDForGame(ctx, dbq.GetModPageByIDForGameParams{
 			ID:            id,

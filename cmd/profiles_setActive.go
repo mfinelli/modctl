@@ -63,7 +63,7 @@ The current active game is used unless --game is provided.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesSetActiveGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesSetActiveGame)
 		if err != nil {
 			return err
 		}

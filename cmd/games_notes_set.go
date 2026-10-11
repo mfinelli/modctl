@@ -56,7 +56,7 @@ Pass - as the argument to read note text from stdin:
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, gamesNotesSetGame)
+		gi, err := argresolver.GameInstall(ctx, q, gamesNotesSetGame)
 		if err != nil {
 			return err
 		}

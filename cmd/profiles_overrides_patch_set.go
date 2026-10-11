@@ -60,7 +60,7 @@ Examples:
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		relpath, err := argresolver.ResolveRelpathArg(args[0])
+		relpath, err := argresolver.Relpath(args[0])
 		if err != nil {
 			return err
 		}
@@ -75,12 +75,12 @@ Examples:
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesOverridesPatchSetGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesPatchSetGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesPatchSetProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesOverridesPatchSetProfile)
 		if err != nil {
 			return err
 		}

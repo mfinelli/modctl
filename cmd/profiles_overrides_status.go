@@ -59,12 +59,12 @@ Pass a path argument to show detail for a single override only.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesOverridesStatusGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesStatusGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesStatusProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesOverridesStatusProfile)
 		if err != nil {
 			return err
 		}

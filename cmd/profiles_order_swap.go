@@ -63,22 +63,22 @@ without having to choose unused priority numbers.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesAddGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesAddGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesAddProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesAddProfile)
 		if err != nil {
 			return err
 		}
 
-		mfvA, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfvA, err := argresolver.ModFileVersion(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}
 
-		mfvB, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[1])
+		mfvB, err := argresolver.ModFileVersion(ctx, q, gi, args[1])
 		if err != nil {
 			return err
 		}

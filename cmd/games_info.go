@@ -63,7 +63,7 @@ provided.`,
 		defer db.Close()
 
 		q := dbq.New(db)
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, args[0])
+		gi, err := argresolver.ExplicitGameInstall(ctx, q, args[0])
 		if err != nil {
 			return err
 		}

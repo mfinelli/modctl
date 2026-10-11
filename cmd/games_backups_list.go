@@ -54,7 +54,7 @@ not install. They are restored automatically on unapply.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, gamesBackupsListGame)
+		gi, err := argresolver.GameInstall(ctx, q, gamesBackupsListGame)
 		if err != nil {
 			return err
 		}

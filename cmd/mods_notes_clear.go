@@ -50,12 +50,12 @@ var modsNotesClearCmd = &cobra.Command{
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, modsNotesClearGame)
+		gi, err := argresolver.GameInstall(ctx, q, modsNotesClearGame)
 		if err != nil {
 			return err
 		}
 
-		mp, err := argresolver.ResolveModPageArg(ctx, q, gi, args[0])
+		mp, err := argresolver.ModPage(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}

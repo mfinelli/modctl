@@ -73,7 +73,7 @@ Use --limit to change the number of operations shown.`,
 		}
 
 		// Resolve game install
-		gi, err := argresolver.ResolveGameInstall(ctx, q, operationsListGame)
+		gi, err := argresolver.GameInstall(ctx, q, operationsListGame)
 		if err != nil {
 			return err
 		}

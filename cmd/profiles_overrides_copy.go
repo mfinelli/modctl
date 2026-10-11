@@ -65,19 +65,19 @@ are replaced.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesOverridesCopyGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesCopyGame)
 		if err != nil {
 			return err
 		}
 
 		// dst is the active profile
-		dst, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesCopyProfile)
+		dst, err := argresolver.Profile(ctx, q, gi, profilesOverridesCopyProfile)
 		if err != nil {
 			return err
 		}
 
 		// src is the named argument
-		src, err := argresolver.ResolveProfileArg(ctx, q, gi, args[0])
+		src, err := argresolver.Profile(ctx, q, gi, args[0])
 		if err != nil {
 			return fmt.Errorf("source profile: %w", err)
 		}

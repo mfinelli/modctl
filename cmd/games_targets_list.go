@@ -48,7 +48,7 @@ var gamesTargetsListCmd = &cobra.Command{
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, gamesTargetsListGame)
+		gi, err := argresolver.GameInstall(ctx, q, gamesTargetsListGame)
 		if err != nil {
 			return err
 		}

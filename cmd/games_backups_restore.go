@@ -61,7 +61,7 @@ that can't be read to check it.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		relpath, err := argresolver.ResolveRelpathArg(args[0])
+		relpath, err := argresolver.Relpath(args[0])
 		if err != nil {
 			return err
 		}
@@ -74,7 +74,7 @@ that can't be read to check it.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, gamesBackupsRestoreGame)
+		gi, err := argresolver.GameInstall(ctx, q, gamesBackupsRestoreGame)
 		if err != nil {
 			return err
 		}

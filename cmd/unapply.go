@@ -72,7 +72,7 @@ Use --dry-run to preview the plan without making any changes.`,
 		q := dbq.New(db)
 
 		// Resolve game install
-		gi, err := argresolver.ResolveGameInstall(ctx, q, unapplyGame)
+		gi, err := argresolver.GameInstall(ctx, q, unapplyGame)
 		if err != nil {
 			return err
 		}

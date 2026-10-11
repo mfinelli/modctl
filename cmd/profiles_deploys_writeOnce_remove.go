@@ -61,22 +61,22 @@ Use 'write-once list' to see current patterns.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesDeploysWriteOnceRemoveGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesDeploysWriteOnceRemoveGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesDeploysWriteOnceRemoveProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesDeploysWriteOnceRemoveProfile)
 		if err != nil {
 			return err
 		}
 
-		mfv, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfv, err := argresolver.ModFileVersion(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}
 
-		itemID, err := argresolver.ResolveProfileItemByVersion(ctx, q, p, mfv.ID)
+		itemID, err := argresolver.ProfileItemByVersion(ctx, q, p, mfv.ID)
 		if err != nil {
 			return err
 		}

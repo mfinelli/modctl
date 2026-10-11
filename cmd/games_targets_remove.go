@@ -63,7 +63,7 @@ Unapply any mods using this target first.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, gamesTargetsRemoveGame)
+		gi, err := argresolver.GameInstall(ctx, q, gamesTargetsRemoveGame)
 		if err != nil {
 			return err
 		}

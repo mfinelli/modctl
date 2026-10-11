@@ -25,13 +25,13 @@ import (
 	"github.com/mfinelli/modctl/internal/fsutil"
 )
 
-// ResolveRelpathArg is the path that a command is given as an argument for a
+// Relpath is the path that a command is given as an argument for a
 // file in a target, such as the file of a backup or an override, made ready to
 // be looked up: cleaned, and as the path that is relative to the root of the
 // target that it has to be. A path that is not one (it is absolute, it gets out
 // of the root by way of "..", or it is the root itself) is an error that says
 // what is wrong with it, as it was typed.
-func ResolveRelpathArg(arg string) (string, error) {
+func Relpath(arg string) (string, error) {
 	relpath := filepath.Clean(arg)
 
 	if err := fsutil.ValidateRelPath(relpath); err != nil {

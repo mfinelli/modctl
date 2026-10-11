@@ -74,7 +74,7 @@ Safety checks:
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesDeleteGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesDeleteGame)
 		if err != nil {
 			return err
 		}

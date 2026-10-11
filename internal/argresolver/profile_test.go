@@ -28,14 +28,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestResolveProfileArg(t *testing.T) {
+func TestProfile(t *testing.T) {
 	t.Run("named profile found", func(t *testing.T) {
 		db := testbuilder.SetupDB(t)
 		gi := testbuilder.NewGame(t, db).Build()
 		p := testbuilder.NewProfile(t, db).WithGame(gi).WithName("my profile").Build()
 		q := dbq.New(db)
 
-		result, err := ResolveProfileArg(context.Background(), q, gi, "my profile")
+		result, err := Profile(context.Background(), q, gi, "my profile")
 		require.NoError(t, err)
 		assert.Equal(t, p.ID, result.ID)
 		assert.Equal(t, "my profile", result.Name)
@@ -46,7 +46,7 @@ func TestResolveProfileArg(t *testing.T) {
 		gi := testbuilder.NewGame(t, db).Build()
 		q := dbq.New(db)
 
-		_, err := ResolveProfileArg(context.Background(), q, gi, "nonexistent")
+		_, err := Profile(context.Background(), q, gi, "nonexistent")
 		assert.ErrorContains(t, err, "nonexistent")
 	})
 
@@ -57,7 +57,7 @@ func TestResolveProfileArg(t *testing.T) {
 		testbuilder.NewProfile(t, db).WithGame(gi2).WithName("other game profile").Build()
 		q := dbq.New(db)
 
-		_, err := ResolveProfileArg(context.Background(), q, gi1, "other game profile")
+		_, err := Profile(context.Background(), q, gi1, "other game profile")
 		assert.ErrorContains(t, err, "other game profile")
 	})
 
@@ -67,7 +67,7 @@ func TestResolveProfileArg(t *testing.T) {
 		gi := testbuilder.NewGame(t, db).Build()
 		q := dbq.New(db)
 
-		result, err := ResolveProfileArg(context.Background(), q, gi, "")
+		result, err := Profile(context.Background(), q, gi, "")
 		require.NoError(t, err)
 		assert.NotZero(t, result.ID)
 		assert.Equal(t, int64(1), result.IsActive)
@@ -82,7 +82,7 @@ func TestResolveProfileArg(t *testing.T) {
 		err := q.DeactivateProfilesForGame(context.Background(), gi.ID)
 		require.NoError(t, err)
 
-		_, err = ResolveProfileArg(context.Background(), q, gi, "")
+		_, err = Profile(context.Background(), q, gi, "")
 		assert.ErrorContains(t, err, "no active profile")
 	})
 
@@ -93,7 +93,7 @@ func TestResolveProfileArg(t *testing.T) {
 		inactive := testbuilder.NewProfile(t, db).WithGame(gi).WithName("inactive").Build()
 		q := dbq.New(db)
 
-		result, err := ResolveProfileArg(context.Background(), q, gi, "")
+		result, err := Profile(context.Background(), q, gi, "")
 		require.NoError(t, err)
 		assert.NotEqual(t, inactive.ID, result.ID)
 		assert.Equal(t, int64(1), result.IsActive)

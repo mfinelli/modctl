@@ -115,7 +115,7 @@ Examples:
 			return nil
 		}
 
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, exportGame)
+		gi, err := argresolver.ExplicitGameInstall(ctx, q, exportGame)
 		if err != nil {
 			return err
 		}

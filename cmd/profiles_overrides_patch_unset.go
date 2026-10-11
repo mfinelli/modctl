@@ -60,7 +60,7 @@ removing the node entirely.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		relpath, err := argresolver.ResolveRelpathArg(args[0])
+		relpath, err := argresolver.Relpath(args[0])
 		if err != nil {
 			return err
 		}
@@ -74,12 +74,12 @@ removing the node entirely.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesOverridesPatchUnsetGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesPatchUnsetGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesPatchUnsetProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesOverridesPatchUnsetProfile)
 		if err != nil {
 			return err
 		}

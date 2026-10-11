@@ -45,7 +45,7 @@ Entries are shown in the order they will be applied.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		relpath, err := argresolver.ResolveRelpathArg(args[0])
+		relpath, err := argresolver.Relpath(args[0])
 		if err != nil {
 			return err
 		}
@@ -58,12 +58,12 @@ Entries are shown in the order they will be applied.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesOverridesPatchListGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesPatchListGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesOverridesPatchListProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesOverridesPatchListProfile)
 		if err != nil {
 			return err
 		}

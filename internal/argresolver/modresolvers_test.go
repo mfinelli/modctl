@@ -97,7 +97,7 @@ func (f modFixture) item(profile dbq.Profile, versionID int64, priority int64, e
 		profile.ID, versionID, target.ID, priority, on)
 }
 
-func TestResolveModFileVersionArg(t *testing.T) {
+func TestModFileVersion(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -108,7 +108,7 @@ func TestResolveModFileVersionArg(t *testing.T) {
 		_, file := f.page(f.game, "Big Mod", "local")
 		id := f.version(file, "1.2")
 
-		got, err := ResolveModFileVersionArg(ctx, f.q, f.game, fmt.Sprint(id))
+		got, err := ModFileVersion(ctx, f.q, f.game, fmt.Sprint(id))
 
 		require.NoError(t, err)
 		assert.Equal(t, id, got.ID)
@@ -122,7 +122,7 @@ func TestResolveModFileVersionArg(t *testing.T) {
 		t.Parallel()
 		f := newModFixture(t)
 
-		_, err := ResolveModFileVersionArg(ctx, f.q, f.game, "424242")
+		_, err := ModFileVersion(ctx, f.q, f.game, "424242")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no mod file version with id 424242")
@@ -136,7 +136,7 @@ func TestResolveModFileVersionArg(t *testing.T) {
 		_, file := f.page(other, "Theirs", "local")
 		id := f.version(file, "1.0")
 
-		_, err := ResolveModFileVersionArg(ctx, f.q, f.game, fmt.Sprint(id))
+		_, err := ModFileVersion(ctx, f.q, f.game, fmt.Sprint(id))
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no mod file version with id")
@@ -148,7 +148,7 @@ func TestResolveModFileVersionArg(t *testing.T) {
 		_, file := f.page(f.game, "Big Mod", "local")
 		id := f.version(file, "")
 
-		got, err := ResolveModFileVersionArg(ctx, f.q, f.game, "Big Mod")
+		got, err := ModFileVersion(ctx, f.q, f.game, "Big Mod")
 
 		require.NoError(t, err)
 		assert.Equal(t, id, got.ID)
@@ -163,7 +163,7 @@ func TestResolveModFileVersionArg(t *testing.T) {
 		_, file := f.page(f.game, "Big Mod", "local")
 		id := f.version(file, "1.0")
 
-		got, err := ResolveModFileVersionArg(ctx, f.q, f.game, "bIg mOd")
+		got, err := ModFileVersion(ctx, f.q, f.game, "bIg mOd")
 
 		require.NoError(t, err)
 		assert.Equal(t, id, got.ID)
@@ -173,7 +173,7 @@ func TestResolveModFileVersionArg(t *testing.T) {
 		t.Parallel()
 		f := newModFixture(t)
 
-		_, err := ResolveModFileVersionArg(ctx, f.q, f.game, "Nothing")
+		_, err := ModFileVersion(ctx, f.q, f.game, "Nothing")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), `no mod file versions found for "Nothing"`)
@@ -186,7 +186,7 @@ func TestResolveModFileVersionArg(t *testing.T) {
 		_, file := f.page(other, "Theirs", "local")
 		f.version(file, "1.0")
 
-		_, err := ResolveModFileVersionArg(ctx, f.q, f.game, "Theirs")
+		_, err := ModFileVersion(ctx, f.q, f.game, "Theirs")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no mod file versions found")
@@ -199,7 +199,7 @@ func TestResolveModFileVersionArg(t *testing.T) {
 		v1 := f.version(file, "1.0")
 		v2 := f.version(file, "")
 
-		_, err := ResolveModFileVersionArg(ctx, f.q, f.game, "Big Mod")
+		_, err := ModFileVersion(ctx, f.q, f.game, "Big Mod")
 
 		require.Error(t, err)
 		msg := err.Error()
@@ -217,7 +217,7 @@ func TestResolveModFileVersionArg(t *testing.T) {
 		va := f.version(a, "1")
 		vb := f.version(b, "2")
 
-		_, err := ResolveModFileVersionArg(ctx, f.q, f.game, "Same Name")
+		_, err := ModFileVersion(ctx, f.q, f.game, "Same Name")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), fmt.Sprint(va))
@@ -230,14 +230,14 @@ func TestResolveModFileVersionArg(t *testing.T) {
 		_, file := f.page(f.game, "2077 Redux", "local")
 		id := f.version(file, "1.0")
 
-		got, err := ResolveModFileVersionArg(ctx, f.q, f.game, "2077 Redux")
+		got, err := ModFileVersion(ctx, f.q, f.game, "2077 Redux")
 
 		require.NoError(t, err)
 		assert.Equal(t, id, got.ID)
 	})
 }
 
-func TestResolveModPageArg(t *testing.T) {
+func TestModPage(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -247,7 +247,7 @@ func TestResolveModPageArg(t *testing.T) {
 		f := newModFixture(t)
 		page, _ := f.page(f.game, "Big Mod", "nexus")
 
-		got, err := ResolveModPageArg(ctx, f.q, f.game, fmt.Sprint(page))
+		got, err := ModPage(ctx, f.q, f.game, fmt.Sprint(page))
 
 		require.NoError(t, err)
 		assert.Equal(t, page, got.ID)
@@ -262,7 +262,7 @@ func TestResolveModPageArg(t *testing.T) {
 		theirs, _ := f.page(other, "Theirs", "local")
 
 		for _, arg := range []string{"424242", fmt.Sprint(theirs)} {
-			_, err := ResolveModPageArg(ctx, f.q, f.game, arg)
+			_, err := ModPage(ctx, f.q, f.game, arg)
 
 			require.Error(t, err, arg)
 			assert.Contains(t, err.Error(), "no mod page with id "+arg)
@@ -275,7 +275,7 @@ func TestResolveModPageArg(t *testing.T) {
 		f := newModFixture(t)
 		page, _ := f.page(f.game, "Big Mod", "local")
 
-		got, err := ResolveModPageArg(ctx, f.q, f.game, "big MOD")
+		got, err := ModPage(ctx, f.q, f.game, "big MOD")
 
 		require.NoError(t, err)
 		assert.Equal(t, page, got.ID)
@@ -287,7 +287,7 @@ func TestResolveModPageArg(t *testing.T) {
 		t.Parallel()
 		f := newModFixture(t)
 
-		_, err := ResolveModPageArg(ctx, f.q, f.game, "Nothing")
+		_, err := ModPage(ctx, f.q, f.game, "Nothing")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), `no mod page found for "Nothing"`)
@@ -299,7 +299,7 @@ func TestResolveModPageArg(t *testing.T) {
 		a, _ := f.page(f.game, "Same Name", "local")
 		b, _ := f.page(f.game, "Same Name", "nexus")
 
-		_, err := ResolveModPageArg(ctx, f.q, f.game, "Same Name")
+		_, err := ModPage(ctx, f.q, f.game, "Same Name")
 
 		require.Error(t, err)
 		msg := err.Error()
@@ -309,7 +309,7 @@ func TestResolveModPageArg(t *testing.T) {
 	})
 }
 
-func TestResolveEnabledProfileVersionArg(t *testing.T) {
+func TestEnabledProfileVersion(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -327,7 +327,7 @@ func TestResolveEnabledProfileVersionArg(t *testing.T) {
 		t.Parallel()
 		f, profile, _, _, v3 := setup(t)
 
-		got, err := ResolveEnabledProfileVersionArg(ctx, f.q, f.game, profile, fmt.Sprint(v3))
+		got, err := EnabledProfileVersion(ctx, f.q, f.game, profile, fmt.Sprint(v3))
 
 		require.NoError(t, err)
 		assert.Equal(t, v3, got)
@@ -337,7 +337,7 @@ func TestResolveEnabledProfileVersionArg(t *testing.T) {
 		t.Parallel()
 		f, profile, _, _, _ := setup(t)
 
-		_, err := ResolveEnabledProfileVersionArg(ctx, f.q, f.game, profile, "424242")
+		_, err := EnabledProfileVersion(ctx, f.q, f.game, profile, "424242")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no mod file version with id 424242")
@@ -364,7 +364,7 @@ func TestResolveEnabledProfileVersionArg(t *testing.T) {
 					want = v1
 				}
 
-				got, err := ResolveEnabledProfileVersionArg(ctx, f.q, f.game, profile, "Big Mod")
+				got, err := EnabledProfileVersion(ctx, f.q, f.game, profile, "Big Mod")
 
 				require.NoError(t, err)
 				assert.Equal(t, want, got)
@@ -379,7 +379,7 @@ func TestResolveEnabledProfileVersionArg(t *testing.T) {
 		f.item(profile, v2, 2, true)
 		f.item(profile, v3, 3, false)
 
-		_, err := ResolveEnabledProfileVersionArg(ctx, f.q, f.game, profile, "Big Mod")
+		_, err := EnabledProfileVersion(ctx, f.q, f.game, profile, "Big Mod")
 
 		require.Error(t, err)
 		msg := err.Error()
@@ -395,7 +395,7 @@ func TestResolveEnabledProfileVersionArg(t *testing.T) {
 		f.item(profile, v1, 1, false)
 		f.item(profile, v2, 2, false)
 
-		_, err := ResolveEnabledProfileVersionArg(ctx, f.q, f.game, profile, "Big Mod")
+		_, err := EnabledProfileVersion(ctx, f.q, f.game, profile, "Big Mod")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), `Multiple mod file versions found for "Big Mod"`,
@@ -410,7 +410,7 @@ func TestResolveEnabledProfileVersionArg(t *testing.T) {
 		only := f.version(file, "1.0")
 		f.item(profile, only, 1, false)
 
-		got, err := ResolveEnabledProfileVersionArg(ctx, f.q, f.game, profile, "Small Mod")
+		got, err := EnabledProfileVersion(ctx, f.q, f.game, profile, "Small Mod")
 
 		require.NoError(t, err)
 		assert.Equal(t, only, got)
@@ -423,7 +423,7 @@ func TestResolveEnabledProfileVersionArg(t *testing.T) {
 		f.item(other, v1, 1, true)
 		f.item(other, v2, 2, true)
 
-		_, err := ResolveEnabledProfileVersionArg(ctx, f.q, f.game, profile, "Big Mod")
+		_, err := EnabledProfileVersion(ctx, f.q, f.game, profile, "Big Mod")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "Multiple mod file versions found", "not the list of the enabled ones of the profile")

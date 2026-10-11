@@ -60,22 +60,22 @@ recreating rules in a different order.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.ResolveGameInstall(ctx, q, profilesRemapClearGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesRemapClearGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, gi, profilesRemapClearProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesRemapClearProfile)
 		if err != nil {
 			return err
 		}
 
-		mfv, err := argresolver.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfv, err := argresolver.ModFileVersion(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}
 
-		itemID, err := argresolver.ResolveProfileItemByVersion(ctx, q, p, mfv.ID)
+		itemID, err := argresolver.ProfileItemByVersion(ctx, q, p, mfv.ID)
 		if err != nil {
 			return err
 		}

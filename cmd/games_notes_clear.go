@@ -44,7 +44,7 @@ var gamesNotesClearCmd = &cobra.Command{
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.ResolveGameInstall(ctx, q, gamesNotesClearGame)
+		gi, err := argresolver.GameInstall(ctx, q, gamesNotesClearGame)
 		if err != nil {
 			return err
 		}
