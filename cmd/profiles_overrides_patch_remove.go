@@ -21,7 +21,6 @@ package cmd
 import (
 	"database/sql"
 	"fmt"
-	"path/filepath"
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/argresolver"
@@ -54,12 +53,11 @@ For ini patches, use --section to identify entries in a specific section.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		relpath := filepath.Clean(args[0])
-		entryKey := args[1]
-
-		if filepath.IsAbs(relpath) {
-			return fmt.Errorf("path must be relative, got %q", relpath)
+		relpath, err := argresolver.ResolveRelpathArg(args[0])
+		if err != nil {
+			return err
 		}
+		entryKey := args[1]
 
 		db, err := database.Open(ctx)
 		if err != nil {

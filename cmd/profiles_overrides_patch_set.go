@@ -60,13 +60,12 @@ Examples:
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		relpath := filepath.Clean(args[0])
+		relpath, err := argresolver.ResolveRelpathArg(args[0])
+		if err != nil {
+			return err
+		}
 		entryKey := args[1]
 		entryValue := args[2]
-
-		if filepath.IsAbs(relpath) {
-			return fmt.Errorf("path must be relative, got %q", relpath)
-		}
 
 		db, err := database.Open(ctx)
 		if err != nil {

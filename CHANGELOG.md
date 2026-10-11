@@ -33,6 +33,9 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
   went out of it (with `..`), which a bundle that was imported could contain.
   Such overrides are now rejected with a warning, and `apply` and `unapply` leave
   alone a file that is recorded as installed at such a path.
+- The commands that take the path of a file in the game directory (for backups
+  and overrides) now also reject a path that goes out of it with `..`, and `.`,
+  instead of only a path that is absolute.
 
 ## v0.8.0 - 2026-10-10
 
