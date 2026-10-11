@@ -93,14 +93,24 @@ func Full(
 	res.Backups = backupCount
 	res.Overrides = overrideCount
 
-	// Replace the database by copying the bundle DB into place
+	// Replace the database with the one of the bundle. It is copied next to the
+	// one that is there first, and only when that is whole does it take its
+	// place, by being renamed over it, which is atomic: a copy that fails (a full
+	// disk, a bundle that is cut short) leaves the database that is there as it
+	// was, and still open.
 	bundleDBPath := filepath.Join(bundle.BundleDir, exporter.DatabaseFilename)
-	db.Close()
-	if err := os.Remove(dbPath); err != nil && !os.IsNotExist(err) {
-		return res, fmt.Errorf("remove existing database: %w", err)
-	}
-	if err := fsutil.CopyFile(ctx, bundleDBPath, dbPath); err != nil {
+	restoringPath := dbPath + ".restoring"
+	if err := fsutil.CopyFile(ctx, bundleDBPath, restoringPath); err != nil {
 		return res, fmt.Errorf("restore database: %w", err)
+	}
+	db.Close()
+	// what the database that is replaced may have left is not part of the new one
+	for _, suffix := range []string{"-wal", "-shm"} {
+		_ = os.Remove(dbPath + suffix)
+	}
+	if err := os.Rename(restoringPath, dbPath); err != nil {
+		_ = os.Remove(restoringPath)
+		return res, fmt.Errorf("replace database: %w", err)
 	}
 
 	// Reopen and migrate (handles case where bundle schema is older than binary)
@@ -108,6 +118,7 @@ func Full(
 	if err != nil {
 		return res, fmt.Errorf("reopen database: %w", err)
 	}
+	defer newDB.Close()
 	if err := database.Migrate(ctx, newDB); err != nil {
 		return res, fmt.Errorf("migrate restored database: %w", err)
 	}
