@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package internal
+package database
 
 import (
 	"database/sql"
@@ -164,7 +164,7 @@ func TestLatestMigrationVersion(t *testing.T) {
 func TestLatestMigrationVersionMatchesGoose(t *testing.T) {
 	t.Parallel()
 
-	fsys := os.DirFS("../migrations")
+	fsys := os.DirFS("../../migrations")
 
 	got, err := latestMigrationVersion(fsys)
 	require.NoError(t, err)

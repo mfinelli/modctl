@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -41,21 +42,11 @@ It is safe to run multiple times.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		err := internal.EnsureDBExists()
-		if err != nil {
-			return err
-		}
-
-		db, err := internal.SetupDB()
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}
 		defer db.Close()
-
-		err = internal.MigrateDB(ctx, db)
-		if err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
 
 		style.Println(style.Bold.Render("Scanning stores..."))
 		style.Println()

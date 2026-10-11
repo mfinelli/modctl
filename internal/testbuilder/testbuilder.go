@@ -27,9 +27,9 @@ import (
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/pressly/goose/v3"
-	"github.com/pressly/goose/v3/database"
+	goosedb "github.com/pressly/goose/v3/database"
 	"github.com/stretchr/testify/require"
 )
 
@@ -58,11 +58,11 @@ func NewProvider(t *testing.T, db *sql.DB) *goose.Provider {
 
 	fsys := os.DirFS(findMigrationsDir(t))
 
-	base, err := database.NewStore(database.DialectSQLite3, "schema_migrations")
+	base, err := goosedb.NewStore(goosedb.DialectSQLite3, "schema_migrations")
 	require.NoError(t, err, "create goose store")
 
 	p, err := goose.NewProvider(goose.DialectCustom, db, fsys,
-		goose.WithStore(&internal.SqliteStore{Store: base}),
+		goose.WithStore(&database.SqliteStore{Store: base}),
 	)
 	require.NoError(t, err, "create goose provider")
 

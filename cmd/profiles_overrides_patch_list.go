@@ -20,15 +20,12 @@ package cmd
 
 import (
 	"fmt"
-	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -48,43 +45,25 @@ Entries are shown in the order they will be applied.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		relpath := filepath.Clean(args[0])
-
-		if filepath.IsAbs(relpath) {
-			return fmt.Errorf("path must be relative, got %q", relpath)
-		}
-
-		if err := internal.EnsureDBExists(); err != nil {
+		relpath, err := argresolver.Relpath(args[0])
+		if err != nil {
 			return err
 		}
-		db, err := internal.SetupDB()
+
+		db, err := database.Open(ctx)
 		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
+			return err
 		}
 		defer db.Close()
-		if err := internal.MigrateDB(ctx, db); err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
 
 		q := dbq.New(db)
 
-		if profilesOverridesPatchListGame == "" {
-			active, err := state.LoadActive()
-			if err != nil {
-				return fmt.Errorf("load active selection: %w", err)
-			}
-			if active.ActiveGameInstallID == 0 {
-				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
-			}
-			profilesOverridesPatchListGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
-		}
-
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesOverridesPatchListGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesPatchListGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesOverridesPatchListProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesOverridesPatchListProfile)
 		if err != nil {
 			return err
 		}

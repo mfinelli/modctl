@@ -25,10 +25,9 @@ import (
 	"strconv"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -60,100 +59,80 @@ Higher priority wins conflicts. Priorities must be unique within a profile.`,
 			return fmt.Errorf("invalid priority %q (expected a positive integer)", args[1])
 		}
 
-		err = internal.EnsureDBExists()
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}
-
-		db, err := internal.SetupDB()
-		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
-		}
 		defer db.Close()
-
-		err = internal.MigrateDB(ctx, db)
-		if err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
 
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		if profilesOrderSetGame == "" {
-			active, err := state.LoadActive()
+		gi, err := argresolver.GameInstall(ctx, q, profilesOrderSetGame)
+		if err != nil {
+			return err
+		}
+
+		p, err := argresolver.Profile(ctx, q, gi, profilesOrderSetProfile)
+		if err != nil {
+			return err
+		}
+
+		mfv, err := argresolver.ModFileVersion(ctx, q, gi, args[0])
+		if err != nil {
+			return err
+		}
+
+		unchanged := false
+		err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+			// Find the item and current priority.
+			item, err := qtx.GetProfileItemByVersionForOrder(ctx, dbq.GetProfileItemByVersionForOrderParams{
+				ProfileID:        p.ID,
+				ModFileVersionID: mfv.ID,
+			})
 			if err != nil {
-				return fmt.Errorf("load active selection: %w", err)
+				if errors.Is(err, sql.ErrNoRows) {
+					return fmt.Errorf("version %d is not in profile %q", mfv.ID, p.Name)
+				}
+				return fmt.Errorf("lookup profile item: %w", err)
 			}
-			if active.ActiveGameInstallID == 0 {
-				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
+
+			if item.Priority == newPrio {
+				unchanged = true
+				return nil
 			}
-			profilesOrderSetGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
-		}
 
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesOrderSetGame)
-		if err != nil {
-			return err
-		}
-
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesOrderSetProfile)
-		if err != nil {
-			return err
-		}
-
-		mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
-		if err != nil {
-			return err
-		}
-
-		tx, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("error starting transaction: %w", err)
-		}
-		defer tx.Rollback()
-		qtx := q.WithTx(tx)
-
-		// Find the item and current priority.
-		item, err := qtx.GetProfileItemByVersionForOrder(ctx, dbq.GetProfileItemByVersionForOrderParams{
-			ProfileID:        p.ID,
-			ModFileVersionID: mfv.ID,
-		})
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("version %d is not in profile %q", mfv.ID, p.Name)
-			}
-			return fmt.Errorf("lookup profile item: %w", err)
-		}
-
-		if item.Priority == newPrio {
-			style.Printf("Priority for version %d is already %d in profile %q\n", mfv.ID, newPrio, p.Name)
-			return nil
-		}
-
-		// Ensure the target priority isn't already taken
-		_, err = qtx.IsPriorityTaken(ctx, dbq.IsPriorityTakenParams{
-			ProfileID: p.ID,
-			Priority:  newPrio,
-		})
-		if err == nil {
-			return fmt.Errorf("priority %d is already used in profile %q", newPrio, p.Name)
-		}
-		if !errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("check priority: %w", err)
-		}
-
-		if err := qtx.SetProfileItemPriorityByID(ctx, dbq.SetProfileItemPriorityByIDParams{
-			Priority: newPrio,
-			ID:       item.ID,
-		}); err != nil {
-			// Race-proof fallback: unique constraint could still trip
-			if internal.IsUniqueConstraint(err) {
+			// Ensure the target priority isn't already taken
+			_, err = qtx.IsPriorityTaken(ctx, dbq.IsPriorityTakenParams{
+				ProfileID: p.ID,
+				Priority:  newPrio,
+			})
+			if err == nil {
 				return fmt.Errorf("priority %d is already used in profile %q", newPrio, p.Name)
 			}
-			return fmt.Errorf("set priority: %w", err)
-		}
+			if !errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("check priority: %w", err)
+			}
 
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit: %w", err)
+			if err := qtx.SetProfileItemPriorityByID(ctx, dbq.SetProfileItemPriorityByIDParams{
+				Priority: newPrio,
+				ID:       item.ID,
+			}); err != nil {
+				// Race-proof fallback: unique constraint could still trip
+				if database.IsUniqueConstraint(err) {
+					return fmt.Errorf("priority %d is already used in profile %q", newPrio, p.Name)
+				}
+				return fmt.Errorf("set priority: %w", err)
+			}
+
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		if unchanged {
+			style.Printf("Priority for version %d is already %d in profile %q\n", mfv.ID, newPrio, p.Name)
+			return nil
 		}
 
 		style.Printf("Set priority for version %d to %d in profile %q\n", mfv.ID, newPrio, p.Name)

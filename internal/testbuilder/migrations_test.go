@@ -28,7 +28,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,7 +39,7 @@ import (
 func newMigrationDB(t *testing.T) (*sql.DB, *goose.Provider) {
 	t.Helper()
 
-	db, err := sql.Open("sqlite3", internal.DSN(filepath.Join(t.TempDir(), "modctl.db"), false))
+	db, err := sql.Open("sqlite3", database.DSN(filepath.Join(t.TempDir(), "modctl.db"), false))
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
 

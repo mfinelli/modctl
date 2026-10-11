@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package planner
+package fsutil
 
 import (
 	"testing"
@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestValidateDestPath(t *testing.T) {
+func TestValidateRelPath(t *testing.T) {
 	t.Parallel()
 
 	t.Run("valid paths", func(t *testing.T) {
@@ -51,12 +51,40 @@ func TestValidateDestPath(t *testing.T) {
 				name: "path with dots in filename",
 				path: "Data/textures/rock.01.dds",
 			},
+			{
+				name: "a leading dot segment",
+				path: "./plugin.esp",
+			},
+			{
+				name: "a doubled slash",
+				path: "Data//plugin.esp",
+			},
+			{
+				name: "a trailing slash",
+				path: "Data/",
+			},
+			{
+				name: "a name that only starts with two dots is not traversal",
+				path: "..hidden/plugin.esp",
+			},
+			{
+				name: "a name that ends in two dots",
+				path: "Data/plugin..",
+			},
+			{
+				name: "a traversal that stays inside",
+				path: "Data/../plugin.esp",
+			},
+			{
+				name: "a traversal that stays inside, further down",
+				path: "Data/textures/../meshes/rock.nif",
+			},
 		}
 
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
-				err := validateDestPath(tc.path)
+				err := ValidateRelPath(tc.path)
 				require.NoError(t, err)
 			})
 		}
@@ -82,7 +110,7 @@ func TestValidateDestPath(t *testing.T) {
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
-				err := validateDestPath(tc.path)
+				err := ValidateRelPath(tc.path)
 				require.Error(t, err)
 				assert.ErrorContains(t, err, "absolute path")
 			})
@@ -116,12 +144,24 @@ func TestValidateDestPath(t *testing.T) {
 				name: "traversal with valid prefix",
 				path: "Data/../../../etc/passwd",
 			},
+			{
+				name: "traversal that is hidden by a doubled slash",
+				path: "Data//../../etc/passwd",
+			},
+			{
+				name: "traversal that starts with a dot segment",
+				path: "./../etc/passwd",
+			},
+			{
+				name: "traversal that comes out of a directory it went into",
+				path: "a/b/../../../c",
+			},
 		}
 
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
-				err := validateDestPath(tc.path)
+				err := ValidateRelPath(tc.path)
 				require.Error(t, err)
 				assert.ErrorContains(t, err, "traversal")
 			})
@@ -147,12 +187,20 @@ func TestValidateDestPath(t *testing.T) {
 				name: "current dir slash",
 				path: "./",
 			},
+			{
+				name: "a directory and back out of it",
+				path: "Data/..",
+			},
+			{
+				name: "dots that cancel out",
+				path: "Data/textures/../..",
+			},
 		}
 
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
-				err := validateDestPath(tc.path)
+				err := ValidateRelPath(tc.path)
 				require.Error(t, err)
 			})
 		}

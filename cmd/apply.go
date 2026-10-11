@@ -31,11 +31,11 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/extractor"
 	"github.com/mfinelli/modctl/internal/lock"
 	"github.com/mfinelli/modctl/internal/patchapply"
 	"github.com/mfinelli/modctl/internal/planner"
-	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -77,38 +77,21 @@ Use --dry-run to preview the plan without making any changes. Add the
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		if err := internal.EnsureDBExists(); err != nil {
+		db, err := database.Open(ctx)
+		if err != nil {
 			return err
 		}
-		db, err := internal.SetupDB()
-		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
-		}
 		defer db.Close()
-		if err := internal.MigrateDB(ctx, db); err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
 
 		q := dbq.New(db)
 
 		// Resolve game install
-		if applyGame == "" {
-			active, err := state.LoadActive()
-			if err != nil {
-				return fmt.Errorf("load active selection: %w", err)
-			}
-			if active.ActiveGameInstallID == 0 {
-				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
-			}
-			applyGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
-		}
-
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, applyGame)
+		gi, err := argresolver.GameInstall(ctx, q, applyGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, applyProfile)
+		p, err := argresolver.Profile(ctx, q, gi, applyProfile)
 		if err != nil {
 			return err
 		}
@@ -455,32 +438,27 @@ Use --dry-run to preview the plan without making any changes. Add the
 		}
 
 		// Mark operation successful and update applied state in one transaction
-		tx, err := db.BeginTx(ctx, nil)
+		err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+			if err := qtx.FinishOperation(ctx, dbq.FinishOperationParams{
+				Status:  "success",
+				Message: sql.NullString{},
+				ID:      op.ID,
+			}); err != nil {
+				return fmt.Errorf("finish operation: %w", err)
+			}
+
+			if err := qtx.UpdateGameInstallAppliedState(ctx, dbq.UpdateGameInstallAppliedStateParams{
+				AppliedProfileID:   sql.NullInt64{Int64: p.ID, Valid: true},
+				AppliedOperationID: sql.NullInt64{Int64: op.ID, Valid: true},
+				ID:                 gi.ID,
+			}); err != nil {
+				return fmt.Errorf("update applied state: %w", err)
+			}
+
+			return nil
+		})
 		if err != nil {
-			return markFailed(fmt.Errorf("begin final transaction: %w", err))
-		}
-		defer tx.Rollback()
-
-		qtx := q.WithTx(tx)
-
-		if err := qtx.FinishOperation(ctx, dbq.FinishOperationParams{
-			Status:  "success",
-			Message: sql.NullString{},
-			ID:      op.ID,
-		}); err != nil {
-			return markFailed(fmt.Errorf("finish operation: %w", err))
-		}
-
-		if err := qtx.UpdateGameInstallAppliedState(ctx, dbq.UpdateGameInstallAppliedStateParams{
-			AppliedProfileID:   sql.NullInt64{Int64: p.ID, Valid: true},
-			AppliedOperationID: sql.NullInt64{Int64: op.ID, Valid: true},
-			ID:                 gi.ID,
-		}); err != nil {
-			return markFailed(fmt.Errorf("update applied state: %w", err))
-		}
-
-		if err := tx.Commit(); err != nil {
-			return markFailed(fmt.Errorf("commit final transaction: %w", err))
+			return markFailed(fmt.Errorf("final transaction: %w", err))
 		}
 
 		// Cleanup staging unless --keep-staging

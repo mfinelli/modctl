@@ -468,7 +468,11 @@ Set the active game:
 	be combined. For game-scoped bundles the game must not already exist
 	unless --force is passed; --same-machine is not valid for game-scoped
 	bundles. Pass --game to import a single game from a full bundle. Does
-	not apply any profiles automatically.
+	not apply any profiles automatically. The targets of the bundle are
+	imported disabled (except with --same-machine), since their paths are
+	those of the machine that the bundle is from: *modctl games refresh*
+	enables the ones that it finds on this machine, and a target that was
+	made by hand is listed, to be enabled with *modctl games targets enable*.
 
 *modctl verify* <bundle>
 	Check the integrity of an export bundle without importing it.

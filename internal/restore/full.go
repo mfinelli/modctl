@@ -27,9 +27,9 @@ import (
 	"path/filepath"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/archivescanner"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/exporter"
 	"github.com/mfinelli/modctl/internal/fsutil"
 )
@@ -49,7 +49,7 @@ func Full(
 	var res Result
 
 	// Validate schema version
-	currentSchema, err := internal.CurrentSchemaVersion(ctx, db)
+	currentSchema, err := database.CurrentSchemaVersion(ctx, db)
 	if err != nil {
 		return res, fmt.Errorf("get current schema version: %w", err)
 	}
@@ -58,6 +58,14 @@ func Full(
 			"bundle schema version %d is newer than current schema version %d; upgrade modctl to import this bundle",
 			bundle.Manifest.SchemaVersion, currentSchema,
 		)
+	}
+
+	// Nothing is changed (not even a dry run is let through) for a bundle that
+	// would have something written outside of the game directory. This is
+	// before the database is replaced, which cannot be undone.
+	bq := dbq.New(bundle.BundleDB)
+	if err := validateFullPaths(ctx, bq, opts.SameMachine); err != nil {
+		return res, err
 	}
 
 	if opts.DryRun {
@@ -85,31 +93,49 @@ func Full(
 	res.Backups = backupCount
 	res.Overrides = overrideCount
 
-	// Replace the database by copying the bundle DB into place
+	// Replace the database with the one of the bundle. It is copied next to the
+	// one that is there first, and only when that is whole does it take its
+	// place, by being renamed over it, which is atomic: a copy that fails (a full
+	// disk, a bundle that is cut short) leaves the database that is there as it
+	// was, and still open.
 	bundleDBPath := filepath.Join(bundle.BundleDir, exporter.DatabaseFilename)
-	db.Close()
-	if err := os.Remove(dbPath); err != nil && !os.IsNotExist(err) {
-		return res, fmt.Errorf("remove existing database: %w", err)
-	}
-	if err := fsutil.CopyFile(ctx, bundleDBPath, dbPath); err != nil {
+	restoringPath := dbPath + ".restoring"
+	if err := fsutil.CopyFile(ctx, bundleDBPath, restoringPath); err != nil {
 		return res, fmt.Errorf("restore database: %w", err)
+	}
+	db.Close()
+	// what the database that is replaced may have left is not part of the new one
+	for _, suffix := range []string{"-wal", "-shm"} {
+		_ = os.Remove(dbPath + suffix)
+	}
+	if err := os.Rename(restoringPath, dbPath); err != nil {
+		_ = os.Remove(restoringPath)
+		return res, fmt.Errorf("replace database: %w", err)
 	}
 
 	// Reopen and migrate (handles case where bundle schema is older than binary)
-	newDB, err := internal.SetupDB()
+	newDB, err := database.Setup()
 	if err != nil {
 		return res, fmt.Errorf("reopen database: %w", err)
 	}
-	if err := internal.MigrateDB(ctx, newDB); err != nil {
+	defer newDB.Close()
+	if err := database.Migrate(ctx, newDB); err != nil {
 		return res, fmt.Errorf("migrate restored database: %w", err)
 	}
 	newQ := dbq.New(newDB)
 
-	// Zero out on-disk state unless this is a same-machine restore
+	// Zero out on-disk state unless this is a same-machine restore, which is also
+	// when the targets are not the ones of another machine
 	if !opts.SameMachine {
 		if err := zeroOnDiskState(ctx, newDB, newQ); err != nil {
 			return res, fmt.Errorf("zero on-disk state: %w", err)
 		}
+
+		disabled, err := disableImportedTargets(ctx, newDB)
+		if err != nil {
+			return res, fmt.Errorf("disable imported targets: %w", err)
+		}
+		res.DisabledTargets = disabled
 	}
 
 	// Import nexus cache if present in bundle
@@ -121,7 +147,6 @@ func Full(
 	}
 
 	// Scan missing inventories against the restored DB
-	bq := dbq.New(bundle.BundleDB)
 	allVersions, err := bq.ListAllModFileVersions(ctx)
 	if err != nil {
 		return res, fmt.Errorf("list mod file versions: %w", err)

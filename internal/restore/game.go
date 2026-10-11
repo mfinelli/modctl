@@ -28,8 +28,8 @@ import (
 	"strings"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/database"
 )
 
 // idRemap holds old -> new ID mappings built during game-scoped import
@@ -76,7 +76,7 @@ func Game(
 	}
 
 	// Validate schema version
-	currentSchema, err := internal.CurrentSchemaVersion(ctx, db)
+	currentSchema, err := database.CurrentSchemaVersion(ctx, db)
 	if err != nil {
 		return res, fmt.Errorf("get current schema version: %w", err)
 	}
@@ -108,6 +108,12 @@ func Game(
 	}
 	oldGameInstallID := matchedInstall.ID
 
+	// Nothing is changed (not even a dry run is let through) for a bundle that
+	// would have something written outside of the game directory
+	if err := validateGamePaths(ctx, bq, oldGameInstallID); err != nil {
+		return res, err
+	}
+
 	// Resolve display name from bundle if not set from manifest
 	if displayName == "" {
 		displayName = matchedInstall.DisplayName
@@ -135,12 +141,6 @@ func Game(
 		return dryRunGame(ctx, bundle, bq, oldGameInstallID)
 	}
 
-	if gameExists && opts.Force {
-		if err := q.ImportDeleteGameInstall(ctx, existing); err != nil {
-			return res, fmt.Errorf("delete existing game install: %w", err)
-		}
-	}
-
 	// Import blobs (archives only; game-scoped bundles never contain backup blobs)
 	archiveCount, _, overrideCount, err := importBlobs(ctx, bundle, bs)
 	if err != nil {
@@ -149,96 +149,116 @@ func Game(
 	res.Archives = archiveCount
 	res.Overrides = overrideCount
 
-	// ID remapping tables
-	remap := &idRemap{
-		targets:         make(map[int64]int64),
-		modPages:        make(map[int64]int64),
-		modFiles:        make(map[int64]int64),
-		modFileVersions: make(map[int64]int64),
-		remapConfigs:    make(map[int64]int64),
-		profiles:        make(map[int64]int64),
-		overrides:       make(map[int64]int64),
-		profileItems:    make(map[int64]int64),
-	}
+	// Everything that goes into the database is in a single transaction, so that
+	// a bundle that can't be imported to the end leaves things as they were, which
+	// includes the game that is replaced with --force (the blobs above are files
+	// that are kept by their content, and are not part of it)
+	var disabledTargets []DisabledTarget
+	err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+		if gameExists && opts.Force {
+			if err := qtx.ImportDeleteGameInstall(ctx, existing); err != nil {
+				return fmt.Errorf("delete existing game install: %w", err)
+			}
+		}
 
-	// Insert store (reuse existing if present)
-	if err := importStore(ctx, q, bq, bundle.Manifest.Game.StoreID); err != nil {
-		return res, fmt.Errorf("import store: %w", err)
-	}
+		// ID remapping tables
+		remap := &idRemap{
+			targets:         make(map[int64]int64),
+			modPages:        make(map[int64]int64),
+			modFiles:        make(map[int64]int64),
+			modFileVersions: make(map[int64]int64),
+			remapConfigs:    make(map[int64]int64),
+			profiles:        make(map[int64]int64),
+			overrides:       make(map[int64]int64),
+			profileItems:    make(map[int64]int64),
+		}
 
-	// Insert game install, capture new ID
-	newGameInstallID, err := importGameInstall(ctx, q, bq, matchedInstall)
+		// Insert store (reuse existing if present)
+		if err := importStore(ctx, qtx, bq, bundle.Manifest.Game.StoreID); err != nil {
+			return fmt.Errorf("import store: %w", err)
+		}
+
+		// Insert game install, capture new ID
+		newGameInstallID, err := importGameInstall(ctx, qtx, bq, matchedInstall)
+		if err != nil {
+			return fmt.Errorf("import game install: %w", err)
+		}
+
+		// Targets
+		disabledTargets, err = importTargets(ctx, qtx, bq, newGameInstallID, oldGameInstallID, displayName, remap)
+		if err != nil {
+			return fmt.Errorf("import targets: %w", err)
+		}
+
+		// Blobs are already recorded by importBlobs via IngestFile +
+		// EnsureBlobRecorded, so no ID remapping needed for blobs.
+
+		// Mod pages
+		if err := importModPages(ctx, qtx, bq, newGameInstallID, oldGameInstallID, remap); err != nil {
+			return fmt.Errorf("import mod pages: %w", err)
+		}
+		res.ModPages = len(remap.modPages)
+
+		// Mod files
+		if err := importModFiles(ctx, qtx, bq, oldGameInstallID, remap); err != nil {
+			return fmt.Errorf("import mod files: %w", err)
+		}
+
+		// Mod file versions
+		if err := importModFileVersions(ctx, qtx, bq, oldGameInstallID, remap); err != nil {
+			return fmt.Errorf("import mod file versions: %w", err)
+		}
+
+		// Remap configs and rules (must come before profile items)
+		if err := importRemapConfigs(ctx, qtx, bq, oldGameInstallID, remap); err != nil {
+			return fmt.Errorf("import remap configs: %w", err)
+		}
+
+		// Profiles
+		if err := importProfiles(ctx, qtx, bq, newGameInstallID, oldGameInstallID, remap); err != nil {
+			return fmt.Errorf("import profiles: %w", err)
+		}
+		res.Profiles = len(remap.profiles)
+
+		// Profile items
+		if err := importProfileItems(ctx, qtx, bq, oldGameInstallID, remap); err != nil {
+			return fmt.Errorf("import profile items: %w", err)
+		}
+
+		if err := importSkipBackupPatterns(ctx, qtx, bq, oldGameInstallID, remap); err != nil {
+			return fmt.Errorf("import skip-backup patterns: %w", err)
+		}
+
+		if err := importWriteOncePatterns(ctx, qtx, bq, oldGameInstallID, remap); err != nil {
+			return fmt.Errorf("import write-once patterns: %w", err)
+		}
+
+		// Profile path policies
+		if err := importProfilePathPolicies(ctx, qtx, bq, oldGameInstallID, remap); err != nil {
+			return fmt.Errorf("import profile path policies: %w", err)
+		}
+
+		// Mod incompatibilities
+		if err := importModIncompatibilities(ctx, qtx, bq, oldGameInstallID, remap); err != nil {
+			return fmt.Errorf("import mod incompatibilities: %w", err)
+		}
+
+		// Overrides and patch entries
+		if err := importOverrides(ctx, qtx, bq, oldGameInstallID, remap); err != nil {
+			return fmt.Errorf("import overrides: %w", err)
+		}
+
+		// Inventory entries (no ID remapping, keyed by archive_sha256 + position)
+		if err := importInventory(ctx, qtx, bq, oldGameInstallID); err != nil {
+			return fmt.Errorf("import inventory: %w", err)
+		}
+
+		return nil
+	})
 	if err != nil {
-		return res, fmt.Errorf("import game install: %w", err)
+		return res, err
 	}
-
-	// Targets
-	if err := importTargets(ctx, q, bq, newGameInstallID, oldGameInstallID, remap); err != nil {
-		return res, fmt.Errorf("import targets: %w", err)
-	}
-
-	// Blobs are already recorded by importBlobs via IngestFile +
-	// EnsureBlobRecorded, so no ID remapping needed for blobs.
-
-	// Mod pages
-	if err := importModPages(ctx, q, bq, newGameInstallID, oldGameInstallID, remap); err != nil {
-		return res, fmt.Errorf("import mod pages: %w", err)
-	}
-	res.ModPages = len(remap.modPages)
-
-	// Mod files
-	if err := importModFiles(ctx, q, bq, oldGameInstallID, remap); err != nil {
-		return res, fmt.Errorf("import mod files: %w", err)
-	}
-
-	// Mod file versions
-	if err := importModFileVersions(ctx, q, bq, oldGameInstallID, remap); err != nil {
-		return res, fmt.Errorf("import mod file versions: %w", err)
-	}
-
-	// Remap configs and rules (must come before profile items)
-	if err := importRemapConfigs(ctx, q, bq, oldGameInstallID, remap); err != nil {
-		return res, fmt.Errorf("import remap configs: %w", err)
-	}
-
-	// Profiles
-	if err := importProfiles(ctx, q, bq, newGameInstallID, oldGameInstallID, remap); err != nil {
-		return res, fmt.Errorf("import profiles: %w", err)
-	}
-	res.Profiles = len(remap.profiles)
-
-	// Profile items
-	if err := importProfileItems(ctx, q, bq, oldGameInstallID, remap); err != nil {
-		return res, fmt.Errorf("import profile items: %w", err)
-	}
-
-	if err := importSkipBackupPatterns(ctx, q, bq, oldGameInstallID, remap); err != nil {
-		return res, fmt.Errorf("import skip-backup patterns: %w", err)
-	}
-
-	if err := importWriteOncePatterns(ctx, q, bq, oldGameInstallID, remap); err != nil {
-		return res, fmt.Errorf("import write-once patterns: %w", err)
-	}
-
-	// Profile path policies
-	if err := importProfilePathPolicies(ctx, q, bq, oldGameInstallID, remap); err != nil {
-		return res, fmt.Errorf("import profile path policies: %w", err)
-	}
-
-	// Mod incompatibilities
-	if err := importModIncompatibilities(ctx, q, bq, oldGameInstallID, remap); err != nil {
-		return res, fmt.Errorf("import mod incompatibilities: %w", err)
-	}
-
-	// Overrides and patch entries
-	if err := importOverrides(ctx, q, bq, oldGameInstallID, remap); err != nil {
-		return res, fmt.Errorf("import overrides: %w", err)
-	}
-
-	// Inventory entries (no ID remapping, keyed by archive_sha256 + position)
-	if err := importInventory(ctx, q, bq, oldGameInstallID); err != nil {
-		return res, fmt.Errorf("import inventory: %w", err)
-	}
+	res.DisabledTargets = disabledTargets
 
 	// Import nexus cache if present in bundle
 	if bundle.Manifest.NexusCacheSha256 != "" {
@@ -321,28 +341,44 @@ func importGameInstall(ctx context.Context, dst, src *dbq.Queries, gi *dbq.GameI
 	return newID, err
 }
 
-func importTargets(ctx context.Context, dst, src *dbq.Queries, newGameInstallID, oldGameInstallID int64, remap *idRemap) error {
+// importTargets inserts the targets of the game, disabled and marked as not
+// confirmed (see targets.go), and returns the ones it disabled.
+func importTargets(ctx context.Context, dst, src *dbq.Queries, newGameInstallID, oldGameInstallID int64, gameName string, remap *idRemap) ([]DisabledTarget, error) {
 	targets, err := src.ListTargetsForGameInstall(ctx, oldGameInstallID)
 	if err != nil {
-		return fmt.Errorf("get targets: %w", err)
+		return nil, fmt.Errorf("get targets: %w", err)
 	}
+
+	var disabled []DisabledTarget
 	for _, t := range targets {
+		metadata, changed := unverifiedTarget(t.Enabled, t.Metadata)
+		enabled := t.Enabled
+		if changed {
+			enabled = 0
+			disabled = append(disabled, DisabledTarget{
+				Game:     gameName,
+				Name:     t.Name,
+				RootPath: t.RootPath,
+				Custom:   t.Origin == targetOriginCustom,
+			})
+		}
+
 		newID, err := dst.ImportInsertTarget(ctx, dbq.ImportInsertTargetParams{
 			GameInstallID: newGameInstallID,
 			Name:          t.Name,
 			RootPath:      t.RootPath,
 			Origin:        t.Origin,
-			Metadata:      t.Metadata,
+			Metadata:      metadata,
 			CreatedAt:     t.CreatedAt,
 			UpdatedAt:     t.UpdatedAt,
-			Enabled:       t.Enabled,
+			Enabled:       enabled,
 		})
 		if err != nil {
-			return fmt.Errorf("insert target %q: %w", t.Name, err)
+			return nil, fmt.Errorf("insert target %q: %w", t.Name, err)
 		}
 		remap.targets[t.ID] = newID
 	}
-	return nil
+	return disabled, nil
 }
 
 func importModPages(ctx context.Context, dst, src *dbq.Queries, newGameInstallID, oldGameInstallID int64, remap *idRemap) error {
@@ -606,7 +642,7 @@ func importInventory(ctx context.Context, dst, src *dbq.Queries, oldGameInstallI
 		})
 		if err != nil {
 			// skip duplicate entries (same archive already imported)
-			if internal.IsUniqueConstraint(err) {
+			if database.IsUniqueConstraint(err) {
 				continue
 			}
 			return fmt.Errorf("insert inventory entry: %w", err)

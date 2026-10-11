@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -34,7 +34,7 @@ import (
 // source kind as the description.
 func ModPageIDs(cmd *cobra.Command, toComplete string) ([]string, cobra.ShellCompDirective) {
 	ctx := context.Background()
-	db, err := internal.SetupDBReadOnly()
+	db, err := database.SetupReadOnly()
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}

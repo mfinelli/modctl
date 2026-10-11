@@ -1041,3 +1041,155 @@ func TestBuildApplyPlanOverrides(t *testing.T) {
 		assert.Empty(t, f.buildApply(t, false).Ops)
 	})
 }
+
+func TestBuildApplyPlanRecordsWhatItOverwrites(t *testing.T) {
+	t.Parallel()
+
+	sha := func(s string) sql.NullString { return sql.NullString{String: shaOf(s), Valid: true} }
+	size := func(s string) sql.NullInt64 { return sql.NullInt64{Int64: int64(len(s)), Valid: true} }
+
+	t.Run("a file of ours that changed", func(t *testing.T) {
+		t.Parallel()
+
+		f := newPlanFixture(t)
+		mod := f.mod(t, modSpec{paths: []string{"a.dll"}})
+		f.content(t, "a.dll", "changed by a game update")
+		f.installedAs(t, "a.dll", mod, "mod content")
+
+		op := opFor(t, f.buildApply(t, false), "a.dll")
+
+		assert.Equal(t, PlanOpOverwrite, op.Kind)
+		assert.Equal(t, sha("changed by a game update"), op.OnDiskSha256, "what is on disk and not what was installed")
+		assert.Equal(t, size("changed by a game update"), op.OnDiskSize)
+	})
+
+	t.Run("a file that another mod installed", func(t *testing.T) {
+		t.Parallel()
+
+		f := newPlanFixture(t)
+		old := f.mod(t, modSpec{priority: 1, paths: []string{"other.dll"}})
+		f.mod(t, modSpec{priority: 2, paths: []string{"a.dll"}})
+		f.content(t, "a.dll", "installed by the old one")
+		f.installedAs(t, "a.dll", old, "installed by the old one")
+
+		op := opFor(t, f.buildApply(t, false), "a.dll")
+
+		assert.Equal(t, PlanOpOverwrite, op.Kind)
+		assert.False(t, op.NeedsBackup)
+		assert.Equal(t, sha("installed by the old one"), op.OnDiskSha256)
+		assert.Equal(t, size("installed by the old one"), op.OnDiskSize)
+	})
+
+	t.Run("a file that an override takes the place of", func(t *testing.T) {
+		t.Parallel()
+
+		f := newPlanFixture(t)
+		mod := f.mod(t, modSpec{paths: []string{"settings.ini"}})
+		f.fullFileOverride(t, "settings.ini")
+		f.content(t, "settings.ini", "mod content")
+		f.installedAs(t, "settings.ini", mod, "mod content")
+
+		op := opFor(t, f.buildApply(t, false), "settings.ini")
+
+		assert.Equal(t, PlanOpOverwrite, op.Kind)
+		assert.Equal(t, sha("mod content"), op.OnDiskSha256)
+		assert.Equal(t, size("mod content"), op.OnDiskSize)
+	})
+
+	t.Run("a file that is not touched has nothing to say", func(t *testing.T) {
+		t.Parallel()
+
+		f := newPlanFixture(t)
+		mod := f.mod(t, modSpec{paths: []string{"a.dll"}})
+		f.content(t, "a.dll", "mod content")
+		f.installedAs(t, "a.dll", mod, "mod content")
+
+		op := opFor(t, f.buildApply(t, false), "a.dll")
+
+		assert.Equal(t, PlanOpNoop, op.Kind)
+		assert.False(t, op.OnDiskSha256.Valid)
+		assert.False(t, op.OnDiskSize.Valid)
+	})
+
+	t.Run("nor does an override that is as it was left", func(t *testing.T) {
+		t.Parallel()
+
+		f := newPlanFixture(t)
+		id, _ := f.fullFileOverride(t, "user.cfg")
+		f.content(t, "user.cfg", "my settings")
+		f.installedByOverride(t, "user.cfg", id, "my settings")
+
+		op := opFor(t, f.buildApply(t, false), "user.cfg")
+
+		assert.Equal(t, PlanOpNoop, op.Kind)
+		assert.False(t, op.OnDiskSha256.Valid)
+	})
+
+	t.Run("a file that is looked at when it is hashed only", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name  string
+			setup func(f planFixture)
+			skip  bool
+		}{
+			{"with --no-recheck", func(f planFixture) {
+				mod := f.mod(t, modSpec{paths: []string{"a.dll"}})
+				f.content(t, "a.dll", "changed")
+				f.installedAs(t, "a.dll", mod, "mod content")
+			}, true},
+			{"a file that was not there yet", func(f planFixture) {
+				f.mod(t, modSpec{paths: []string{"a.dll"}})
+			}, false},
+			{"a file that was there and is not ours (the backup is what says what it was)", func(f planFixture) {
+				f.mod(t, modSpec{paths: []string{"a.dll"}})
+				f.content(t, "a.dll", "the game's own")
+			}, false},
+			{"a file of ours that is gone", func(f planFixture) {
+				mod := f.mod(t, modSpec{paths: []string{"a.dll"}})
+				f.installedAs(t, "a.dll", mod, "mod content")
+			}, false},
+			{"a file that can't be hashed", func(f planFixture) {
+				mod := f.mod(t, modSpec{paths: []string{"a.dll"}})
+				require.NoError(t, os.MkdirAll(filepath.Join(f.root, "a.dll"), 0o755))
+				f.installedAs(t, "a.dll", mod, "mod content")
+			}, false},
+			{"a patch that is applied again", func(f planFixture) {
+				id := f.patchOverride(t, "a.ini", "ini_patch", f.archive(t), "a.ini")
+				f.content(t, "a.ini", "patched")
+				f.installedByOverride(t, "a.ini", id, "patched")
+			}, false},
+		}
+
+		for _, tc := range tests {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				f := newPlanFixture(t)
+				tc.setup(f)
+
+				plan := f.buildApply(t, tc.skip)
+
+				require.Len(t, plan.Ops, 1)
+				assert.NotEqual(t, PlanOpNoop, plan.Ops[0].Kind, "it is written")
+				assert.False(t, plan.Ops[0].OnDiskSha256.Valid, "it was not hashed")
+				assert.False(t, plan.Ops[0].OnDiskSize.Valid)
+			})
+		}
+	})
+
+	t.Run("a file with write-once is not written, so it has nothing to say", func(t *testing.T) {
+		t.Parallel()
+
+		f := newPlanFixture(t)
+		mod := f.mod(t, modSpec{paths: []string{"settings.ini"}, writeOnce: []string{"settings.ini"}})
+		f.content(t, "settings.ini", "changed by the game")
+		f.installedAs(t, "settings.ini", mod, "as deployed")
+
+		op := opFor(t, f.buildApply(t, false), "settings.ini")
+
+		assert.Equal(t, PlanOpNoop, op.Kind)
+		assert.False(t, op.OnDiskSha256.Valid)
+	})
+}

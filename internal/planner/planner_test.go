@@ -46,9 +46,10 @@ func TestRecheckHash(t *testing.T) {
 	t.Run("file that can be hashed", func(t *testing.T) {
 		t.Parallel()
 
-		sha, warning, err := recheckHash(context.Background(), writeHello(t), destPath)
+		sha, size, warning, err := recheckHash(context.Background(), writeHello(t), destPath)
 		require.NoError(t, err)
 		assert.Equal(t, helloSha, sha)
+		assert.Equal(t, int64(5), size, "the size of what was hashed")
 		assert.Empty(t, warning)
 	})
 
@@ -57,9 +58,10 @@ func TestRecheckHash(t *testing.T) {
 
 		missing := filepath.Join(t.TempDir(), "gone.dll")
 
-		sha, warning, err := recheckHash(context.Background(), missing, destPath)
+		sha, size, warning, err := recheckHash(context.Background(), missing, destPath)
 		require.NoError(t, err)
 		assert.Empty(t, sha)
+		assert.Zero(t, size)
 		assert.Contains(t, warning, "could not hash")
 		assert.Contains(t, warning, destPath)
 	})
@@ -68,9 +70,10 @@ func TestRecheckHash(t *testing.T) {
 		t.Parallel()
 
 		// a directory can be opened but not read, whoever is running the test
-		sha, warning, err := recheckHash(context.Background(), t.TempDir(), destPath)
+		sha, size, warning, err := recheckHash(context.Background(), t.TempDir(), destPath)
 		require.NoError(t, err)
 		assert.Empty(t, sha)
+		assert.Zero(t, size)
 		assert.Contains(t, warning, "could not hash")
 		assert.Contains(t, warning, destPath)
 	})
@@ -81,8 +84,9 @@ func TestRecheckHash(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		sha, warning, err := recheckHash(ctx, writeHello(t), destPath)
+		sha, size, warning, err := recheckHash(ctx, writeHello(t), destPath)
 		require.Error(t, err)
+		assert.Zero(t, size)
 		assert.ErrorIs(t, err, context.Canceled)
 		assert.Contains(t, err.Error(), destPath)
 		assert.Empty(t, sha)
@@ -95,7 +99,7 @@ func TestRecheckHash(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		_, warning, err := recheckHash(ctx, filepath.Join(t.TempDir(), "gone.dll"), destPath)
+		_, _, warning, err := recheckHash(ctx, filepath.Join(t.TempDir(), "gone.dll"), destPath)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, context.Canceled)
 		assert.Empty(t, warning)
@@ -107,7 +111,7 @@ func TestRecheckHash(t *testing.T) {
 		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
 		defer cancel()
 
-		_, warning, err := recheckHash(ctx, writeHello(t), destPath)
+		_, _, warning, err := recheckHash(ctx, writeHello(t), destPath)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, context.DeadlineExceeded)
 		assert.Empty(t, warning)

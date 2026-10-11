@@ -16,6 +16,19 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+// Package argresolver turns what a command is given (a flag or an argument)
+// into what it names, in the database of modctl, and says what is wrong when it
+// can't. The functions are named after what they return:
+//
+//   - GameInstall and Profile are for a flag that can be left out, which then
+//     means the one that is active (the game install by itself, the profile
+//     of a game install);
+//   - ExplicitGameInstall is for a game install that is always given;
+//   - ModPage, ModFileVersion and EnabledProfileVersion are for mods, by their
+//     id or by the name of their mod page;
+//   - ProfileItemByVersion is for the item that a version is in a profile;
+//   - Relpath is for a path in a target, which has no database to look in but
+//     has to be inside of it.
 package argresolver
 
 import (
@@ -23,13 +36,33 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/state"
 )
 
-func ResolveGameInstallArg(ctx context.Context, q *dbq.Queries, arg string) (dbq.GameInstall, error) {
+// GameInstall resolves the game install that a command is for: the one
+// that arg says (see ExplicitGameInstall), or the active one if arg is
+// empty, which is what leaving out --game means.
+func GameInstall(ctx context.Context, q *dbq.Queries, arg string) (dbq.GameInstall, error) {
+	if arg == "" {
+		active, err := state.LoadActive()
+		if err != nil {
+			return dbq.GameInstall{}, fmt.Errorf("load active selection: %w", err)
+		}
+		if active.ActiveGameInstallID == 0 {
+			return dbq.GameInstall{}, errors.New("no active game selected; run `modctl games set-active ...` or pass --game")
+		}
+		arg = strconv.FormatInt(active.ActiveGameInstallID, 10)
+	}
+
+	return ExplicitGameInstall(ctx, q, arg)
+}
+
+func ExplicitGameInstall(ctx context.Context, q *dbq.Queries, arg string) (dbq.GameInstall, error) {
 	// Fast path: numeric ID
 	if id, ok := internal.ParseInt64(arg); ok {
 		gi, err := q.GetGameInstallByID(ctx, id)

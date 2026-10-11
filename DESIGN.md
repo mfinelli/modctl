@@ -118,7 +118,8 @@ reference it (since nothing is on disk after unapply, this is safe).
 Targets can be disabled (`targets.enabled = 0`), which is how a game that only
 uses one of `game_dir`/`proton_prefix` avoids planning for the other. Disabling
 is allowed for discovered targets as well and survives refresh (the discovery
-upsert only touches the path). A target can only be disabled when it is safe
+upsert only touches the path, except for a target that was imported, below). A
+target can only be disabled when it is safe
 to stop managing it:
 
 - no `installed_files` rows reference it (the authoritative record of what is
@@ -126,6 +127,19 @@ to stop managing it:
   files in between;
 - no profile items or overrides reference it, since they would never deploy;
 - it is not the only enabled target.
+
+The targets of a bundle are not trusted: a path in a bundle is whatever the one
+who made it wrote, and `apply` writes to the paths of the targets. So the targets
+that an import adds (a game import, and a full restore that is not on the same
+machine) are inserted disabled, with `{"unverified": true}` in their metadata,
+which keeps what else the metadata has. A target that was disabled in the bundle
+is inserted disabled without the mark, since finding it is not a reason to enable
+what was turned off. The discovery upsert enables a target that has the mark and
+takes the mark off, with the path that this machine just found for it. It never
+touches a target of the user, and the origin that the bundle says is not what
+decides anything: only what a refresh itself found does. A target that was made
+by hand, and so is not found by discovery, stays disabled until the user enables
+it, and the import lists those.
 
 Apply and `profiles preview` only consider enabled targets; `unapply` always
 walks every target, because it undoes recorded state and must never skip rows
@@ -525,6 +539,18 @@ All extraction goes to staging, then the tool:
 - applies remap rules deterministically
 - moves files into place
 
+The same goes for the paths of overrides, and for the paths that are recorded as
+installed (which are what is removed or put back when something is applied again
+or unapplied): they are checked with `fsutil.ValidateRelPath` when a plan is made.
+An override with a path that is not valid is rejected with a warning, and a file
+that is recorded as installed at such a path is left alone, with a warning.
+
+A bundle is checked the same way before anything is restored from it: a bundle
+that has an override with a path that is not valid is refused (as is one that has
+backups or installed files like that, when a full restore keeps them, which is
+only the case on the same machine), and this is done before the existing database
+or game is changed, and also for a dry run. `verify` reports it as an issue.
+
 ### Drift detection on overwrite
 
 During apply, before overwriting any tool-owned file the planner hashes the
@@ -541,6 +567,16 @@ and handles them as follows:
 Noop ops are never shown to the user but are logged at debug level.
 Use `--no-recheck` to skip hash checks for faster applies at the cost of
 not detecting external modifications.
+
+What the planner hashed is not thrown away: an op that overwrites a file carries
+the hash and size of what was on disk (`PlanOp.OnDiskSha256` and `OnDiskSize`),
+and deploying it records them as `old_content_sha256` and `old_size_bytes` of
+the change, so that `operations show` can say what a file was replaced by what.
+A file that is backed up before it is overwritten records the backup instead,
+which is the file as it was when it was copied. A file that nobody hashed has no
+old content in its change: that is a file that is written for the first time,
+one that was overwritten with `--no-recheck`, a patch override, and a file that
+could not be hashed. None of these is read at apply only to say what it was.
 
 ### Symlinks and special files
 

@@ -21,13 +21,11 @@ package cmd
 import (
 	"database/sql"
 	"fmt"
-	"strconv"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
@@ -54,37 +52,16 @@ Note: modctl automatically creates a "default" profile during game refresh.`,
 
 		name := args[0]
 
-		err := internal.EnsureDBExists()
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}
-
-		db, err := internal.SetupDB()
-		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
-		}
 		defer db.Close()
-
-		err = internal.MigrateDB(ctx, db)
-		if err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
 
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		if profilesCreateGame == "" {
-			active, err := state.LoadActive()
-			if err != nil {
-				return fmt.Errorf("load active selection: %w", err)
-			}
-			if active.ActiveGameInstallID == 0 {
-				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
-			}
-			profilesCreateGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
-		}
-
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesCreateGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesCreateGame)
 		if err != nil {
 			return err
 		}
@@ -101,7 +78,7 @@ Note: modctl automatically creates a "default" profile during game refresh.`,
 			IsActive:      util.SqliteBoolToInt(false),
 		})
 		if err != nil {
-			if internal.IsUniqueConstraint(err) {
+			if database.IsUniqueConstraint(err) {
 				return fmt.Errorf("profile %q already exists for this game", name)
 			}
 			return fmt.Errorf("create profile: %w", err)

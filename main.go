@@ -23,7 +23,7 @@ import (
 	"os"
 
 	"github.com/mfinelli/modctl/cmd"
-	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/database"
 )
 
 //go:embed migrations/*.sql
@@ -34,7 +34,7 @@ var sampleTarGz []byte
 
 func main() {
 	cmd.SampleTarGz = sampleTarGz
-	internal.Migrations = migrations
+	database.Migrations = migrations
 
 	if r := cmd.Execute(); r != 0 {
 		os.Exit(r)

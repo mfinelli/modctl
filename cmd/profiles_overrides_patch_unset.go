@@ -21,14 +21,12 @@ package cmd
 import (
 	"database/sql"
 	"fmt"
-	"path/filepath"
-	"strconv"
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -62,44 +60,26 @@ removing the node entirely.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		relpath := filepath.Clean(args[0])
-		entryKey := args[1]
-
-		if filepath.IsAbs(relpath) {
-			return fmt.Errorf("path must be relative, got %q", relpath)
-		}
-
-		if err := internal.EnsureDBExists(); err != nil {
+		relpath, err := argresolver.Relpath(args[0])
+		if err != nil {
 			return err
 		}
-		db, err := internal.SetupDB()
+		entryKey := args[1]
+
+		db, err := database.Open(ctx)
 		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
+			return err
 		}
 		defer db.Close()
-		if err := internal.MigrateDB(ctx, db); err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
 
 		q := dbq.New(db)
 
-		if profilesOverridesPatchUnsetGame == "" {
-			active, err := state.LoadActive()
-			if err != nil {
-				return fmt.Errorf("load active selection: %w", err)
-			}
-			if active.ActiveGameInstallID == 0 {
-				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
-			}
-			profilesOverridesPatchUnsetGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
-		}
-
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesOverridesPatchUnsetGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesPatchUnsetGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesOverridesPatchUnsetProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesOverridesPatchUnsetProfile)
 		if err != nil {
 			return err
 		}
@@ -207,52 +187,48 @@ removing the node entirely.`,
 			unsetPatchType = overrideType[:len(overrideType)-len("_patch")] + "_unset"
 		}
 
-		tx, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("begin transaction: %w", err)
-		}
-		defer tx.Rollback()
-		qtx := q.WithTx(tx)
-
-		existingEntry, entryErr := qtx.GetOverridePatchEntryByKey(ctx, dbq.GetOverridePatchEntryByKeyParams{
-			OverrideID:   overrideID,
-			EntryKey:     entryKey,
-			EntrySection: entrySection,
-		})
-
-		if entryErr != nil {
-			// no existing entry: append new unset entry
-			maxPos, err := qtx.GetMaxOverridePatchPosition(ctx, overrideID)
-			if err != nil {
-				return fmt.Errorf("get max position: %w", err)
-			}
-			if _, err := qtx.InsertOverridePatchEntry(ctx, dbq.InsertOverridePatchEntryParams{
+		err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+			existingEntry, entryErr := qtx.GetOverridePatchEntryByKey(ctx, dbq.GetOverridePatchEntryByKeyParams{
 				OverrideID:   overrideID,
-				Position:     maxPos + 1,
-				PatchType:    unsetPatchType,
-				EntrySection: entrySection,
 				EntryKey:     entryKey,
-				EntryValue:   sql.NullString{},
-			}); err != nil {
-				return fmt.Errorf("insert unset patch entry: %w", err)
-			}
-			style.Printf("marked key %q for removal in override for %q in profile %q\n",
-				entryKey, relpath, p.Name)
-		} else {
-			// existing entry: update type to unset and clear value
-			if err := qtx.UpdateOverridePatchEntryTypeAndValue(ctx, dbq.UpdateOverridePatchEntryTypeAndValueParams{
-				PatchType:  unsetPatchType,
-				EntryValue: sql.NullString{},
-				ID:         existingEntry.ID,
-			}); err != nil {
-				return fmt.Errorf("update patch entry: %w", err)
-			}
-			style.Printf("converted patch entry %q to unset in override for %q in profile %q\n",
-				entryKey, relpath, p.Name)
-		}
+				EntrySection: entrySection,
+			})
 
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit: %w", err)
+			if entryErr != nil {
+				// no existing entry: append new unset entry
+				maxPos, err := qtx.GetMaxOverridePatchPosition(ctx, overrideID)
+				if err != nil {
+					return fmt.Errorf("get max position: %w", err)
+				}
+				if _, err := qtx.InsertOverridePatchEntry(ctx, dbq.InsertOverridePatchEntryParams{
+					OverrideID:   overrideID,
+					Position:     maxPos + 1,
+					PatchType:    unsetPatchType,
+					EntrySection: entrySection,
+					EntryKey:     entryKey,
+					EntryValue:   sql.NullString{},
+				}); err != nil {
+					return fmt.Errorf("insert unset patch entry: %w", err)
+				}
+				style.Printf("marked key %q for removal in override for %q in profile %q\n",
+					entryKey, relpath, p.Name)
+			} else {
+				// existing entry: update type to unset and clear value
+				if err := qtx.UpdateOverridePatchEntryTypeAndValue(ctx, dbq.UpdateOverridePatchEntryTypeAndValueParams{
+					PatchType:  unsetPatchType,
+					EntryValue: sql.NullString{},
+					ID:         existingEntry.ID,
+				}); err != nil {
+					return fmt.Errorf("update patch entry: %w", err)
+				}
+				style.Printf("converted patch entry %q to unset in override for %q in profile %q\n",
+					entryKey, relpath, p.Name)
+			}
+
+			return nil
+		})
+		if err != nil {
+			return err
 		}
 
 		return nil

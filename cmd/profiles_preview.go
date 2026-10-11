@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/mfinelli/modctl/dbq"
@@ -31,10 +30,10 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/extractor"
 	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/planner"
-	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/cobra"
@@ -69,43 +68,25 @@ Binary files are detected automatically and refused unless --force is passed.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		relpath := filepath.Clean(args[0])
-
-		if filepath.IsAbs(relpath) {
-			return fmt.Errorf("path must be relative, got %q", relpath)
-		}
-
-		if err := internal.EnsureDBExists(); err != nil {
+		relpath, err := argresolver.Relpath(args[0])
+		if err != nil {
 			return err
 		}
-		db, err := internal.SetupDB()
+
+		db, err := database.Open(ctx)
 		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
+			return err
 		}
 		defer db.Close()
-		if err := internal.MigrateDB(ctx, db); err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
 
 		q := dbq.New(db)
 
-		if profilesPreviewGame == "" {
-			active, err := state.LoadActive()
-			if err != nil {
-				return fmt.Errorf("load active selection: %w", err)
-			}
-			if active.ActiveGameInstallID == 0 {
-				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
-			}
-			profilesPreviewGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
-		}
-
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesPreviewGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesPreviewGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesPreviewProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesPreviewProfile)
 		if err != nil {
 			return err
 		}

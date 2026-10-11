@@ -23,7 +23,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -31,8 +30,8 @@ import (
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/nexusclient"
-	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/mfinelli/modctl/internal/updatechain"
 	"github.com/spf13/cobra"
@@ -63,21 +62,11 @@ on the same path - run 'modctl apply --dry-run' for a precise diff.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		err := internal.EnsureDBExists()
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}
-
-		db, err := internal.SetupDB()
-		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
-		}
 		defer db.Close()
-
-		err = internal.MigrateDB(ctx, db)
-		if err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
 
 		cacheReader, err := nexusclient.NewCacheReader(ctx, logger)
 		if err != nil {
@@ -90,23 +79,12 @@ on the same path - run 'modctl apply --dry-run' for a precise diff.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		if profilesStatusGame == "" {
-			active, err := state.LoadActive()
-			if err != nil {
-				return fmt.Errorf("load active selection: %w", err)
-			}
-			if active.ActiveGameInstallID == 0 {
-				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
-			}
-			profilesStatusGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
-		}
-
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesStatusGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesStatusGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesStatusProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesStatusProfile)
 		if err != nil {
 			return err
 		}

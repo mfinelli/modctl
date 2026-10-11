@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +33,7 @@ import (
 func StoreIDs(cmd *cobra.Command, toComplete string) ([]string, cobra.ShellCompDirective) {
 	ctx := context.Background()
 
-	db, err := internal.SetupDBReadOnly()
+	db, err := database.SetupReadOnly()
 	if err != nil {
 		// No DB (not initialized) or error: don't fall back to file completion.
 		return nil, cobra.ShellCompDirectiveNoFileComp

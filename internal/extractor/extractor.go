@@ -34,6 +34,7 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/patchapply"
 	"github.com/mfinelli/modctl/internal/planner"
@@ -55,6 +56,23 @@ type DeployFileResult struct {
 	WasBackedUp bool
 	// BackupSha256 is set when WasBackedUp is true
 	BackupSha256 string
+	// BackupSizeBytes is the size of the backup, when WasBackedUp is true
+	BackupSizeBytes int64
+}
+
+// replacedContent is the hash and size of the content that a file that is
+// deployed takes the place of, for operation_changes. It is what was backed up,
+// which is the file as it was when it was copied, and when nothing was backed
+// up it is what the plan saw when it hashed the file (a recheck). It is not set
+// when no one looked at the file: that is the case of a file that is not there
+// yet, and of one that the plan was told not to look at (--no-recheck), which
+// is not read here just to say what it was.
+func replacedContent(op planner.PlanOp, backedUp bool, backupSha string, backupSize int64) (sha sql.NullString, size sql.NullInt64) {
+	if backedUp && backupSha != "" {
+		return sql.NullString{String: backupSha, Valid: true}, sql.NullInt64{Int64: backupSize, Valid: true}
+	}
+
+	return op.OnDiskSha256, op.OnDiskSize
 }
 
 // RemoveFileResult is the outcome of removing a single file during apply
@@ -74,6 +92,8 @@ type DeployOverrideFileResult struct {
 	SizeBytes     int64
 	WasBackedUp   bool
 	BackupSha256  string
+	// BackupSizeBytes is the size of the backup, when WasBackedUp is true
+	BackupSizeBytes int64
 }
 
 // StagingPathFor returns the staging directory for a given archive sha256
@@ -181,6 +201,7 @@ func (e Extractor) DeployFile(
 		}
 		result.WasBackedUp = true
 		result.BackupSha256 = backupResult.SHA256Hex
+		result.BackupSizeBytes = backupResult.SizeBytes
 	}
 
 	// Ensure destination directory exists
@@ -197,73 +218,63 @@ func (e Extractor) DeployFile(
 	result.SizeBytes = sizeBytes
 
 	// DB writes in a single transaction
-	tx, err := db.BeginTx(ctx, nil)
+	err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+		// Update archive_inventory_entries.content_sha256 if not already set
+		if err := qtx.UpdateInventoryEntryContentSha256(ctx, dbq.UpdateInventoryEntryContentSha256Params{
+			ContentSha256: sql.NullString{String: contentSha256, Valid: true},
+			ArchiveSha256: winner.Entry.ArchiveSha256,
+			Position:      winner.Entry.Position,
+		}); err != nil {
+			return fmt.Errorf("update inventory content sha256: %w", err)
+		}
+
+		// Upsert installed_files
+		if err := qtx.UpsertInstalledFile(ctx, dbq.UpsertInstalledFileParams{
+			GameInstallID:         gameInstallID,
+			TargetID:              targetID,
+			Relpath:               op.DestPath,
+			ContentSha256:         contentSha256,
+			SizeBytes:             sizeBytes,
+			OwnerModFileVersionID: sql.NullInt64{Int64: winner.ModFileVersionID, Valid: true},
+			OwnerOverrideID:       sql.NullInt64{},
+			OwnerProfileID:        sql.NullInt64{Int64: profileID, Valid: true},
+			LastOperationID:       sql.NullInt64{Int64: operationID, Valid: true},
+		}); err != nil {
+			return fmt.Errorf("upsert installed file: %w", err)
+		}
+
+		// Determine action for operation_changes
+		action := "write"
+		if op.Kind == planner.PlanOpOverwrite {
+			action = "overwrite"
+		}
+
+		// What the file takes the place of, for operation_changes (see
+		// replacedContent)
+		oldSha, oldSize := replacedContent(op, result.WasBackedUp, result.BackupSha256, result.BackupSizeBytes)
+
+		// Insert operation_changes
+		if err := qtx.InsertOperationChange(ctx, dbq.InsertOperationChangeParams{
+			OperationID:      operationID,
+			GameInstallID:    gameInstallID,
+			TargetID:         targetID,
+			Relpath:          op.DestPath,
+			Action:           action,
+			OldContentSha256: oldSha,
+			OldSizeBytes:     oldSize,
+			NewContentSha256: sql.NullString{String: contentSha256, Valid: true},
+			NewSizeBytes:     sql.NullInt64{Int64: sizeBytes, Valid: true},
+			ModFileVersionID: sql.NullInt64{Int64: winner.ModFileVersionID, Valid: true},
+			BackupBlobSha256: sql.NullString{String: result.BackupSha256, Valid: result.WasBackedUp},
+			Notes:            sql.NullString{},
+		}); err != nil {
+			return fmt.Errorf("insert operation change: %w", err)
+		}
+
+		return nil
+	})
 	if err != nil {
-		return DeployFileResult{}, fmt.Errorf("begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-
-	qtx := q.WithTx(tx)
-
-	// Update archive_inventory_entries.content_sha256 if not already set
-	if err := qtx.UpdateInventoryEntryContentSha256(ctx, dbq.UpdateInventoryEntryContentSha256Params{
-		ContentSha256: sql.NullString{String: contentSha256, Valid: true},
-		ArchiveSha256: winner.Entry.ArchiveSha256,
-		Position:      winner.Entry.Position,
-	}); err != nil {
-		return DeployFileResult{}, fmt.Errorf("update inventory content sha256: %w", err)
-	}
-
-	// Upsert installed_files
-	if err := qtx.UpsertInstalledFile(ctx, dbq.UpsertInstalledFileParams{
-		GameInstallID:         gameInstallID,
-		TargetID:              targetID,
-		Relpath:               op.DestPath,
-		ContentSha256:         contentSha256,
-		SizeBytes:             sizeBytes,
-		OwnerModFileVersionID: sql.NullInt64{Int64: winner.ModFileVersionID, Valid: true},
-		OwnerOverrideID:       sql.NullInt64{},
-		OwnerProfileID:        sql.NullInt64{Int64: profileID, Valid: true},
-		LastOperationID:       sql.NullInt64{Int64: operationID, Valid: true},
-	}); err != nil {
-		return DeployFileResult{}, fmt.Errorf("upsert installed file: %w", err)
-	}
-
-	// Determine action for operation_changes
-	action := "write"
-	if op.Kind == planner.PlanOpOverwrite {
-		action = "overwrite"
-	}
-
-	// Build old_content_sha256 for operation_changes
-	// For NeedsBackup cases we have the backup sha which is the pre-existing
-	// content. For overwrite of tool-owned files we don't rehash so leave NULL.
-	var oldSha sql.NullString
-	var oldSize sql.NullInt64
-	if op.NeedsBackup && result.BackupSha256 != "" {
-		oldSha = sql.NullString{String: result.BackupSha256, Valid: true}
-	}
-
-	// Insert operation_changes
-	if err := qtx.InsertOperationChange(ctx, dbq.InsertOperationChangeParams{
-		OperationID:      operationID,
-		GameInstallID:    gameInstallID,
-		TargetID:         targetID,
-		Relpath:          op.DestPath,
-		Action:           action,
-		OldContentSha256: oldSha,
-		OldSizeBytes:     oldSize,
-		NewContentSha256: sql.NullString{String: contentSha256, Valid: true},
-		NewSizeBytes:     sql.NullInt64{Int64: sizeBytes, Valid: true},
-		ModFileVersionID: sql.NullInt64{Int64: winner.ModFileVersionID, Valid: true},
-		BackupBlobSha256: sql.NullString{String: result.BackupSha256, Valid: result.WasBackedUp},
-		Notes:            sql.NullString{},
-	}); err != nil {
-		return DeployFileResult{}, fmt.Errorf("insert operation change: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return DeployFileResult{}, fmt.Errorf("commit: %w", err)
+		return DeployFileResult{}, err
 	}
 
 	return result, nil
@@ -289,41 +300,36 @@ func (e Extractor) RemoveFile(
 		return RemoveFileResult{}, err
 	}
 
-	tx, err := db.BeginTx(ctx, nil)
+	err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+		if err := qtx.DeleteInstalledFile(ctx, dbq.DeleteInstalledFileParams{
+			GameInstallID: gameInstallID,
+			TargetID:      targetID,
+			Relpath:       op.DestPath,
+		}); err != nil {
+			return fmt.Errorf("delete installed file: %w", err)
+		}
+
+		if err := qtx.InsertOperationChange(ctx, dbq.InsertOperationChangeParams{
+			OperationID:      operationID,
+			GameInstallID:    gameInstallID,
+			TargetID:         targetID,
+			Relpath:          op.DestPath,
+			Action:           "remove",
+			OldContentSha256: oldSha,
+			OldSizeBytes:     oldSize,
+			NewContentSha256: sql.NullString{},
+			NewSizeBytes:     sql.NullInt64{},
+			ModFileVersionID: sql.NullInt64{},
+			BackupBlobSha256: sql.NullString{},
+			Notes:            sql.NullString{},
+		}); err != nil {
+			return fmt.Errorf("insert operation change: %w", err)
+		}
+
+		return nil
+	})
 	if err != nil {
-		return RemoveFileResult{}, fmt.Errorf("begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-
-	qtx := q.WithTx(tx)
-
-	if err := qtx.DeleteInstalledFile(ctx, dbq.DeleteInstalledFileParams{
-		GameInstallID: gameInstallID,
-		TargetID:      targetID,
-		Relpath:       op.DestPath,
-	}); err != nil {
-		return RemoveFileResult{}, fmt.Errorf("delete installed file: %w", err)
-	}
-
-	if err := qtx.InsertOperationChange(ctx, dbq.InsertOperationChangeParams{
-		OperationID:      operationID,
-		GameInstallID:    gameInstallID,
-		TargetID:         targetID,
-		Relpath:          op.DestPath,
-		Action:           "remove",
-		OldContentSha256: oldSha,
-		OldSizeBytes:     oldSize,
-		NewContentSha256: sql.NullString{},
-		NewSizeBytes:     sql.NullInt64{},
-		ModFileVersionID: sql.NullInt64{},
-		BackupBlobSha256: sql.NullString{},
-		Notes:            sql.NullString{},
-	}); err != nil {
-		return RemoveFileResult{}, fmt.Errorf("insert operation change: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return RemoveFileResult{}, fmt.Errorf("commit: %w", err)
+		return RemoveFileResult{}, err
 	}
 
 	return RemoveFileResult{DestPath: op.DestPath}, nil
@@ -378,51 +384,46 @@ func (e Extractor) RestoreFile(
 		return RestoreFileResult{}, fmt.Errorf("restore %q: %w", op.DestPath, err)
 	}
 
-	tx, err := db.BeginTx(ctx, nil)
+	err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+		// Delete the installed_files row - the file is no longer tool-owned
+		if err := qtx.DeleteInstalledFile(ctx, dbq.DeleteInstalledFileParams{
+			GameInstallID: gameInstallID,
+			TargetID:      targetID,
+			Relpath:       op.DestPath,
+		}); err != nil {
+			return fmt.Errorf("delete installed file: %w", err)
+		}
+
+		// Delete the backups row - the backup has been consumed.
+		if err := qtx.DeleteBackup(ctx, dbq.DeleteBackupParams{
+			GameInstallID: gameInstallID,
+			TargetID:      targetID,
+			Relpath:       op.DestPath,
+		}); err != nil {
+			return fmt.Errorf("delete backup row: %w", err)
+		}
+
+		if err := qtx.InsertOperationChange(ctx, dbq.InsertOperationChangeParams{
+			OperationID:      operationID,
+			GameInstallID:    gameInstallID,
+			TargetID:         targetID,
+			Relpath:          op.DestPath,
+			Action:           "restore_backup",
+			OldContentSha256: oldSha,
+			OldSizeBytes:     oldSize,
+			NewContentSha256: sql.NullString{String: op.BackupSha256, Valid: true},
+			NewSizeBytes:     sql.NullInt64{Int64: backupInfo.Size(), Valid: true},
+			ModFileVersionID: sql.NullInt64{},
+			BackupBlobSha256: sql.NullString{String: op.BackupSha256, Valid: true},
+			Notes:            sql.NullString{},
+		}); err != nil {
+			return fmt.Errorf("insert operation change: %w", err)
+		}
+
+		return nil
+	})
 	if err != nil {
-		return RestoreFileResult{}, fmt.Errorf("begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-
-	qtx := q.WithTx(tx)
-
-	// Delete the installed_files row - the file is no longer tool-owned
-	if err := qtx.DeleteInstalledFile(ctx, dbq.DeleteInstalledFileParams{
-		GameInstallID: gameInstallID,
-		TargetID:      targetID,
-		Relpath:       op.DestPath,
-	}); err != nil {
-		return RestoreFileResult{}, fmt.Errorf("delete installed file: %w", err)
-	}
-
-	// Delete the backups row - the backup has been consumed.
-	if err := qtx.DeleteBackup(ctx, dbq.DeleteBackupParams{
-		GameInstallID: gameInstallID,
-		TargetID:      targetID,
-		Relpath:       op.DestPath,
-	}); err != nil {
-		return RestoreFileResult{}, fmt.Errorf("delete backup row: %w", err)
-	}
-
-	if err := qtx.InsertOperationChange(ctx, dbq.InsertOperationChangeParams{
-		OperationID:      operationID,
-		GameInstallID:    gameInstallID,
-		TargetID:         targetID,
-		Relpath:          op.DestPath,
-		Action:           "restore_backup",
-		OldContentSha256: oldSha,
-		OldSizeBytes:     oldSize,
-		NewContentSha256: sql.NullString{String: op.BackupSha256, Valid: true},
-		NewSizeBytes:     sql.NullInt64{Int64: backupInfo.Size(), Valid: true},
-		ModFileVersionID: sql.NullInt64{},
-		BackupBlobSha256: sql.NullString{String: op.BackupSha256, Valid: true},
-		Notes:            sql.NullString{},
-	}); err != nil {
-		return RestoreFileResult{}, fmt.Errorf("insert operation change: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return RestoreFileResult{}, fmt.Errorf("commit: %w", err)
+		return RestoreFileResult{}, err
 	}
 
 	return RestoreFileResult{DestPath: op.DestPath}, nil
@@ -465,6 +466,7 @@ func (e Extractor) DeployOverrideFile(
 		}
 		result.WasBackedUp = true
 		result.BackupSha256 = backupResult.SHA256Hex
+		result.BackupSizeBytes = backupResult.SizeBytes
 	}
 
 	// Ensure destination directory exists
@@ -537,60 +539,51 @@ func (e Extractor) DeployOverrideFile(
 	result.SizeBytes = sizeBytes
 
 	// DB writes in a single transaction
-	tx, err := db.BeginTx(ctx, nil)
+	err := database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+		// Upsert installed_files with owner_override_id
+		if err := qtx.UpsertInstalledFile(ctx, dbq.UpsertInstalledFileParams{
+			GameInstallID:         gameInstallID,
+			TargetID:              targetID,
+			Relpath:               op.DestPath,
+			ContentSha256:         contentSha256,
+			SizeBytes:             sizeBytes,
+			OwnerModFileVersionID: sql.NullInt64{},
+			OwnerOverrideID:       sql.NullInt64{Int64: op.OverrideID.Int64, Valid: true},
+			OwnerProfileID:        sql.NullInt64{Int64: profileID, Valid: true},
+			LastOperationID:       sql.NullInt64{Int64: operationID, Valid: true},
+		}); err != nil {
+			return fmt.Errorf("upsert installed file: %w", err)
+		}
+
+		action := "write"
+		if op.Kind == planner.PlanOpOverwrite {
+			action = "overwrite"
+		}
+
+		oldSha, oldSize := replacedContent(op, result.WasBackedUp, result.BackupSha256, result.BackupSizeBytes)
+
+		if err := qtx.InsertOperationChange(ctx, dbq.InsertOperationChangeParams{
+			OperationID:      operationID,
+			GameInstallID:    gameInstallID,
+			TargetID:         targetID,
+			Relpath:          op.DestPath,
+			Action:           action,
+			OldContentSha256: oldSha,
+			OldSizeBytes:     oldSize,
+			NewContentSha256: sql.NullString{String: contentSha256, Valid: true},
+			NewSizeBytes:     sql.NullInt64{Int64: sizeBytes, Valid: true},
+			ModFileVersionID: sql.NullInt64{},
+			OwnerOverrideID:  sql.NullInt64{Int64: op.OverrideID.Int64, Valid: true},
+			BackupBlobSha256: sql.NullString{String: result.BackupSha256, Valid: result.WasBackedUp},
+			Notes:            sql.NullString{},
+		}); err != nil {
+			return fmt.Errorf("insert operation change: %w", err)
+		}
+
+		return nil
+	})
 	if err != nil {
-		return DeployOverrideFileResult{}, fmt.Errorf("begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-
-	qtx := q.WithTx(tx)
-
-	// Upsert installed_files with owner_override_id
-	if err := qtx.UpsertInstalledFile(ctx, dbq.UpsertInstalledFileParams{
-		GameInstallID:         gameInstallID,
-		TargetID:              targetID,
-		Relpath:               op.DestPath,
-		ContentSha256:         contentSha256,
-		SizeBytes:             sizeBytes,
-		OwnerModFileVersionID: sql.NullInt64{},
-		OwnerOverrideID:       sql.NullInt64{Int64: op.OverrideID.Int64, Valid: true},
-		OwnerProfileID:        sql.NullInt64{Int64: profileID, Valid: true},
-		LastOperationID:       sql.NullInt64{Int64: operationID, Valid: true},
-	}); err != nil {
-		return DeployOverrideFileResult{}, fmt.Errorf("upsert installed file: %w", err)
-	}
-
-	action := "write"
-	if op.Kind == planner.PlanOpOverwrite {
-		action = "overwrite"
-	}
-
-	var oldSha sql.NullString
-	var oldSize sql.NullInt64
-	if op.NeedsBackup && result.BackupSha256 != "" {
-		oldSha = sql.NullString{String: result.BackupSha256, Valid: true}
-	}
-
-	if err := qtx.InsertOperationChange(ctx, dbq.InsertOperationChangeParams{
-		OperationID:      operationID,
-		GameInstallID:    gameInstallID,
-		TargetID:         targetID,
-		Relpath:          op.DestPath,
-		Action:           action,
-		OldContentSha256: oldSha,
-		OldSizeBytes:     oldSize,
-		NewContentSha256: sql.NullString{String: contentSha256, Valid: true},
-		NewSizeBytes:     sql.NullInt64{Int64: sizeBytes, Valid: true},
-		ModFileVersionID: sql.NullInt64{},
-		OwnerOverrideID:  sql.NullInt64{Int64: op.OverrideID.Int64, Valid: true},
-		BackupBlobSha256: sql.NullString{String: result.BackupSha256, Valid: result.WasBackedUp},
-		Notes:            sql.NullString{},
-	}); err != nil {
-		return DeployOverrideFileResult{}, fmt.Errorf("insert operation change: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return DeployOverrideFileResult{}, fmt.Errorf("commit: %w", err)
+		return DeployOverrideFileResult{}, err
 	}
 
 	return result, nil

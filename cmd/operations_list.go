@@ -21,15 +21,13 @@ package cmd
 import (
 	"database/sql"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -53,17 +51,11 @@ Use --limit to change the number of operations shown.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		if err := internal.EnsureDBExists(); err != nil {
+		db, err := database.Open(ctx)
+		if err != nil {
 			return err
 		}
-		db, err := internal.SetupDB()
-		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
-		}
 		defer db.Close()
-		if err := internal.MigrateDB(ctx, db); err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
 
 		q := dbq.New(db)
 
@@ -81,18 +73,7 @@ Use --limit to change the number of operations shown.`,
 		}
 
 		// Resolve game install
-		if operationsListGame == "" {
-			active, err := state.LoadActive()
-			if err != nil {
-				return fmt.Errorf("load active selection: %w", err)
-			}
-			if active.ActiveGameInstallID == 0 {
-				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
-			}
-			operationsListGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
-		}
-
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, operationsListGame)
+		gi, err := argresolver.GameInstall(ctx, q, operationsListGame)
 		if err != nil {
 			return err
 		}

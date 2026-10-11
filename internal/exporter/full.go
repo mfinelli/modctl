@@ -28,8 +28,8 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/fsutil"
 )
 
@@ -109,7 +109,7 @@ func Full(
 	}
 
 	// 2. Get schema version
-	schemaVersion, err := internal.CurrentSchemaVersion(ctx, db)
+	schemaVersion, err := database.CurrentSchemaVersion(ctx, db)
 	if err != nil {
 		return Result{}, fmt.Errorf("get schema version: %w", err)
 	}
@@ -247,7 +247,7 @@ func snapshotCacheDB(ctx context.Context, cacheDBPath string) (path string, sha2
 	tmpPath := tmp.Name()
 	tmp.Close()
 
-	cacheDB, err := sql.Open("sqlite3", internal.DSN(cacheDBPath, false))
+	cacheDB, err := sql.Open("sqlite3", database.DSN(cacheDBPath, false))
 	if err != nil {
 		os.Remove(tmpPath)
 		return "", "", fmt.Errorf("open cache db: %w", err)

@@ -22,13 +22,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -56,52 +54,31 @@ without having to choose unused priority numbers.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		err := internal.EnsureDBExists()
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}
-
-		db, err := internal.SetupDB()
-		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
-		}
 		defer db.Close()
-
-		err = internal.MigrateDB(ctx, db)
-		if err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
 
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		if profilesAddGame == "" {
-			active, err := state.LoadActive()
-			if err != nil {
-				return fmt.Errorf("load active selection: %w", err)
-			}
-			if active.ActiveGameInstallID == 0 {
-				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
-			}
-			profilesAddGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
-		}
-
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesAddGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesAddGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesAddProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesAddProfile)
 		if err != nil {
 			return err
 		}
 
-		mfvA, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfvA, err := argresolver.ModFileVersion(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}
 
-		mfvB, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[1])
+		mfvB, err := argresolver.ModFileVersion(ctx, q, gi, args[1])
 		if err != nil {
 			return err
 		}
@@ -109,74 +86,71 @@ without having to choose unused priority numbers.`,
 			return fmt.Errorf("swap requires two different mod file version ids")
 		}
 
-		tx, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("error starting transaction: %w", err)
-		}
-		defer tx.Rollback()
-		qtx := q.WithTx(tx)
+		var a, b dbq.GetProfileItemByVersionForOrderRow
+		err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+			// Look up both items in the profile.
+			a, err = qtx.GetProfileItemByVersionForOrder(ctx, dbq.GetProfileItemByVersionForOrderParams{
+				ProfileID:        p.ID,
+				ModFileVersionID: mfvA.ID,
+			})
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return fmt.Errorf("version %d is not in profile %q", mfvA.ID, p.Name)
+				}
+				return fmt.Errorf("lookup version %d: %w", mfvA.ID, err)
+			}
 
-		// Look up both items in the profile.
-		a, err := qtx.GetProfileItemByVersionForOrder(ctx, dbq.GetProfileItemByVersionForOrderParams{
-			ProfileID:        p.ID,
-			ModFileVersionID: mfvA.ID,
+			b, err = qtx.GetProfileItemByVersionForOrder(ctx, dbq.GetProfileItemByVersionForOrderParams{
+				ProfileID:        p.ID,
+				ModFileVersionID: mfvB.ID,
+			})
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return fmt.Errorf("version %d is not in profile %q", mfvB.ID, p.Name)
+				}
+				return fmt.Errorf("lookup version %d: %w", mfvB.ID, err)
+			}
+
+			if a.Priority == b.Priority {
+				// Should be impossible with the unique index, but just in case...
+				return fmt.Errorf("cannot swap: both versions have the same priority (%d)", a.Priority)
+			}
+
+			// Use a sentinel priority that is guaranteed free.
+			maxPrio, err := qtx.GetMaxPriorityForProfile(ctx, p.ID)
+			if err != nil {
+				return fmt.Errorf("get max priority: %w", err)
+			}
+			sentinel := maxPrio + 1
+
+			// A -> sentinel
+			if err := qtx.SetProfileItemPriorityByID(ctx, dbq.SetProfileItemPriorityByIDParams{
+				Priority: sentinel,
+				ID:       a.ID,
+			}); err != nil {
+				return fmt.Errorf("swap (step 1): %w", err)
+			}
+
+			// B -> old A
+			if err := qtx.SetProfileItemPriorityByID(ctx, dbq.SetProfileItemPriorityByIDParams{
+				Priority: a.Priority,
+				ID:       b.ID,
+			}); err != nil {
+				return fmt.Errorf("swap (step 2): %w", err)
+			}
+
+			// A -> old B
+			if err := qtx.SetProfileItemPriorityByID(ctx, dbq.SetProfileItemPriorityByIDParams{
+				Priority: b.Priority,
+				ID:       a.ID,
+			}); err != nil {
+				return fmt.Errorf("swap (step 3): %w", err)
+			}
+
+			return nil
 		})
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("version %d is not in profile %q", mfvA.ID, p.Name)
-			}
-			return fmt.Errorf("lookup version %d: %w", mfvA.ID, err)
-		}
-
-		b, err := qtx.GetProfileItemByVersionForOrder(ctx, dbq.GetProfileItemByVersionForOrderParams{
-			ProfileID:        p.ID,
-			ModFileVersionID: mfvB.ID,
-		})
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("version %d is not in profile %q", mfvB.ID, p.Name)
-			}
-			return fmt.Errorf("lookup version %d: %w", mfvB.ID, err)
-		}
-
-		if a.Priority == b.Priority {
-			// Should be impossible with the unique index, but just in case...
-			return fmt.Errorf("cannot swap: both versions have the same priority (%d)", a.Priority)
-		}
-
-		// Use a sentinel priority that is guaranteed free.
-		maxPrio, err := qtx.GetMaxPriorityForProfile(ctx, p.ID)
-		if err != nil {
-			return fmt.Errorf("get max priority: %w", err)
-		}
-		sentinel := maxPrio + 1
-
-		// A -> sentinel
-		if err := qtx.SetProfileItemPriorityByID(ctx, dbq.SetProfileItemPriorityByIDParams{
-			Priority: sentinel,
-			ID:       a.ID,
-		}); err != nil {
-			return fmt.Errorf("swap (step 1): %w", err)
-		}
-
-		// B -> old A
-		if err := qtx.SetProfileItemPriorityByID(ctx, dbq.SetProfileItemPriorityByIDParams{
-			Priority: a.Priority,
-			ID:       b.ID,
-		}); err != nil {
-			return fmt.Errorf("swap (step 2): %w", err)
-		}
-
-		// A -> old B
-		if err := qtx.SetProfileItemPriorityByID(ctx, dbq.SetProfileItemPriorityByIDParams{
-			Priority: b.Priority,
-			ID:       a.ID,
-		}); err != nil {
-			return fmt.Errorf("swap (step 3): %w", err)
-		}
-
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit: %w", err)
+			return err
 		}
 
 		style.Printf("Swapped priorities in profile %q: %d(%d) <-> %d(%d)\n",

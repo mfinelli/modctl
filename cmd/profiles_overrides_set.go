@@ -22,14 +22,13 @@ import (
 	"database/sql"
 	"fmt"
 	"path/filepath"
-	"strconv"
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -57,44 +56,26 @@ winner for this path in the active profile.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		relpath := filepath.Clean(args[0])
-		srcFile := args[1]
-
-		if filepath.IsAbs(relpath) {
-			return fmt.Errorf("path must be relative, got %q", relpath)
-		}
-
-		if err := internal.EnsureDBExists(); err != nil {
+		relpath, err := argresolver.Relpath(args[0])
+		if err != nil {
 			return err
 		}
-		db, err := internal.SetupDB()
+		srcFile := args[1]
+
+		db, err := database.Open(ctx)
 		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
+			return err
 		}
 		defer db.Close()
-		if err := internal.MigrateDB(ctx, db); err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
 
 		q := dbq.New(db)
 
-		if profilesOverridesSetGame == "" {
-			active, err := state.LoadActive()
-			if err != nil {
-				return fmt.Errorf("load active selection: %w", err)
-			}
-			if active.ActiveGameInstallID == 0 {
-				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
-			}
-			profilesOverridesSetGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
-		}
-
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesOverridesSetGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesSetGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesOverridesSetProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesOverridesSetProfile)
 		if err != nil {
 			return err
 		}
@@ -139,61 +120,57 @@ winner for this path in the active profile.`,
 		}
 
 		originalName := filepath.Base(srcFile)
-		tx, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("begin transaction: %w", err)
-		}
-		defer tx.Rollback()
-		qtx := q.WithTx(tx)
-
-		if err := blobstore.EnsureBlobRecorded(
-			ctx,
-			qtx,
-			ingestResult.SHA256Hex,
-			string(blobstore.KindOverride),
-			ingestResult.SizeBytes,
-			&originalName,
-		); err != nil {
-			return fmt.Errorf("record override blob: %w", err)
-		}
-
-		// capture source anchor from current conflict winner for this path
 		var srcArchiveSha256 sql.NullString
-		var srcRawPath sql.NullString
-		var srcContentSha256 sql.NullString
+		err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+			if err := blobstore.EnsureBlobRecorded(
+				ctx,
+				qtx,
+				ingestResult.SHA256Hex,
+				string(blobstore.KindOverride),
+				ingestResult.SizeBytes,
+				&originalName,
+			); err != nil {
+				return fmt.Errorf("record override blob: %w", err)
+			}
 
-		anchor, err := qtx.GetCurrentWinnerForPath(ctx, dbq.GetCurrentWinnerForPathParams{
-			ProfileID: p.ID,
-			RawPath:   sql.NullString{String: relpath, Valid: true},
+			// capture source anchor from current conflict winner for this path
+			var srcRawPath sql.NullString
+			var srcContentSha256 sql.NullString
+
+			anchor, err := qtx.GetCurrentWinnerForPath(ctx, dbq.GetCurrentWinnerForPathParams{
+				ProfileID: p.ID,
+				RawPath:   sql.NullString{String: relpath, Valid: true},
+			})
+			if err == nil {
+				srcArchiveSha256 = sql.NullString{String: anchor.ArchiveSha256, Valid: true}
+				srcRawPath = anchor.RawPath
+				srcContentSha256 = anchor.ContentSha256
+			}
+			// if no winner found anchor stays NULL (net-new override)
+
+			notes := sql.NullString{}
+			if profilesOverridesSetNotes != "" {
+				notes = sql.NullString{String: profilesOverridesSetNotes, Valid: true}
+			}
+
+			if _, err = qtx.UpsertOverride(ctx, dbq.UpsertOverrideParams{
+				ProfileID:           p.ID,
+				TargetID:            target.ID,
+				Relpath:             relpath,
+				BlobSha256:          sql.NullString{String: ingestResult.SHA256Hex, Valid: true},
+				OverrideType:        "full_file",
+				SourceArchiveSha256: srcArchiveSha256,
+				SourceRawPath:       srcRawPath,
+				SourceContentSha256: srcContentSha256,
+				Notes:               notes,
+			}); err != nil {
+				return fmt.Errorf("upsert override: %w", err)
+			}
+
+			return nil
 		})
-		if err == nil {
-			srcArchiveSha256 = sql.NullString{String: anchor.ArchiveSha256, Valid: true}
-			srcRawPath = anchor.RawPath
-			srcContentSha256 = anchor.ContentSha256
-		}
-		// if no winner found anchor stays NULL (net-new override)
-
-		notes := sql.NullString{}
-		if profilesOverridesSetNotes != "" {
-			notes = sql.NullString{String: profilesOverridesSetNotes, Valid: true}
-		}
-
-		if _, err = qtx.UpsertOverride(ctx, dbq.UpsertOverrideParams{
-			ProfileID:           p.ID,
-			TargetID:            target.ID,
-			Relpath:             relpath,
-			BlobSha256:          sql.NullString{String: ingestResult.SHA256Hex, Valid: true},
-			OverrideType:        "full_file",
-			SourceArchiveSha256: srcArchiveSha256,
-			SourceRawPath:       srcRawPath,
-			SourceContentSha256: srcContentSha256,
-			Notes:               notes,
-		}); err != nil {
-			return fmt.Errorf("upsert override: %w", err)
-		}
-
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit: %w", err)
+		if err != nil {
+			return err
 		}
 
 		style.Printf("override set for %q in profile %q\n", relpath, p.Name)

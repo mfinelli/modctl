@@ -189,3 +189,75 @@ func TestHashFile(t *testing.T) {
 		}
 	})
 }
+
+func TestHashFileSize(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	for _, n := range []int{0, 1, 5, 4095, 4096, 4097, 1<<20 + 13, 3 << 20} {
+		n := n
+		t.Run("a file of "+strconv.Itoa(n)+" bytes", func(t *testing.T) {
+			t.Parallel()
+
+			data := patterned(n)
+			path := filepath.Join(t.TempDir(), "file")
+			require.NoError(t, os.WriteFile(path, data, 0o644))
+
+			sha, size, err := HashFileSize(ctx, path)
+
+			require.NoError(t, err)
+			assert.Equal(t, sumHex(data), sha)
+			assert.Equal(t, int64(n), size, "it is how many bytes were hashed")
+		})
+	}
+
+	t.Run("it is the same hash as HashFile gives", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.TempDir(), "file")
+		require.NoError(t, os.WriteFile(path, patterned(70000), 0o644))
+
+		viaSize, _, err := HashFileSize(ctx, path)
+		require.NoError(t, err)
+		plain, err := HashFile(ctx, path)
+		require.NoError(t, err)
+
+		assert.Equal(t, plain, viaSize)
+	})
+
+	t.Run("a file that is not there is an error, with no size", func(t *testing.T) {
+		t.Parallel()
+
+		sha, size, err := HashFileSize(ctx, filepath.Join(t.TempDir(), "gone"))
+
+		require.Error(t, err)
+		assert.Empty(t, sha)
+		assert.Zero(t, size)
+	})
+
+	t.Run("a directory is an error, with no size", func(t *testing.T) {
+		t.Parallel()
+
+		sha, size, err := HashFileSize(ctx, t.TempDir())
+
+		require.Error(t, err)
+		assert.Empty(t, sha)
+		assert.Zero(t, size, "a size without a hash says less than nothing")
+	})
+
+	t.Run("being told to stop is an error, with no size", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.TempDir(), "file")
+		require.NoError(t, os.WriteFile(path, patterned(3<<20), 0o644))
+		ctx, cancel := context.WithCancel(ctx)
+		cancel()
+
+		sha, size, err := HashFileSize(ctx, path)
+
+		require.ErrorIs(t, err, context.Canceled)
+		assert.Empty(t, sha)
+		assert.Zero(t, size)
+	})
+}

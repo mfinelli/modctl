@@ -20,13 +20,12 @@ package cmd
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -57,57 +56,40 @@ the write-once configuration from the old version.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		if err := internal.EnsureDBExists(); err != nil {
+		db, err := database.Open(ctx)
+		if err != nil {
 			return err
 		}
-		db, err := internal.SetupDB()
-		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
-		}
 		defer db.Close()
-		if err := internal.MigrateDB(ctx, db); err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
 
 		q := dbq.New(db)
 
-		if profilesDeploysWriteOnceCopyGame == "" {
-			active, err := state.LoadActive()
-			if err != nil {
-				return fmt.Errorf("load active selection: %w", err)
-			}
-			if active.ActiveGameInstallID == 0 {
-				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
-			}
-			profilesDeploysWriteOnceCopyGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
-		}
-
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesDeploysWriteOnceCopyGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesDeploysWriteOnceCopyGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesDeploysWriteOnceCopyProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesDeploysWriteOnceCopyProfile)
 		if err != nil {
 			return err
 		}
 
-		mfvSrc, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfvSrc, err := argresolver.ModFileVersion(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}
 
-		mfvDst, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[1])
+		mfvDst, err := argresolver.ModFileVersion(ctx, q, gi, args[1])
 		if err != nil {
 			return err
 		}
 
-		srcItemID, err := internal.ResolveProfileItemByVersion(ctx, &p, q, mfvSrc.ID)
+		srcItemID, err := argresolver.ProfileItemByVersion(ctx, q, p, mfvSrc.ID)
 		if err != nil {
 			return fmt.Errorf("source: %w", err)
 		}
 
-		dstItemID, err := internal.ResolveProfileItemByVersion(ctx, &p, q, mfvDst.ID)
+		dstItemID, err := argresolver.ProfileItemByVersion(ctx, q, p, mfvDst.ID)
 		if err != nil {
 			return fmt.Errorf("destination: %w", err)
 		}

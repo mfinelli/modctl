@@ -21,14 +21,11 @@ package cmd
 import (
 	"database/sql"
 	"fmt"
-	"path/filepath"
-	"strconv"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -56,44 +53,26 @@ For ini patches, use --section to identify entries in a specific section.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		relpath := filepath.Clean(args[0])
-		entryKey := args[1]
-
-		if filepath.IsAbs(relpath) {
-			return fmt.Errorf("path must be relative, got %q", relpath)
-		}
-
-		if err := internal.EnsureDBExists(); err != nil {
+		relpath, err := argresolver.Relpath(args[0])
+		if err != nil {
 			return err
 		}
-		db, err := internal.SetupDB()
+		entryKey := args[1]
+
+		db, err := database.Open(ctx)
 		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
+			return err
 		}
 		defer db.Close()
-		if err := internal.MigrateDB(ctx, db); err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
 
 		q := dbq.New(db)
 
-		if profilesOverridesPatchRemoveGame == "" {
-			active, err := state.LoadActive()
-			if err != nil {
-				return fmt.Errorf("load active selection: %w", err)
-			}
-			if active.ActiveGameInstallID == 0 {
-				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
-			}
-			profilesOverridesPatchRemoveGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
-		}
-
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesOverridesPatchRemoveGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesPatchRemoveGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesOverridesPatchRemoveProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesOverridesPatchRemoveProfile)
 		if err != nil {
 			return err
 		}
@@ -144,41 +123,38 @@ For ini patches, use --section to identify entries in a specific section.`,
 				entryKey, relpath)
 		}
 
-		tx, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("begin transaction: %w", err)
-		}
-		defer tx.Rollback()
-		qtx := q.WithTx(tx)
-
-		if err := qtx.DeleteOverridePatchEntry(ctx, dbq.DeleteOverridePatchEntryParams{
-			OverrideID: override.ID,
-			Position:   entry.Position,
-		}); err != nil {
-			return fmt.Errorf("delete patch entry: %w", err)
-		}
-
-		// remove override row if no entries remain
-		remaining, err := qtx.GetMaxOverridePatchPosition(ctx, override.ID)
-		if err != nil {
-			return fmt.Errorf("check remaining entries: %w", err)
-		}
-
-		overrideRemoved := false
-		if remaining == -1 {
-			// GetMaxOverridePatchPosition returns -1 via COALESCE when no rows exist
-			if err := qtx.DeleteOverride(ctx, dbq.DeleteOverrideParams{
-				ProfileID: p.ID,
-				TargetID:  target.ID,
-				Relpath:   relpath,
+		var overrideRemoved bool
+		err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+			if err := qtx.DeleteOverridePatchEntry(ctx, dbq.DeleteOverridePatchEntryParams{
+				OverrideID: override.ID,
+				Position:   entry.Position,
 			}); err != nil {
-				return fmt.Errorf("delete empty override: %w", err)
+				return fmt.Errorf("delete patch entry: %w", err)
 			}
-			overrideRemoved = true
-		}
 
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit: %w", err)
+			// remove override row if no entries remain
+			remaining, err := qtx.GetMaxOverridePatchPosition(ctx, override.ID)
+			if err != nil {
+				return fmt.Errorf("check remaining entries: %w", err)
+			}
+
+			overrideRemoved = false
+			if remaining == -1 {
+				// GetMaxOverridePatchPosition returns -1 via COALESCE when no rows exist
+				if err := qtx.DeleteOverride(ctx, dbq.DeleteOverrideParams{
+					ProfileID: p.ID,
+					TargetID:  target.ID,
+					Relpath:   relpath,
+				}); err != nil {
+					return fmt.Errorf("delete empty override: %w", err)
+				}
+				overrideRemoved = true
+			}
+
+			return nil
+		})
+		if err != nil {
+			return err
 		}
 
 		style.Printf("removed patch entry %q from override for %q in profile %q\n",

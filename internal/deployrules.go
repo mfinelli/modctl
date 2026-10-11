@@ -24,6 +24,7 @@ import (
 	"fmt"
 
 	"github.com/mfinelli/modctl/dbq"
+	"github.com/mfinelli/modctl/internal/database"
 )
 
 // CopyDeployRules copies skip-backup and write-once patterns from one profile
@@ -45,41 +46,37 @@ func CopyDeployRules(ctx context.Context, db *sql.DB, q *dbq.Queries, srcItemID,
 		return 0, 0, nil
 	}
 
-	tx, err := db.BeginTx(ctx, nil)
+	err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+		// Replace destination skip-backup patterns
+		if err := qtx.DeleteAllSkipBackupPatterns(ctx, dstItemID); err != nil {
+			return fmt.Errorf("clear dst skip-backup patterns: %w", err)
+		}
+		for _, p := range skipBackupPatterns {
+			if err := qtx.AddSkipBackupPattern(ctx, dbq.AddSkipBackupPatternParams{
+				ProfileItemID: dstItemID,
+				Pattern:       p.Pattern,
+			}); err != nil {
+				return fmt.Errorf("copy skip-backup pattern %q: %w", p.Pattern, err)
+			}
+		}
+
+		// Replace destination write-once patterns
+		if err := qtx.DeleteAllWriteOncePatterns(ctx, dstItemID); err != nil {
+			return fmt.Errorf("clear dst write-once patterns: %w", err)
+		}
+		for _, p := range writeOncePatterns {
+			if err := qtx.AddWriteOncePattern(ctx, dbq.AddWriteOncePatternParams{
+				ProfileItemID: dstItemID,
+				Pattern:       p.Pattern,
+			}); err != nil {
+				return fmt.Errorf("copy write-once pattern %q: %w", p.Pattern, err)
+			}
+		}
+
+		return nil
+	})
 	if err != nil {
-		return 0, 0, fmt.Errorf("begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-	qtx := q.WithTx(tx)
-
-	// Replace destination skip-backup patterns
-	if err := qtx.DeleteAllSkipBackupPatterns(ctx, dstItemID); err != nil {
-		return 0, 0, fmt.Errorf("clear dst skip-backup patterns: %w", err)
-	}
-	for _, p := range skipBackupPatterns {
-		if err := qtx.AddSkipBackupPattern(ctx, dbq.AddSkipBackupPatternParams{
-			ProfileItemID: dstItemID,
-			Pattern:       p.Pattern,
-		}); err != nil {
-			return 0, 0, fmt.Errorf("copy skip-backup pattern %q: %w", p.Pattern, err)
-		}
-	}
-
-	// Replace destination write-once patterns
-	if err := qtx.DeleteAllWriteOncePatterns(ctx, dstItemID); err != nil {
-		return 0, 0, fmt.Errorf("clear dst write-once patterns: %w", err)
-	}
-	for _, p := range writeOncePatterns {
-		if err := qtx.AddWriteOncePattern(ctx, dbq.AddWriteOncePatternParams{
-			ProfileItemID: dstItemID,
-			Pattern:       p.Pattern,
-		}); err != nil {
-			return 0, 0, fmt.Errorf("copy write-once pattern %q: %w", p.Pattern, err)
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return 0, 0, fmt.Errorf("commit: %w", err)
+		return 0, 0, err
 	}
 
 	return len(skipBackupPatterns), len(writeOncePatterns), nil
@@ -98,27 +95,23 @@ func CopySkipBackupPatterns(ctx context.Context, db *sql.DB, q *dbq.Queries, src
 		return 0, nil
 	}
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, fmt.Errorf("begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-	qtx := q.WithTx(tx)
-
-	if err := qtx.DeleteAllSkipBackupPatterns(ctx, dstItemID); err != nil {
-		return 0, fmt.Errorf("clear dst skip-backup patterns: %w", err)
-	}
-	for _, p := range patterns {
-		if err := qtx.AddSkipBackupPattern(ctx, dbq.AddSkipBackupPatternParams{
-			ProfileItemID: dstItemID,
-			Pattern:       p.Pattern,
-		}); err != nil {
-			return 0, fmt.Errorf("copy skip-backup pattern %q: %w", p.Pattern, err)
+	err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+		if err := qtx.DeleteAllSkipBackupPatterns(ctx, dstItemID); err != nil {
+			return fmt.Errorf("clear dst skip-backup patterns: %w", err)
 		}
-	}
+		for _, p := range patterns {
+			if err := qtx.AddSkipBackupPattern(ctx, dbq.AddSkipBackupPatternParams{
+				ProfileItemID: dstItemID,
+				Pattern:       p.Pattern,
+			}); err != nil {
+				return fmt.Errorf("copy skip-backup pattern %q: %w", p.Pattern, err)
+			}
+		}
 
-	if err := tx.Commit(); err != nil {
-		return 0, fmt.Errorf("commit: %w", err)
+		return nil
+	})
+	if err != nil {
+		return 0, err
 	}
 
 	return len(patterns), nil
@@ -137,27 +130,23 @@ func CopyWriteOncePatterns(ctx context.Context, db *sql.DB, q *dbq.Queries, srcI
 		return 0, nil
 	}
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, fmt.Errorf("begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-	qtx := q.WithTx(tx)
-
-	if err := qtx.DeleteAllWriteOncePatterns(ctx, dstItemID); err != nil {
-		return 0, fmt.Errorf("clear dst write-once patterns: %w", err)
-	}
-	for _, p := range patterns {
-		if err := qtx.AddWriteOncePattern(ctx, dbq.AddWriteOncePatternParams{
-			ProfileItemID: dstItemID,
-			Pattern:       p.Pattern,
-		}); err != nil {
-			return 0, fmt.Errorf("copy write-once pattern %q: %w", p.Pattern, err)
+	err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+		if err := qtx.DeleteAllWriteOncePatterns(ctx, dstItemID); err != nil {
+			return fmt.Errorf("clear dst write-once patterns: %w", err)
 		}
-	}
+		for _, p := range patterns {
+			if err := qtx.AddWriteOncePattern(ctx, dbq.AddWriteOncePatternParams{
+				ProfileItemID: dstItemID,
+				Pattern:       p.Pattern,
+			}); err != nil {
+				return fmt.Errorf("copy write-once pattern %q: %w", p.Pattern, err)
+			}
+		}
 
-	if err := tx.Commit(); err != nil {
-		return 0, fmt.Errorf("commit: %w", err)
+		return nil
+	})
+	if err != nil {
+		return 0, err
 	}
 
 	return len(patterns), nil

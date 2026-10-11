@@ -26,6 +26,7 @@ import (
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -55,24 +56,14 @@ provided.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		err := internal.EnsureDBExists()
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}
-
-		db, err := internal.SetupDB()
-		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
-		}
 		defer db.Close()
 
-		err = internal.MigrateDB(ctx, db)
-		if err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
-
 		q := dbq.New(db)
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, args[0])
+		gi, err := argresolver.ExplicitGameInstall(ctx, q, args[0])
 		if err != nil {
 			return err
 		}

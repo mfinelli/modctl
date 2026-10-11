@@ -27,8 +27,8 @@ import (
 	"path/filepath"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/restore"
 	"github.com/mfinelli/modctl/internal/style"
@@ -47,6 +47,8 @@ Performs a full integrity check without importing anything:
   - Verifies every blob file hashes correctly against its filename
   - Checks that every blob referenced in the database is present in the bundle
   - Checks that every blob file in the bundle has a corresponding database row
+  - Checks that no path in the bundle would be written to outside of the game's
+    directory
   - Warns about version compatibility issues
 
 Exits non-zero if any integrity issues are found. Version warnings
@@ -104,7 +106,7 @@ Exits non-zero if any integrity issues are found. Version warnings
 		// same thing (every command migrates it), but it may not exist yet, or
 		// may not have been migrated since an upgrade. An older schema is not
 		// worth a warning since import migrates it.
-		if latest, err := internal.LatestSchemaVersion(); err == nil &&
+		if latest, err := database.LatestSchemaVersion(); err == nil &&
 			bundle.Manifest.SchemaVersion > latest {
 			style.Println(style.Warning.Render(fmt.Sprintf(
 				"  ⚠ bundle schema version %d is newer than the latest this version of modctl supports (%d) - upgrade modctl before importing",
@@ -161,6 +163,17 @@ Exits non-zero if any integrity issues are found. Version warnings
 				style.Println(style.Failure.Render("  ✗ " + iss))
 				issues = append(issues, iss)
 			}
+		}
+		style.Println()
+
+		// paths: a restore refuses a bundle that would have something written
+		// outside of a game's directory, so this is where that is found out
+		style.Println(style.Bold.Render("Paths"))
+		if err := restore.CheckPaths(ctx, bundle); err != nil {
+			style.Println(style.Failure.Render("  ✗ " + err.Error()))
+			issues = append(issues, err.Error())
+		} else {
+			style.Println(style.Success.Render("  ✓ all paths are inside of the directories they are for"))
 		}
 		style.Println()
 
@@ -355,7 +368,7 @@ func checkBundleBlobs(ctx context.Context, bundle *restore.Bundle, bq *dbq.Queri
 
 // checkBundleCacheDB runs quick_check on the nexus cache database.
 func checkBundleCacheDB(ctx context.Context, cachePath string) []string {
-	cacheDB, err := sql.Open("sqlite3", internal.DSN(cachePath, true))
+	cacheDB, err := sql.Open("sqlite3", database.DSN(cachePath, true))
 	if err != nil {
 		return []string{"open nexus cache db: " + err.Error()}
 	}

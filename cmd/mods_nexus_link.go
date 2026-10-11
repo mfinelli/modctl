@@ -23,15 +23,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/nexus"
 	"github.com/mfinelli/modctl/internal/nexusclient"
-	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -66,21 +64,11 @@ version for manual linking.`,
 			return fmt.Errorf("nexus api key not configured; set nexus.apikey in your config file")
 		}
 
-		err := internal.EnsureDBExists()
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}
-
-		db, err := internal.SetupDB()
-		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
-		}
 		defer db.Close()
-
-		err = internal.MigrateDB(ctx, db)
-		if err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
 
 		client, err := nexusclient.New(ctx, apiKey, logger, rootCmd.Version)
 		if err != nil {
@@ -91,24 +79,13 @@ version for manual linking.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		if modsNexusLinkGame == "" {
-			active, err := state.LoadActive()
-			if err != nil {
-				return fmt.Errorf("load active selection: %w", err)
-			}
-			if active.ActiveGameInstallID == 0 {
-				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
-			}
-			modsNexusLinkGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
-		}
-
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, modsNexusLinkGame)
+		gi, err := argresolver.GameInstall(ctx, q, modsNexusLinkGame)
 		if err != nil {
 			return err
 		}
 
 		if modsNexusLinkVersionID != "" {
-			mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, modsNexusLinkVersionID)
+			mfv, err := argresolver.ModFileVersion(ctx, q, gi, modsNexusLinkVersionID)
 			if err != nil {
 				return err
 			}
@@ -292,36 +269,32 @@ func runManualLink(
 			style.Println(style.Subtle.Render(fmt.Sprintf("  updated mod file label: %s", match.File.Name)))
 		} else {
 			// Target label already exists on a sibling row: merge
-			tx, err := db.BeginTx(ctx, nil)
+			err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+				// Promote is_primary if the row being deleted holds it
+				if util.SqliteIntToBool(row.IsPrimary) && !util.SqliteIntToBool(existing.IsPrimary) {
+					if err := qtx.ClearModFilePrimary(ctx, row.ModFileID); err != nil {
+						return fmt.Errorf("clearing primary flag: %w", err)
+					}
+					if err := qtx.SetModFilePrimary(ctx, existing.ID); err != nil {
+						return fmt.Errorf("promoting primary flag: %w", err)
+					}
+				}
+
+				if err := qtx.MoveModFileVersions(ctx, dbq.MoveModFileVersionsParams{
+					NewModFileID: existing.ID,
+					OldModFileID: row.ModFileID,
+				}); err != nil {
+					return fmt.Errorf("moving mod file versions: %w", err)
+				}
+
+				if err := qtx.DeleteModFile(ctx, row.ModFileID); err != nil {
+					return fmt.Errorf("deleting orphaned mod file: %w", err)
+				}
+
+				return nil
+			})
 			if err != nil {
-				return fmt.Errorf("begin merge transaction: %w", err)
-			}
-			defer tx.Rollback()
-			qtx := q.WithTx(tx)
-
-			// Promote is_primary if the row being deleted holds it
-			if util.SqliteIntToBool(row.IsPrimary) && !util.SqliteIntToBool(existing.IsPrimary) {
-				if err := qtx.ClearModFilePrimary(ctx, row.ModFileID); err != nil {
-					return fmt.Errorf("clearing primary flag: %w", err)
-				}
-				if err := qtx.SetModFilePrimary(ctx, existing.ID); err != nil {
-					return fmt.Errorf("promoting primary flag: %w", err)
-				}
-			}
-
-			if err := qtx.MoveModFileVersions(ctx, dbq.MoveModFileVersionsParams{
-				NewModFileID: existing.ID,
-				OldModFileID: row.ModFileID,
-			}); err != nil {
-				return fmt.Errorf("moving mod file versions: %w", err)
-			}
-
-			if err := qtx.DeleteModFile(ctx, row.ModFileID); err != nil {
-				return fmt.Errorf("deleting orphaned mod file: %w", err)
-			}
-
-			if err := tx.Commit(); err != nil {
-				return fmt.Errorf("commit merge: %w", err)
+				return fmt.Errorf("merge: %w", err)
 			}
 
 			style.Println(style.Subtle.Render(fmt.Sprintf(

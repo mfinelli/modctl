@@ -22,13 +22,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
@@ -69,47 +68,26 @@ targets cannot be used.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		err := internal.EnsureDBExists()
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}
-
-		db, err := internal.SetupDB()
-		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
-		}
 		defer db.Close()
-
-		err = internal.MigrateDB(ctx, db)
-		if err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
 
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		if profilesAddGame == "" {
-			active, err := state.LoadActive()
-			if err != nil {
-				return fmt.Errorf("load active selection: %w", err)
-			}
-			if active.ActiveGameInstallID == 0 {
-				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
-			}
-			profilesAddGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
-		}
-
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesAddGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesAddGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesAddProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesAddProfile)
 		if err != nil {
 			return err
 		}
 
-		mfv, err := internal.ResolveModFileVersionArg(ctx, q, gi, args[0])
+		mfv, err := argresolver.ModFileVersion(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}
@@ -125,79 +103,80 @@ targets cannot be used.`,
 			return fmt.Errorf("game %q: %w", gi.DisplayName, err)
 		}
 
-		tx, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("error starting transaction: %w", err)
-		}
-		defer tx.Rollback()
-		qtx := q.WithTx(tx)
-
-		// Validate mod_file_version exists (nicer than FK failure).
-		if _, err := qtx.ExistsModFileVersion(ctx, mfv.ID); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("mod file version %d not found", mfv.ID)
+		var (
+			priority   int64
+			enabledVal int64
+			itemID     int64
+		)
+		err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+			// Validate mod_file_version exists (nicer than FK failure).
+			if _, err := qtx.ExistsModFileVersion(ctx, mfv.ID); err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return fmt.Errorf("mod file version %d not found", mfv.ID)
+				}
+				return fmt.Errorf("check mod file version: %w", err)
 			}
-			return fmt.Errorf("check mod file version: %w", err)
-		}
 
-		// Compute priority if not explicitly provided.
-		priority := profilesAddPriority
-		if profilesAddPriority == 0 {
-			maxPrio, err := qtx.GetMaxPriorityForProfile(ctx, p.ID)
-			if err != nil {
-				return fmt.Errorf("get max priority: %w", err)
+			// Compute priority if not explicitly provided.
+			priority = profilesAddPriority
+			if profilesAddPriority == 0 {
+				maxPrio, err := qtx.GetMaxPriorityForProfile(ctx, p.ID)
+				if err != nil {
+					return fmt.Errorf("get max priority: %w", err)
+				}
+				priority = maxPrio + 1
+			} else {
+				// Explicit priority: ensure it isn't already in use for this profile.
+				_, err := qtx.IsPriorityTaken(ctx, dbq.IsPriorityTakenParams{
+					ProfileID: p.ID,
+					Priority:  profilesAddPriority,
+				})
+				if err == nil {
+					return fmt.Errorf("priority %d is already used in profile %q", profilesAddPriority, p.Name)
+				}
+				if !errors.Is(err, sql.ErrNoRows) {
+					return fmt.Errorf("check priority: %w", err)
+				}
 			}
-			priority = maxPrio + 1
-		} else {
-			// Explicit priority: ensure it isn't already in use for this profile.
-			_, err := qtx.IsPriorityTaken(ctx, dbq.IsPriorityTakenParams{
-				ProfileID: p.ID,
-				Priority:  profilesAddPriority,
+
+			enabledVal = util.SqliteBoolToInt(true) // default enabled=true
+			if profilesAddDisabled {
+				enabledVal = util.SqliteBoolToInt(false)
+			}
+
+			itemID, err = qtx.CreateProfileItem(ctx, dbq.CreateProfileItemParams{
+				ProfileID:        p.ID,
+				ModFileVersionID: mfv.ID,
+				TargetID:         target.ID,
+				Enabled:          enabledVal,
+				Priority:         priority,
 			})
-			if err == nil {
-				return fmt.Errorf("priority %d is already used in profile %q", profilesAddPriority, p.Name)
+			if err != nil {
+				// NOTE: This tells us it was a UNIQUE constraint, but not which one.
+				// We rely on the explicit IsPriorityTaken check for a clear duplicate-priority message.
+				if database.IsUniqueConstraint(err) {
+					// Most common case: duplicate version in profile
+					// (UNIQUE(profile_id, mod_file_version_id)).
+					// If user provided a priority on the command line
+					// duplicate priority should have been caught above
+					// unless a race occurred.
+					if profilesAddPriority != 0 {
+						return fmt.Errorf("could not add version %d to profile %q (duplicate version or priority conflict)", mfv.ID, p.Name)
+					}
+					return fmt.Errorf("version %d is already in profile %q", mfv.ID, p.Name)
+				}
+				if database.IsForeignKeyConstraint(err) {
+					// Should be prevented by ExistsModFileVersion,
+					// but keep a friendly message anyway.
+					return fmt.Errorf("invalid reference while adding version %d to profile %q", mfv.ID, p.Name)
+				}
+				return fmt.Errorf("add to profile: %w", err)
 			}
-			if !errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("check priority: %w", err)
-			}
-		}
 
-		enabledVal := util.SqliteBoolToInt(true) // default enabled=true
-		if profilesAddDisabled {
-			enabledVal = util.SqliteBoolToInt(false)
-		}
-
-		itemID, err := qtx.CreateProfileItem(ctx, dbq.CreateProfileItemParams{
-			ProfileID:        p.ID,
-			ModFileVersionID: mfv.ID,
-			TargetID:         target.ID,
-			Enabled:          enabledVal,
-			Priority:         priority,
+			return nil
 		})
 		if err != nil {
-			// NOTE: This tells us it was a UNIQUE constraint, but not which one.
-			// We rely on the explicit IsPriorityTaken check for a clear duplicate-priority message.
-			if internal.IsUniqueConstraint(err) {
-				// Most common case: duplicate version in profile
-				// (UNIQUE(profile_id, mod_file_version_id)).
-				// If user provided a priority on the command line
-				// duplicate priority should have been caught above
-				// unless a race occurred.
-				if profilesAddPriority != 0 {
-					return fmt.Errorf("could not add version %d to profile %q (duplicate version or priority conflict)", mfv.ID, p.Name)
-				}
-				return fmt.Errorf("version %d is already in profile %q", mfv.ID, p.Name)
-			}
-			if internal.IsForeignKeyConstraint(err) {
-				// Should be prevented by ExistsModFileVersion,
-				// but keep a friendly message anyway.
-				return fmt.Errorf("invalid reference while adding version %d to profile %q", mfv.ID, p.Name)
-			}
-			return fmt.Errorf("add to profile: %w", err)
-		}
-
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit: %w", err)
+			return err
 		}
 
 		style.Printf("Added version %d to profile %q (item_id=%d, priority=%d, enabled=%t, target=%s)\n",

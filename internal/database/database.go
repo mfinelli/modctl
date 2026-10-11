@@ -16,12 +16,11 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package internal
+package database
 
 import (
 	"context"
 	"database/sql"
-	"embed"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -31,7 +30,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
-	"github.com/pressly/goose/v3/database"
+	goosedb "github.com/pressly/goose/v3/database"
 	"github.com/spf13/viper"
 )
 
@@ -48,7 +47,20 @@ const DB_PRAGMAS = "?_foreign_keys=ON&_journal_mode=WAL&_synchronous=NORMAL"
 // that way.
 const DB_PRAGMAS_READONLY = "?_foreign_keys=ON&mode=ro"
 
-var Migrations embed.FS
+// Migrations is where the migrations are read from, in a directory called
+// "migrations": the ones that are embedded in the binary, which main sets. A
+// test has none unless it sets some, which is what lets it have the ones of the
+// repository.
+var Migrations fs.FS
+
+// migrationsFS is the "migrations" directory of Migrations.
+func migrationsFS() (fs.FS, error) {
+	if Migrations == nil {
+		return nil, errors.New("no migrations are embedded")
+	}
+
+	return fs.Sub(Migrations, "migrations")
+}
 
 // DSN returns the connection string for the SQLite database at path, which
 // every database open in modctl should use rather than building its own.
@@ -65,22 +77,22 @@ func DSN(path string, readOnly bool) string {
 	return fmt.Sprintf("file:%s%s", url.PathEscape(path), pragmas)
 }
 
-func SetupDB() (*sql.DB, error) {
+func Setup() (*sql.DB, error) {
 	return sql.Open("sqlite3", DSN(viper.GetString("database"), false))
 }
 
-func SetupDBReadOnly() (*sql.DB, error) {
+func SetupReadOnly() (*sql.DB, error) {
 	return sql.Open("sqlite3", DSN(viper.GetString("database"), true))
 }
 
 func GooseProvider(db *sql.DB) (*goose.Provider, error) {
-	// Make the provider FS point at the "migrations" directory within the embed.FS.
-	fsys, err := fs.Sub(Migrations, "migrations")
+	// Make the provider FS point at the "migrations" directory within Migrations.
+	fsys, err := migrationsFS()
 	if err != nil {
 		return nil, fmt.Errorf("error preparing migrations fs: %w", err)
 	}
 
-	base, err := database.NewStore(database.DialectSQLite3, "schema_migrations")
+	base, err := goosedb.NewStore(goosedb.DialectSQLite3, "schema_migrations")
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +101,7 @@ func GooseProvider(db *sql.DB) (*goose.Provider, error) {
 	)
 }
 
-func MigrateDB(ctx context.Context, db *sql.DB) error {
+func Migrate(ctx context.Context, db *sql.DB) error {
 	p, err := GooseProvider(db)
 	if err != nil {
 		return fmt.Errorf("error setting up goose provider: %w", err)
@@ -114,14 +126,14 @@ func CurrentSchemaVersion(ctx context.Context, db *sql.DB) (int64, error) {
 		return 0, fmt.Errorf("get goose provider: %w", err)
 	}
 
-	return schemaVersion(ctx, p)
+	return SchemaVersion(ctx, p)
 }
 
-// schemaVersion returns the applied migration version as seen by p. It is
+// SchemaVersion returns the applied migration version as seen by p. It is
 // split out from CurrentSchemaVersion so that tests can supply a provider that
 // reads its migrations from the filesystem (the embedded copy is only
 // populated in the real binary).
-func schemaVersion(ctx context.Context, p *goose.Provider) (int64, error) {
+func SchemaVersion(ctx context.Context, p *goose.Provider) (int64, error) {
 	current, _, err := p.GetVersions(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("get schema version: %w", err)
@@ -136,7 +148,7 @@ func schemaVersion(ctx context.Context, p *goose.Provider) (int64, error) {
 // once it has been fully migrated, and what a bundle's schema version has to
 // be compared against to tell whether this build can import it.
 func LatestSchemaVersion() (int64, error) {
-	fsys, err := fs.Sub(Migrations, "migrations")
+	fsys, err := migrationsFS()
 	if err != nil {
 		return 0, fmt.Errorf("error preparing migrations fs: %w", err)
 	}
@@ -176,9 +188,36 @@ func latestMigrationVersion(fsys fs.FS) (int64, error) {
 	return latest, nil
 }
 
-// EnsureDBExists verifies that the configured database file exists
+// Open opens the database that the commands use: it has to be there (it is
+// made by init), and it is migrated to the latest schema before it is handed
+// over. The caller closes it.
+func Open(ctx context.Context) (*sql.DB, error) {
+	return openWith(ctx, Migrate)
+}
+
+// openWith is Open with the migrating done by migrate, so that a test can
+// have migrations that are not the ones that are embedded in the binary.
+func openWith(ctx context.Context, migrate func(context.Context, *sql.DB) error) (*sql.DB, error) {
+	if err := EnsureExists(); err != nil {
+		return nil, err
+	}
+
+	db, err := Setup()
+	if err != nil {
+		return nil, fmt.Errorf("error setting up database: %w", err)
+	}
+
+	if err := migrate(ctx, db); err != nil {
+		db.Close()
+		return nil, err
+	}
+
+	return db, nil
+}
+
+// EnsureExists verifies that the configured database file exists
 // and is a regular file. If not, it returns a user-friendly error.
-func EnsureDBExists() error {
+func EnsureExists() error {
 	path := viper.GetString("database")
 	if path == "" {
 		return fmt.Errorf("database path is not configured")
@@ -205,10 +244,10 @@ func EnsureDBExists() error {
 // A custom goose store to let us override the schema migrations table to use
 // more idiomatic sqlite
 type SqliteStore struct {
-	database.Store // embed and delegate everything
+	goosedb.Store // embed and delegate everything
 }
 
-func (s *SqliteStore) CreateVersionTable(ctx context.Context, db database.DBTxConn) error {
+func (s *SqliteStore) CreateVersionTable(ctx context.Context, db goosedb.DBTxConn) error {
 	_, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
         id         INTEGER PRIMARY KEY,
         version_id INTEGER NOT NULL,

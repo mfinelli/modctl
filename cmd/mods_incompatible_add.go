@@ -21,13 +21,11 @@ package cmd
 import (
 	"database/sql"
 	"fmt"
-	"strconv"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -59,47 +57,26 @@ known crashes, conflicting game mechanics, or anything else.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		err := internal.EnsureDBExists()
+		db, err := database.Open(ctx)
 		if err != nil {
 			return err
 		}
-
-		db, err := internal.SetupDB()
-		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
-		}
 		defer db.Close()
-
-		err = internal.MigrateDB(ctx, db)
-		if err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
 
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		if modsIncompatibleAddGame == "" {
-			active, err := state.LoadActive()
-			if err != nil {
-				return fmt.Errorf("load active selection: %w", err)
-			}
-			if active.ActiveGameInstallID == 0 {
-				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
-			}
-			modsIncompatibleAddGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
-		}
-
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, modsIncompatibleAddGame)
+		gi, err := argresolver.GameInstall(ctx, q, modsIncompatibleAddGame)
 		if err != nil {
 			return err
 		}
 
-		mpA, err := internal.ResolveModPageArg(ctx, q, gi, args[0])
+		mpA, err := argresolver.ModPage(ctx, q, gi, args[0])
 		if err != nil {
 			return err
 		}
 
-		mpB, err := internal.ResolveModPageArg(ctx, q, gi, args[1])
+		mpB, err := argresolver.ModPage(ctx, q, gi, args[1])
 		if err != nil {
 			return err
 		}
@@ -131,11 +108,11 @@ known crashes, conflicting game mechanics, or anything else.`,
 			ModPageIDB: mpB.ID,
 			Reason:     nullReason,
 		}); err != nil {
-			if internal.IsUniqueConstraint(err) {
+			if database.IsUniqueConstraint(err) {
 				return fmt.Errorf("mods %q (id: %d) and %q (id: %d) are already flagged as incompatible",
 					pageA.Name, pageA.ID, pageB.Name, pageB.ID)
 			}
-			if internal.IsTriggerConstraint(err) {
+			if database.IsTriggerConstraint(err) {
 				// Fired by trg_mod_incompatibilities_same_game_ins - shouldn't be
 				// reachable in normal use since we verify game_install_id above,
 				// but handle it gracefully in case of a race or direct DB access.

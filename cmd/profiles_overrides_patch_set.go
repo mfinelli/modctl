@@ -22,14 +22,13 @@ import (
 	"database/sql"
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/state"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -61,45 +60,27 @@ Examples:
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		relpath := filepath.Clean(args[0])
+		relpath, err := argresolver.Relpath(args[0])
+		if err != nil {
+			return err
+		}
 		entryKey := args[1]
 		entryValue := args[2]
 
-		if filepath.IsAbs(relpath) {
-			return fmt.Errorf("path must be relative, got %q", relpath)
-		}
-
-		if err := internal.EnsureDBExists(); err != nil {
+		db, err := database.Open(ctx)
+		if err != nil {
 			return err
 		}
-		db, err := internal.SetupDB()
-		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
-		}
 		defer db.Close()
-		if err := internal.MigrateDB(ctx, db); err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
 
 		q := dbq.New(db)
 
-		if profilesOverridesPatchSetGame == "" {
-			active, err := state.LoadActive()
-			if err != nil {
-				return fmt.Errorf("load active selection: %w", err)
-			}
-			if active.ActiveGameInstallID == 0 {
-				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
-			}
-			profilesOverridesPatchSetGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
-		}
-
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, profilesOverridesPatchSetGame)
+		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesPatchSetGame)
 		if err != nil {
 			return err
 		}
 
-		p, err := argresolver.ResolveProfileArg(ctx, q, &gi, profilesOverridesPatchSetProfile)
+		p, err := argresolver.Profile(ctx, q, gi, profilesOverridesPatchSetProfile)
 		if err != nil {
 			return err
 		}
@@ -205,51 +186,47 @@ Examples:
 			EntrySection: entrySection,
 		})
 
-		tx, err := db.BeginTx(ctx, nil)
+		err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+			// determine patch type string for the entry
+			setPatchType := overrideType[:len(overrideType)-len("_patch")] + "_set"
+			// e.g. "ini_patch" -> "ini_set", "yaml_patch" -> "yaml_set"
+
+			if entryErr != nil {
+				// new entry: append at end
+				maxPos, err := qtx.GetMaxOverridePatchPosition(ctx, overrideID)
+				if err != nil {
+					return fmt.Errorf("get max position: %w", err)
+				}
+				newPos := maxPos + 1
+
+				if _, err := qtx.InsertOverridePatchEntry(ctx, dbq.InsertOverridePatchEntryParams{
+					OverrideID:   overrideID,
+					Position:     newPos,
+					PatchType:    setPatchType,
+					EntrySection: entrySection,
+					EntryKey:     entryKey,
+					EntryValue:   sql.NullString{String: entryValue, Valid: true},
+				}); err != nil {
+					return fmt.Errorf("insert patch entry: %w", err)
+				}
+				style.Printf("added patch entry %q to override for %q in profile %q\n",
+					entryKey, relpath, p.Name)
+			} else {
+				// existing entry: update value in place
+				if err := qtx.UpdateOverridePatchEntryValue(ctx, dbq.UpdateOverridePatchEntryValueParams{
+					EntryValue: sql.NullString{String: entryValue, Valid: true},
+					ID:         existingEntry.ID,
+				}); err != nil {
+					return fmt.Errorf("update patch entry: %w", err)
+				}
+				style.Printf("updated patch entry %q in override for %q in profile %q\n",
+					entryKey, relpath, p.Name)
+			}
+
+			return nil
+		})
 		if err != nil {
-			return fmt.Errorf("begin transaction: %w", err)
-		}
-		defer tx.Rollback()
-		qtx := q.WithTx(tx)
-
-		// determine patch type string for the entry
-		setPatchType := overrideType[:len(overrideType)-len("_patch")] + "_set"
-		// e.g. "ini_patch" -> "ini_set", "yaml_patch" -> "yaml_set"
-
-		if entryErr != nil {
-			// new entry: append at end
-			maxPos, err := qtx.GetMaxOverridePatchPosition(ctx, overrideID)
-			if err != nil {
-				return fmt.Errorf("get max position: %w", err)
-			}
-			newPos := maxPos + 1
-
-			if _, err := qtx.InsertOverridePatchEntry(ctx, dbq.InsertOverridePatchEntryParams{
-				OverrideID:   overrideID,
-				Position:     newPos,
-				PatchType:    setPatchType,
-				EntrySection: entrySection,
-				EntryKey:     entryKey,
-				EntryValue:   sql.NullString{String: entryValue, Valid: true},
-			}); err != nil {
-				return fmt.Errorf("insert patch entry: %w", err)
-			}
-			style.Printf("added patch entry %q to override for %q in profile %q\n",
-				entryKey, relpath, p.Name)
-		} else {
-			// existing entry: update value in place
-			if err := qtx.UpdateOverridePatchEntryValue(ctx, dbq.UpdateOverridePatchEntryValueParams{
-				EntryValue: sql.NullString{String: entryValue, Valid: true},
-				ID:         existingEntry.ID,
-			}); err != nil {
-				return fmt.Errorf("update patch entry: %w", err)
-			}
-			style.Printf("updated patch entry %q in override for %q in profile %q\n",
-				entryKey, relpath, p.Name)
-		}
-
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit: %w", err)
+			return err
 		}
 
 		return nil

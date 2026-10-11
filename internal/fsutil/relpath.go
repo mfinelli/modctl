@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package planner
+package fsutil
 
 import (
 	"errors"
@@ -24,9 +24,13 @@ import (
 	"strings"
 )
 
-// validateDestPath rejects paths that are unsafe to write to disk.
-// It checks for absolute paths, path traversal, and other dangerous patterns.
-func validateDestPath(p string) error {
+// ValidateRelPath rejects a path that is not safe to write inside a directory
+// that it is meant to be relative to (the root of a target, say): an absolute
+// path, one that gets out of the directory by way of "..", and one that is
+// nothing but the directory itself.
+// The path is judged as it is written (with slashes), without looking at the
+// disk, so symlinks are not part of what it can tell.
+func ValidateRelPath(p string) error {
 	if path.IsAbs(p) {
 		return errors.New("absolute path not allowed")
 	}

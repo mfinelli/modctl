@@ -29,6 +29,31 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 - `apply` now warns when a file that a mod installs is a symlink in the game
   directory. The symlink is replaced by a regular file (what it points to is
   not changed), and `unapply` can't bring the symlink back.
+- Fix `apply` writing an override outside of the game directory when its path
+  went out of it (with `..`), which a bundle that was imported could contain.
+  Such overrides are now rejected with a warning, and `apply` and `unapply` leave
+  alone a file that is recorded as installed at such a path.
+- The commands that take the path of a file in the game directory (for backups
+  and overrides) now also reject a path that goes out of it with `..`, and `.`,
+  instead of only a path that is absolute.
+- `import` refuses a bundle that has an override with a path that goes out of the
+  game directory (and, for a full restore on the same machine, backups or
+  installed files with such a path), before anything is changed, and `verify`
+  reports it.
+- Importing a game bundle is now all or nothing: a bundle that can't be imported
+  to the end leaves the database as it was. Before, the game that `--force`
+  replaces was already deleted, and what had been imported of the bundle stayed.
+- Importing a full bundle no longer removes the database before the one of the
+  bundle has been copied: if that fails, the database that was there is left as
+  it was, instead of being lost.
+- The targets of a bundle are now imported disabled (apart from a restore on the
+  same machine), since their paths are whatever the bundle says. `games refresh`
+  enables the ones that it finds for a game that is installed on the machine,
+  with the path that it found, and the import lists the ones that a user made by
+  hand, which have to be enabled with `games targets enable`.
+- `apply` now records the hash and size of the file that an overwrite replaces,
+  from the check for drift that it already does or from the backup it made.
+  Nothing is read just for this so with `--no-recheck` nothing is recorded.
 
 ## v0.8.0 - 2026-10-10
 
