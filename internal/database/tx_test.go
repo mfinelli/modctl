@@ -142,7 +142,7 @@ func TestInTx(t *testing.T) {
 		assert.Equal(t, 1, blobCount(t, db))
 	})
 
-	t.Run("a commit that fails is a CommitError, and nothing is there", func(t *testing.T) {
+	t.Run("a commit that fails is an error that says so, and nothing is there", func(t *testing.T) {
 		t.Parallel()
 		db := fileDB(t)
 		ctx, cancel := context.WithCancel(ctx)
@@ -155,22 +155,19 @@ func TestInTx(t *testing.T) {
 			return nil
 		})
 
-		var commitErr *database.CommitError
-		require.ErrorAs(t, err, &commitErr)
+		require.Error(t, err)
 		assert.ErrorIs(t, err, context.Canceled, "what went wrong is what it wraps")
-		assert.ErrorIs(t, commitErr.Err, context.Canceled)
 		assert.Contains(t, err.Error(), "commit: ")
 		assert.Equal(t, 0, blobCount(t, db))
 	})
 
-	t.Run("an error of fn is not a CommitError", func(t *testing.T) {
+	t.Run("an error of fn is not described as a commit", func(t *testing.T) {
 		t.Parallel()
 		db := fileDB(t)
 
 		err := database.InTx(ctx, db, func(*sql.Tx) error { return errors.New("boom") })
 
-		var commitErr *database.CommitError
-		assert.False(t, errors.As(err, &commitErr))
+		assert.EqualError(t, err, "boom")
 	})
 
 	t.Run("a transaction that can't be started is an error, and fn is not called", func(t *testing.T) {
@@ -187,8 +184,7 @@ func TestInTx(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "begin transaction")
 		assert.False(t, called)
-		var commitErr *database.CommitError
-		assert.False(t, errors.As(err, &commitErr))
+		assert.NotContains(t, err.Error(), "commit")
 	})
 
 	t.Run("a context that is done doesn't start one", func(t *testing.T) {
@@ -278,7 +274,7 @@ func TestWithTx(t *testing.T) {
 		assert.Equal(t, 0, blobCount(t, db))
 	})
 
-	t.Run("a commit that fails is a CommitError", func(t *testing.T) {
+	t.Run("a commit that fails is an error that says so", func(t *testing.T) {
 		t.Parallel()
 		db := fileDB(t)
 		ctx, cancel := context.WithCancel(ctx)
@@ -290,8 +286,9 @@ func TestWithTx(t *testing.T) {
 			return nil
 		})
 
-		var commitErr *database.CommitError
-		require.ErrorAs(t, err, &commitErr)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "commit: ")
+		assert.ErrorIs(t, err, context.Canceled)
 		assert.Equal(t, 0, blobCount(t, db))
 	})
 

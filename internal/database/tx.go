@@ -26,27 +26,11 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 )
 
-// CommitError is the error of a transaction that could not be committed: what
-// was done in it is not there. It is told apart from the errors of what was
-// done in the transaction (which are returned as they are) for the callers that
-// have something to do about it, such as marking an operation as failed.
-type CommitError struct {
-	Err error
-}
-
-func (e *CommitError) Error() string {
-	return "commit: " + e.Err.Error()
-}
-
-func (e *CommitError) Unwrap() error {
-	return e.Err
-}
-
 // InTx runs fn in a transaction on db. It is committed if fn returns nil, and
 // rolled back if fn returns an error (which is returned as it is) or panics (as
-// it goes up). A transaction that can't be committed is an error that is a
-// *CommitError, and one that can't be started is an error that says so, in
-// which case fn is not called.
+// it goes up). A transaction that can't be committed or can't be started is an
+// error that says so ("commit: ..." and "begin transaction: ..."), and in the
+// second case fn is not called.
 //
 // fn must not use db for what has to be in the transaction: the transaction is
 // its own connection, and what is done through db is not part of it.
@@ -65,7 +49,7 @@ func InTx(ctx context.Context, db *sql.DB, fn func(tx *sql.Tx) error) error {
 	}
 
 	if err := tx.Commit(); err != nil {
-		return &CommitError{Err: err}
+		return fmt.Errorf("commit: %w", err)
 	}
 
 	return nil
