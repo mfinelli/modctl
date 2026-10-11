@@ -46,6 +46,11 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 - Importing a full bundle no longer removes the database before the one of the
   bundle has been copied: if that fails, the database that was there is left as
   it was, instead of being lost.
+- The targets of a bundle are now imported disabled (apart from a restore on the
+  same machine), since their paths are whatever the bundle says. `games refresh`
+  enables the ones that it finds for a game that is installed on the machine,
+  with the path that it found, and the import lists the ones that a user made by
+  hand, which have to be enabled with `games targets enable`.
 
 ## v0.8.0 - 2026-10-10
 

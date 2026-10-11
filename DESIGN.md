@@ -118,7 +118,8 @@ reference it (since nothing is on disk after unapply, this is safe).
 Targets can be disabled (`targets.enabled = 0`), which is how a game that only
 uses one of `game_dir`/`proton_prefix` avoids planning for the other. Disabling
 is allowed for discovered targets as well and survives refresh (the discovery
-upsert only touches the path). A target can only be disabled when it is safe
+upsert only touches the path, except for a target that was imported, below). A
+target can only be disabled when it is safe
 to stop managing it:
 
 - no `installed_files` rows reference it (the authoritative record of what is
@@ -126,6 +127,19 @@ to stop managing it:
   files in between;
 - no profile items or overrides reference it, since they would never deploy;
 - it is not the only enabled target.
+
+The targets of a bundle are not trusted: a path in a bundle is whatever the one
+who made it wrote, and `apply` writes to the paths of the targets. So the targets
+that an import adds (a game import, and a full restore that is not on the same
+machine) are inserted disabled, with `{"unverified": true}` in their metadata,
+which keeps what else the metadata has. A target that was disabled in the bundle
+is inserted disabled without the mark, since finding it is not a reason to enable
+what was turned off. The discovery upsert enables a target that has the mark and
+takes the mark off, with the path that this machine just found for it. It never
+touches a target of the user, and the origin that the bundle says is not what
+decides anything: only what a refresh itself found does. A target that was made
+by hand, and so is not found by discovery, stays disabled until the user enables
+it, and the import lists those.
 
 Apply and `profiles preview` only consider enabled targets; `unapply` always
 walks every target, because it undoes recorded state and must never skip rows

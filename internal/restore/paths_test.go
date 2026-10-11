@@ -79,6 +79,16 @@ func (g *bundleGame) blob(kind string) string {
 	return sha
 }
 
+// addTarget adds a target to the game.
+func (g *bundleGame) addTarget(name, origin, root string, enabled int) {
+	g.t.Helper()
+
+	_, err := g.db.Exec(`INSERT INTO targets (game_install_id, name, root_path, origin, created_at, updated_at, enabled)
+		VALUES (?, ?, ?, ?, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', ?)`,
+		g.game.ID, name, root, origin, enabled)
+	require.NoError(g.t, err)
+}
+
 // rename gives the game another name, which tells it from another game that is
 // the same as it in everything else.
 func (g *bundleGame) rename(name string) {

@@ -153,6 +153,7 @@ func Game(
 	// a bundle that can't be imported to the end leaves things as they were, which
 	// includes the game that is replaced with --force (the blobs above are files
 	// that are kept by their content, and are not part of it)
+	var disabledTargets []DisabledTarget
 	err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
 		if gameExists && opts.Force {
 			if err := qtx.ImportDeleteGameInstall(ctx, existing); err != nil {
@@ -184,7 +185,8 @@ func Game(
 		}
 
 		// Targets
-		if err := importTargets(ctx, qtx, bq, newGameInstallID, oldGameInstallID, remap); err != nil {
+		disabledTargets, err = importTargets(ctx, qtx, bq, newGameInstallID, oldGameInstallID, displayName, remap)
+		if err != nil {
 			return fmt.Errorf("import targets: %w", err)
 		}
 
@@ -256,6 +258,7 @@ func Game(
 	if err != nil {
 		return res, err
 	}
+	res.DisabledTargets = disabledTargets
 
 	// Import nexus cache if present in bundle
 	if bundle.Manifest.NexusCacheSha256 != "" {
@@ -338,28 +341,44 @@ func importGameInstall(ctx context.Context, dst, src *dbq.Queries, gi *dbq.GameI
 	return newID, err
 }
 
-func importTargets(ctx context.Context, dst, src *dbq.Queries, newGameInstallID, oldGameInstallID int64, remap *idRemap) error {
+// importTargets inserts the targets of the game, disabled and marked as not
+// confirmed (see targets.go), and returns the ones it disabled.
+func importTargets(ctx context.Context, dst, src *dbq.Queries, newGameInstallID, oldGameInstallID int64, gameName string, remap *idRemap) ([]DisabledTarget, error) {
 	targets, err := src.ListTargetsForGameInstall(ctx, oldGameInstallID)
 	if err != nil {
-		return fmt.Errorf("get targets: %w", err)
+		return nil, fmt.Errorf("get targets: %w", err)
 	}
+
+	var disabled []DisabledTarget
 	for _, t := range targets {
+		metadata, changed := unverifiedTarget(t.Enabled, t.Metadata)
+		enabled := t.Enabled
+		if changed {
+			enabled = 0
+			disabled = append(disabled, DisabledTarget{
+				Game:     gameName,
+				Name:     t.Name,
+				RootPath: t.RootPath,
+				Custom:   t.Origin == targetOriginCustom,
+			})
+		}
+
 		newID, err := dst.ImportInsertTarget(ctx, dbq.ImportInsertTargetParams{
 			GameInstallID: newGameInstallID,
 			Name:          t.Name,
 			RootPath:      t.RootPath,
 			Origin:        t.Origin,
-			Metadata:      t.Metadata,
+			Metadata:      metadata,
 			CreatedAt:     t.CreatedAt,
 			UpdatedAt:     t.UpdatedAt,
-			Enabled:       t.Enabled,
+			Enabled:       enabled,
 		})
 		if err != nil {
-			return fmt.Errorf("insert target %q: %w", t.Name, err)
+			return nil, fmt.Errorf("insert target %q: %w", t.Name, err)
 		}
 		remap.targets[t.ID] = newID
 	}
-	return nil
+	return disabled, nil
 }
 
 func importModPages(ctx context.Context, dst, src *dbq.Queries, newGameInstallID, oldGameInstallID int64, remap *idRemap) error {

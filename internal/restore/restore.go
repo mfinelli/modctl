@@ -60,6 +60,10 @@ type Result struct {
 	Profiles         int
 	InventoryScanned int
 	InventoryFailed  int
+
+	// DisabledTargets are the targets that were imported disabled (see
+	// targets.go), which the user is to be told about.
+	DisabledTargets []DisabledTarget
 }
 
 // Bundle is the extracted, validated contents of an import bundle.

@@ -2391,3 +2391,26 @@ WHERE id = ?;
 UPDATE game_installs
 SET notes = NULL, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 WHERE id = ?;
+
+-- A restore that has the targets of a bundle: they are not to be trusted until
+-- this machine has confirmed them.
+
+-- name: ListEnabledTargetsWithGame :many
+SELECT
+  g.display_name AS game,
+  t.id,
+  t.name,
+  t.root_path,
+  t.origin,
+  t.metadata
+FROM targets t
+JOIN game_installs g ON g.id = t.game_install_id
+WHERE t.enabled != 0
+ORDER BY g.display_name, t.name, t.id;
+
+-- name: DisableTargetWithMetadata :exec
+UPDATE targets
+SET enabled = 0,
+    metadata = ?,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE id = ?;

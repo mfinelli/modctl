@@ -124,11 +124,18 @@ func Full(
 	}
 	newQ := dbq.New(newDB)
 
-	// Zero out on-disk state unless this is a same-machine restore
+	// Zero out on-disk state unless this is a same-machine restore, which is also
+	// when the targets are not the ones of another machine
 	if !opts.SameMachine {
 		if err := zeroOnDiskState(ctx, newDB, newQ); err != nil {
 			return res, fmt.Errorf("zero on-disk state: %w", err)
 		}
+
+		disabled, err := disableImportedTargets(ctx, newDB)
+		if err != nil {
+			return res, fmt.Errorf("disable imported targets: %w", err)
+		}
+		res.DisabledTargets = disabled
 	}
 
 	// Import nexus cache if present in bundle

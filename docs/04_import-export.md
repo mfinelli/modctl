@@ -135,6 +135,16 @@ modctl profiles set-active "My Mods"
 modctl apply
 ```
 
+The targets of a bundle (the directories that mods are deployed to) are
+imported disabled, unless this is a restore to the same machine. Their paths are
+the ones of the machine that the bundle is from, so nothing is deployed to them
+until this machine has confirmed them: run `modctl games refresh`, and the ones
+that it finds for a game that is installed here are enabled, with the path that
+it found. A target that you made by hand with `games targets add` is not found
+that way, and the import lists it; check its path and enable it with
+`modctl games targets enable <name>`. A target that was disabled in the bundle
+stays disabled.
+
 ### Previewing an import
 
 Use `--dry-run` to see what would be imported without making any changes:

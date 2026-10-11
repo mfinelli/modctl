@@ -232,6 +232,23 @@ Use --dry-run to preview what would be imported without making any changes.`,
 				result.InventoryFailed,
 			)))
 		}
+		if len(result.DisabledTargets) > 0 {
+			style.Println(style.Warning.Render(fmt.Sprintf(
+				"  ⚠ %d target(s) were imported disabled: their paths are the ones of the bundle, not of this machine",
+				len(result.DisabledTargets),
+			)))
+			style.Println(style.Subtle.Render(
+				"    run 'games refresh' to enable the ones that are found on this machine"))
+			for _, t := range result.DisabledTargets {
+				if !t.Custom {
+					continue
+				}
+				style.Println(style.Subtle.Render(fmt.Sprintf(
+					"    %s: %s (%s) is not found by that: check the path, then 'games targets enable %s'",
+					t.Game, t.Name, t.RootPath, t.Name,
+				)))
+			}
+		}
 		if !importDryRun {
 			style.Println()
 			style.Println(style.Subtle.Render(
