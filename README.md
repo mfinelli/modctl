@@ -127,6 +127,7 @@ docs/          User-facing documentation (also published to the website)
 internal/      Internal Go packages
 migrations/    Goose database migration files
 pkg/           Package build scripts, specs, PKGBUILDs, signing keys
+scripts/       Development scripts
 www/           Public website (Zola)
 ```
 
