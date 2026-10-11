@@ -34,6 +34,7 @@ import (
 	"github.com/adrg/xdg"
 	"github.com/andygrunwald/vdf"
 	"github.com/mfinelli/modctl/dbq"
+	"github.com/mfinelli/modctl/internal/database"
 	"go.finelli.dev/util"
 )
 
@@ -260,39 +261,35 @@ func refreshSteamLibraries(
 	}
 	changes := classifyInstalls(known, found)
 
-	tx, err := db.BeginTx(ctx, nil)
+	err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+		if err := qtx.MarkStoreInstallsNotPresent(ctx, "steam"); err != nil {
+			return fmt.Errorf("error marking steam installs not present: %w", err)
+		}
+
+		for _, di := range installs {
+			id, err := qtx.UpsertGameInstall(ctx, di.params)
+			if err != nil {
+				return fmt.Errorf("upsert game install %s:%s#%s: %w",
+					di.params.StoreID, di.params.StoreGameID, di.params.InstanceID, err)
+			}
+
+			if err := upsertGameDirTarget(ctx, qtx, id, di.params.InstallRoot); err != nil {
+				return fmt.Errorf("error upserting game_dir target: %w", err)
+			}
+
+			if err := upsertProtonPrefixTarget(ctx, qtx, id, di.steamappsDir, di.params.StoreGameID); err != nil {
+				return fmt.Errorf("error upserting proton_prefix target: %w", err)
+			}
+
+			if err := qtx.EnsureDefaultProfile(ctx, id); err != nil {
+				return fmt.Errorf("error ensuring default profile for install_id=%d: %w", id, err)
+			}
+		}
+
+		return nil
+	})
 	if err != nil {
-		return result, fmt.Errorf("error starting transaction: %w", err)
-	}
-	defer tx.Rollback()
-	qtx := q.WithTx(tx)
-
-	if err := qtx.MarkStoreInstallsNotPresent(ctx, "steam"); err != nil {
-		return result, fmt.Errorf("error marking steam installs not present: %w", err)
-	}
-
-	for _, di := range installs {
-		id, err := qtx.UpsertGameInstall(ctx, di.params)
-		if err != nil {
-			return result, fmt.Errorf("upsert game install %s:%s#%s: %w",
-				di.params.StoreID, di.params.StoreGameID, di.params.InstanceID, err)
-		}
-
-		if err := upsertGameDirTarget(ctx, qtx, id, di.params.InstallRoot); err != nil {
-			return result, fmt.Errorf("error upserting game_dir target: %w", err)
-		}
-
-		if err := upsertProtonPrefixTarget(ctx, qtx, id, di.steamappsDir, di.params.StoreGameID); err != nil {
-			return result, fmt.Errorf("error upserting proton_prefix target: %w", err)
-		}
-
-		if err := qtx.EnsureDefaultProfile(ctx, id); err != nil {
-			return result, fmt.Errorf("error ensuring default profile for install_id=%d: %w", id, err)
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return result, fmt.Errorf("error committing transaction: %w", err)
+		return result, err
 	}
 
 	// only report changes that were actually saved

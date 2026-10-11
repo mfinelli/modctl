@@ -24,6 +24,7 @@ import (
 	"fmt"
 
 	"github.com/mfinelli/modctl/dbq"
+	"github.com/mfinelli/modctl/internal/database"
 )
 
 // BackupResult is the outcome of a successful IngestBackup call
@@ -65,39 +66,34 @@ func IngestBackup(
 		origSha = sql.NullString{String: originalContentSha256, Valid: true}
 	}
 
-	tx, err := db.BeginTx(ctx, nil)
+	err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+		if err := EnsureBlobRecorded(
+			ctx,
+			qtx,
+			ingestResult.SHA256Hex,
+			string(KindBackup),
+			ingestResult.SizeBytes,
+			nil,
+		); err != nil {
+			return fmt.Errorf("record backup blob: %w", err)
+		}
+
+		if err := qtx.UpsertBackup(ctx, dbq.UpsertBackupParams{
+			GameInstallID:         gameInstallID,
+			TargetID:              targetID,
+			Relpath:               relpath,
+			BackupBlobSha256:      ingestResult.SHA256Hex,
+			OriginalContentSha256: origSha,
+			SizeBytes:             ingestResult.SizeBytes,
+			CreatedByOperationID:  operationID,
+		}); err != nil {
+			return fmt.Errorf("upsert backup row: %w", err)
+		}
+
+		return nil
+	})
 	if err != nil {
-		return BackupResult{}, fmt.Errorf("begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-
-	qtx := q.WithTx(tx)
-
-	if err := EnsureBlobRecorded(
-		ctx,
-		qtx,
-		ingestResult.SHA256Hex,
-		string(KindBackup),
-		ingestResult.SizeBytes,
-		nil,
-	); err != nil {
-		return BackupResult{}, fmt.Errorf("record backup blob: %w", err)
-	}
-
-	if err := qtx.UpsertBackup(ctx, dbq.UpsertBackupParams{
-		GameInstallID:         gameInstallID,
-		TargetID:              targetID,
-		Relpath:               relpath,
-		BackupBlobSha256:      ingestResult.SHA256Hex,
-		OriginalContentSha256: origSha,
-		SizeBytes:             ingestResult.SizeBytes,
-		CreatedByOperationID:  operationID,
-	}); err != nil {
-		return BackupResult{}, fmt.Errorf("upsert backup row: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return BackupResult{}, fmt.Errorf("commit: %w", err)
+		return BackupResult{}, err
 	}
 
 	return BackupResult(ingestResult), nil
