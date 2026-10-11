@@ -36,17 +36,26 @@ import (
 // other call. Please keep it that way (for instance, don't cache a buffer
 // between calls to save allocations).
 func HashFile(ctx context.Context, path string) (string, error) {
+	sha, _, err := HashFileSize(ctx, path)
+	return sha, err
+}
+
+// HashFileSize is HashFile that also returns how many bytes were hashed, which
+// is the size of the content that the hash is of: a size that is looked up
+// separately could be of a file that changed in between.
+func HashFileSize(ctx context.Context, path string) (sha string, size int64, err error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return "", fmt.Errorf("open file for hashing: %w", err)
+		return "", 0, fmt.Errorf("open file for hashing: %w", err)
 	}
 	defer f.Close()
 
 	h := sha256.New()
 	buf := make([]byte, bufferSizeOf(f))
-	if _, err := CopyWithContext(ctx, h, f, buf); err != nil {
-		return "", fmt.Errorf("hash file contents: %w", err)
+	n, err := CopyWithContext(ctx, h, f, buf)
+	if err != nil {
+		return "", 0, fmt.Errorf("hash file contents: %w", err)
 	}
 
-	return hex.EncodeToString(h.Sum(nil)), nil
+	return hex.EncodeToString(h.Sum(nil)), n, nil
 }

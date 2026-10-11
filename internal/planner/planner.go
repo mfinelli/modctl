@@ -108,6 +108,14 @@ type PlanOp struct {
 	// OverrideBaseRawPath is the path inside the base archive for patch ops.
 	OverrideBaseRawPath sql.NullString
 
+	// OnDiskSha256 and OnDiskSize are what the file that is at the path was when
+	// the plan hashed it: what an op that overwrites it takes the place of. They
+	// are only set when the plan did look at the file (a recheck that was not
+	// told to be skipped, and that could hash the file), and for a patch
+	// override, or a file that is written for the first time, they are not.
+	OnDiskSha256 sql.NullString
+	OnDiskSize   sql.NullInt64
+
 	// SkipBackup is true when a skip-backup pattern matched this path.
 	// Informational only; used for dry-run display.
 	SkipBackup bool
@@ -405,7 +413,7 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 				op.Kind = PlanOpOverwrite
 			} else if hasOverride && !skipRecheck {
 				// Full-file override noop check
-				onDiskHash, warning, err := recheckHash(ctx, absPath, pf.DestPath)
+				onDiskHash, onDiskSize, warning, err := recheckHash(ctx, absPath, pf.DestPath)
 				if err != nil {
 					return Plan{}, err
 				}
@@ -419,6 +427,7 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 					op.Kind = PlanOpNoop
 				} else {
 					op.Kind = PlanOpOverwrite
+					op.setOnDisk(onDiskHash, onDiskSize)
 				}
 			} else if hasOverride && skipRecheck {
 				// --no-recheck with override: always reapply
@@ -430,7 +439,7 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 				// act on it.
 				op.Kind = PlanOpNoop
 				if !skipRecheck {
-					onDiskHash, warning, err := recheckHash(ctx, absPath, pf.DestPath)
+					onDiskHash, _, warning, err := recheckHash(ctx, absPath, pf.DestPath)
 					if err != nil {
 						return Plan{}, err
 					}
@@ -444,7 +453,7 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 				}
 			} else if !skipRecheck {
 				// Normal mod-owned file recheck
-				onDiskHash, warning, err := recheckHash(ctx, absPath, pf.DestPath)
+				onDiskHash, onDiskSize, warning, err := recheckHash(ctx, absPath, pf.DestPath)
 				if err != nil {
 					return Plan{}, err
 				}
@@ -472,6 +481,9 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 					// Different winner: plain overwrite, no backup needed
 					// since tool owns file
 					op.Kind = PlanOpOverwrite
+				}
+				if op.Kind == PlanOpOverwrite && warning == "" {
+					op.setOnDisk(onDiskHash, onDiskSize)
 				}
 			} else {
 				// --no-recheck: tool owns it and it's on disk, normal overwrite, no backup
@@ -682,17 +694,24 @@ func matchesAny(patterns []string, path string) bool {
 // changed), so that comes back as a warning and not as an error. The exception
 // is being told to stop: nothing planned after that could be trusted, since it
 // would be built on files that were never hashed, so the plan is abandoned.
-func recheckHash(ctx context.Context, absPath, destPath string) (sha, warning string, err error) {
-	sha, err = fsutil.HashFile(ctx, absPath)
+func recheckHash(ctx context.Context, absPath, destPath string) (sha string, size int64, warning string, err error) {
+	sha, size, err = fsutil.HashFileSize(ctx, absPath)
 	if err == nil {
-		return sha, "", nil
+		return sha, size, "", nil
 	}
 	if ctx.Err() != nil {
 		// report that we were told to stop, not whatever the hash ran into
-		return "", "", fmt.Errorf("recheck %q: %w", destPath, ctx.Err())
+		return "", 0, "", fmt.Errorf("recheck %q: %w", destPath, ctx.Err())
 	}
 
-	return "", fmt.Sprintf("recheck: could not hash %q: %v", destPath, err), nil
+	return "", 0, fmt.Sprintf("recheck: could not hash %q: %v", destPath, err), nil
+}
+
+// setOnDisk records what the file that the op overwrites was, as the plan
+// hashed it.
+func (op *PlanOp) setOnDisk(sha string, size int64) {
+	op.OnDiskSha256 = sql.NullString{String: sha, Valid: true}
+	op.OnDiskSize = sql.NullInt64{Int64: size, Valid: true}
 }
 
 // symlinkWarning says what is going to happen to a symlink at destPath that a

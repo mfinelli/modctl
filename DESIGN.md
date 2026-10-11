@@ -568,6 +568,16 @@ Noop ops are never shown to the user but are logged at debug level.
 Use `--no-recheck` to skip hash checks for faster applies at the cost of
 not detecting external modifications.
 
+What the planner hashed is not thrown away: an op that overwrites a file carries
+the hash and size of what was on disk (`PlanOp.OnDiskSha256` and `OnDiskSize`),
+and deploying it records them as `old_content_sha256` and `old_size_bytes` of
+the change, so that `operations show` can say what a file was replaced by what.
+A file that is backed up before it is overwritten records the backup instead,
+which is the file as it was when it was copied. A file that nobody hashed has no
+old content in its change: that is a file that is written for the first time,
+one that was overwritten with `--no-recheck`, a patch override, and a file that
+could not be hashed. None of these is read at apply only to say what it was.
+
 ### Symlinks and special files
 
 Default v1 policy:

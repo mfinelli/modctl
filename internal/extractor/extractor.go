@@ -56,6 +56,23 @@ type DeployFileResult struct {
 	WasBackedUp bool
 	// BackupSha256 is set when WasBackedUp is true
 	BackupSha256 string
+	// BackupSizeBytes is the size of the backup, when WasBackedUp is true
+	BackupSizeBytes int64
+}
+
+// replacedContent is the hash and size of the content that a file that is
+// deployed takes the place of, for operation_changes. It is what was backed up,
+// which is the file as it was when it was copied, and when nothing was backed
+// up it is what the plan saw when it hashed the file (a recheck). It is not set
+// when no one looked at the file: that is the case of a file that is not there
+// yet, and of one that the plan was told not to look at (--no-recheck), which
+// is not read here just to say what it was.
+func replacedContent(op planner.PlanOp, backedUp bool, backupSha string, backupSize int64) (sha sql.NullString, size sql.NullInt64) {
+	if backedUp && backupSha != "" {
+		return sql.NullString{String: backupSha, Valid: true}, sql.NullInt64{Int64: backupSize, Valid: true}
+	}
+
+	return op.OnDiskSha256, op.OnDiskSize
 }
 
 // RemoveFileResult is the outcome of removing a single file during apply
@@ -75,6 +92,8 @@ type DeployOverrideFileResult struct {
 	SizeBytes     int64
 	WasBackedUp   bool
 	BackupSha256  string
+	// BackupSizeBytes is the size of the backup, when WasBackedUp is true
+	BackupSizeBytes int64
 }
 
 // StagingPathFor returns the staging directory for a given archive sha256
@@ -182,6 +201,7 @@ func (e Extractor) DeployFile(
 		}
 		result.WasBackedUp = true
 		result.BackupSha256 = backupResult.SHA256Hex
+		result.BackupSizeBytes = backupResult.SizeBytes
 	}
 
 	// Ensure destination directory exists
@@ -229,14 +249,9 @@ func (e Extractor) DeployFile(
 			action = "overwrite"
 		}
 
-		// Build old_content_sha256 for operation_changes
-		// For NeedsBackup cases we have the backup sha which is the pre-existing
-		// content. For overwrite of tool-owned files we don't rehash so leave NULL.
-		var oldSha sql.NullString
-		var oldSize sql.NullInt64
-		if op.NeedsBackup && result.BackupSha256 != "" {
-			oldSha = sql.NullString{String: result.BackupSha256, Valid: true}
-		}
+		// What the file takes the place of, for operation_changes (see
+		// replacedContent)
+		oldSha, oldSize := replacedContent(op, result.WasBackedUp, result.BackupSha256, result.BackupSizeBytes)
 
 		// Insert operation_changes
 		if err := qtx.InsertOperationChange(ctx, dbq.InsertOperationChangeParams{
@@ -451,6 +466,7 @@ func (e Extractor) DeployOverrideFile(
 		}
 		result.WasBackedUp = true
 		result.BackupSha256 = backupResult.SHA256Hex
+		result.BackupSizeBytes = backupResult.SizeBytes
 	}
 
 	// Ensure destination directory exists
@@ -544,11 +560,7 @@ func (e Extractor) DeployOverrideFile(
 			action = "overwrite"
 		}
 
-		var oldSha sql.NullString
-		var oldSize sql.NullInt64
-		if op.NeedsBackup && result.BackupSha256 != "" {
-			oldSha = sql.NullString{String: result.BackupSha256, Valid: true}
-		}
+		oldSha, oldSize := replacedContent(op, result.WasBackedUp, result.BackupSha256, result.BackupSizeBytes)
 
 		if err := qtx.InsertOperationChange(ctx, dbq.InsertOperationChangeParams{
 			OperationID:      operationID,
