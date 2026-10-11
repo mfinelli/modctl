@@ -525,6 +525,12 @@ All extraction goes to staging, then the tool:
 - applies remap rules deterministically
 - moves files into place
 
+The same goes for the paths of overrides, and for the paths that are recorded as
+installed (which are what is removed or put back when something is applied again
+or unapplied): they are checked with `fsutil.ValidateRelPath` when a plan is made.
+An override with a path that is not valid is rejected with a warning, and a file
+that is recorded as installed at such a path is left alone, with a warning.
+
 ### Drift detection on overwrite
 
 During apply, before overwriting any tool-owned file the planner hashes the

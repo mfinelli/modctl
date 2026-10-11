@@ -309,6 +309,15 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 	overrideMap := make(map[string]overrideInfo, len(overrides))
 
 	for _, o := range overrides {
+		// An override is written to its relpath like the file of a mod is, so
+		// it has to stay inside the target like one (it can come from anywhere,
+		// such as a bundle that was imported)
+		if err := fsutil.ValidateRelPath(o.Relpath); err != nil {
+			plan.Warnings = append(plan.Warnings,
+				fmt.Sprintf("rejected override %q: %v", o.Relpath, err))
+			continue
+		}
+
 		oi := overrideInfo{
 			id:           o.ID,
 			overrideType: o.OverrideType,
@@ -519,6 +528,15 @@ func BuildApplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID, profileI
 			continue
 		}
 
+		// What is removed (or put back) is whatever is at the path, so a path
+		// that is outside the target is left alone, even if it is in the
+		// database as having been installed
+		if err := fsutil.ValidateRelPath(relpath); err != nil {
+			plan.Warnings = append(plan.Warnings,
+				fmt.Sprintf("rejected installed file %q: %v", relpath, err))
+			continue
+		}
+
 		// Check if the current owner is being displaced by a loser promotion.
 		// This happens when the installed file's owner is no longer in the
 		// profile but another mod that lost the conflict is still present.
@@ -597,6 +615,13 @@ func BuildUnapplyPlan(ctx context.Context, q *dbq.Queries, gameInstallID int64, 
 	}
 
 	for _, f := range installedFiles {
+		// As when applying: a path that is outside the target is left alone
+		if err := fsutil.ValidateRelPath(f.Relpath); err != nil {
+			plan.Warnings = append(plan.Warnings,
+				fmt.Sprintf("rejected installed file %q: %v", f.Relpath, err))
+			continue
+		}
+
 		absPath := filepath.Join(target.RootPath, f.Relpath)
 		existsOnDisk, err := fsutil.Exists(absPath)
 		if err != nil {

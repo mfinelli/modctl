@@ -29,6 +29,10 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 - `apply` now warns when a file that a mod installs is a symlink in the game
   directory. The symlink is replaced by a regular file (what it points to is
   not changed), and `unapply` can't bring the symlink back.
+- Fix `apply` writing an override outside of the game directory when its path
+  went out of it (with `..`), which a bundle that was imported could contain.
+  Such overrides are now rejected with a warning, and `apply` and `unapply` leave
+  alone a file that is recorded as installed at such a path.
 
 ## v0.8.0 - 2026-10-10
 
