@@ -1572,3 +1572,79 @@ func warningsContainingText(warnings []string, substr string) []string {
 	}
 	return out
 }
+
+func TestRefreshConfirmsAnImportedTarget(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	setup := func(t *testing.T) (*sql.DB, steamLibraries, string) {
+		t.Helper()
+
+		dir := t.TempDir()
+		root := filepath.Join(dir, "Steam")
+		writeSteamGame(t, root, "100", "Root Game")
+		db := testbuilder.SetupDB(t)
+		steam := steamLibraries{Libs: []string{root}, Roots: []string{root}, DidScan: true}
+		_, err := refreshSteamLibraries(ctx, db, dbq.New(db), steam)
+		require.NoError(t, err)
+		return db, steam, filepath.Join(root, "steamapps", "common", "Root Game")
+	}
+
+	read := func(t *testing.T, db *sql.DB) (enabled int64, root string, metadata sql.NullString) {
+		t.Helper()
+
+		require.NoError(t, db.QueryRow(`SELECT enabled, root_path, metadata FROM targets WHERE name = 'game_dir'`).
+			Scan(&enabled, &root, &metadata))
+		return enabled, root, metadata
+	}
+
+	t.Run("a target that was imported is enabled, with the path of this machine", func(t *testing.T) {
+		t.Parallel()
+		db, steam, local := setup(t)
+		// what an import leaves of the target of a game that is installed here too
+		_, err := db.Exec(`UPDATE targets SET enabled = 0, root_path = '/other/machine/game', metadata = '{"unverified":true}' WHERE name = 'game_dir'`)
+		require.NoError(t, err)
+
+		_, err = refreshSteamLibraries(ctx, db, dbq.New(db), steam)
+		require.NoError(t, err)
+
+		enabled, root, metadata := read(t, db)
+		assert.Equal(t, int64(1), enabled)
+		assert.Equal(t, local, root)
+		assert.False(t, metadata.Valid, "the mark is gone")
+	})
+
+	t.Run("a target that the user disabled stays disabled", func(t *testing.T) {
+		t.Parallel()
+		db, steam, local := setup(t)
+		_, err := db.Exec(`UPDATE targets SET enabled = 0 WHERE name = 'game_dir'`)
+		require.NoError(t, err)
+
+		_, err = refreshSteamLibraries(ctx, db, dbq.New(db), steam)
+		require.NoError(t, err)
+
+		enabled, root, _ := read(t, db)
+		assert.Equal(t, int64(0), enabled)
+		assert.Equal(t, local, root)
+	})
+
+	t.Run("a target that is still imported when the game is not found stays disabled", func(t *testing.T) {
+		t.Parallel()
+		db, _, _ := setup(t)
+		_, err := db.Exec(`UPDATE targets SET enabled = 0, root_path = '/other/machine/game', metadata = '{"unverified":true}' WHERE name = 'game_dir'`)
+		require.NoError(t, err)
+
+		// a refresh that finds a different game, and not this one
+		dir := t.TempDir()
+		other := filepath.Join(dir, "Steam")
+		writeSteamGame(t, other, "200", "Another Game")
+		_, err = refreshSteamLibraries(ctx, db, dbq.New(db), steamLibraries{Libs: []string{other}, Roots: []string{other}, DidScan: true})
+		require.NoError(t, err)
+
+		enabled, root, metadata := read(t, db)
+		assert.Equal(t, int64(0), enabled)
+		assert.Equal(t, "/other/machine/game", root, "the path of the bundle is the path that it is")
+		assert.True(t, metadata.Valid, "and it is still not confirmed")
+	})
+}

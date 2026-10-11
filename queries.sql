@@ -71,6 +71,13 @@ SELECT * FROM targets WHERE game_install_id = ? AND name = ? LIMIT 1;
 -- name: UpsertDiscoveredTarget :one
 -- if a user_override exists for the same (game_install_id, name) the conflict
 -- is silently ignored and the user's row is left untouched
+--
+-- A target that was imported from a bundle is disabled and has "unverified" in
+-- its metadata (see the restore package): its path is the one of the machine
+-- that the bundle is from. Finding the target here is what confirms it, with the
+-- path of this machine, so it is enabled and the mark is taken off. A target
+-- that does not have the mark (one that was disabled by the user, say) keeps
+-- being as it is.
 INSERT INTO targets (
   game_install_id, name, root_path, origin,
   created_at,
@@ -83,6 +90,13 @@ VALUES (
 )
 ON CONFLICT (game_install_id, name) DO UPDATE SET
   root_path = excluded.root_path,
+  enabled = CASE
+    WHEN COALESCE(json_extract(targets.metadata, '$.unverified'), 0) = 1
+    THEN 1 ELSE targets.enabled END,
+  metadata = CASE
+    WHEN COALESCE(json_extract(targets.metadata, '$.unverified'), 0) = 1
+    THEN NULLIF(json_remove(targets.metadata, '$.unverified'), '{}')
+    ELSE targets.metadata END,
   updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 WHERE targets.origin = 'discovered'
 RETURNING *;
