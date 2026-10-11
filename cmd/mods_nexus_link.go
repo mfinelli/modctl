@@ -270,36 +270,32 @@ func runManualLink(
 			style.Println(style.Subtle.Render(fmt.Sprintf("  updated mod file label: %s", match.File.Name)))
 		} else {
 			// Target label already exists on a sibling row: merge
-			tx, err := db.BeginTx(ctx, nil)
+			err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+				// Promote is_primary if the row being deleted holds it
+				if util.SqliteIntToBool(row.IsPrimary) && !util.SqliteIntToBool(existing.IsPrimary) {
+					if err := qtx.ClearModFilePrimary(ctx, row.ModFileID); err != nil {
+						return fmt.Errorf("clearing primary flag: %w", err)
+					}
+					if err := qtx.SetModFilePrimary(ctx, existing.ID); err != nil {
+						return fmt.Errorf("promoting primary flag: %w", err)
+					}
+				}
+
+				if err := qtx.MoveModFileVersions(ctx, dbq.MoveModFileVersionsParams{
+					NewModFileID: existing.ID,
+					OldModFileID: row.ModFileID,
+				}); err != nil {
+					return fmt.Errorf("moving mod file versions: %w", err)
+				}
+
+				if err := qtx.DeleteModFile(ctx, row.ModFileID); err != nil {
+					return fmt.Errorf("deleting orphaned mod file: %w", err)
+				}
+
+				return nil
+			})
 			if err != nil {
-				return fmt.Errorf("begin merge transaction: %w", err)
-			}
-			defer tx.Rollback()
-			qtx := q.WithTx(tx)
-
-			// Promote is_primary if the row being deleted holds it
-			if util.SqliteIntToBool(row.IsPrimary) && !util.SqliteIntToBool(existing.IsPrimary) {
-				if err := qtx.ClearModFilePrimary(ctx, row.ModFileID); err != nil {
-					return fmt.Errorf("clearing primary flag: %w", err)
-				}
-				if err := qtx.SetModFilePrimary(ctx, existing.ID); err != nil {
-					return fmt.Errorf("promoting primary flag: %w", err)
-				}
-			}
-
-			if err := qtx.MoveModFileVersions(ctx, dbq.MoveModFileVersionsParams{
-				NewModFileID: existing.ID,
-				OldModFileID: row.ModFileID,
-			}); err != nil {
-				return fmt.Errorf("moving mod file versions: %w", err)
-			}
-
-			if err := qtx.DeleteModFile(ctx, row.ModFileID); err != nil {
-				return fmt.Errorf("deleting orphaned mod file: %w", err)
-			}
-
-			if err := tx.Commit(); err != nil {
-				return fmt.Errorf("commit merge: %w", err)
+				return fmt.Errorf("merge: %w", err)
 			}
 
 			style.Println(style.Subtle.Render(fmt.Sprintf(

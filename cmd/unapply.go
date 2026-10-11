@@ -299,28 +299,23 @@ Use --dry-run to preview the plan without making any changes.`,
 		}
 
 		// Mark operation successful and clear applied state in one transaction
-		tx, err := db.BeginTx(ctx, nil)
+		err = database.WithTx(ctx, db, func(qtx *dbq.Queries) error {
+			if err := qtx.FinishOperation(ctx, dbq.FinishOperationParams{
+				Status:  "success",
+				Message: sql.NullString{},
+				ID:      op.ID,
+			}); err != nil {
+				return fmt.Errorf("finish operation: %w", err)
+			}
+
+			if err := qtx.ClearGameInstallAppliedState(ctx, gi.ID); err != nil {
+				return fmt.Errorf("clear applied state: %w", err)
+			}
+
+			return nil
+		})
 		if err != nil {
-			return markFailed(fmt.Errorf("begin final transaction: %w", err))
-		}
-		defer tx.Rollback()
-
-		qtx := q.WithTx(tx)
-
-		if err := qtx.FinishOperation(ctx, dbq.FinishOperationParams{
-			Status:  "success",
-			Message: sql.NullString{},
-			ID:      op.ID,
-		}); err != nil {
-			return markFailed(fmt.Errorf("finish operation: %w", err))
-		}
-
-		if err := qtx.ClearGameInstallAppliedState(ctx, gi.ID); err != nil {
-			return markFailed(fmt.Errorf("clear applied state: %w", err))
-		}
-
-		if err := tx.Commit(); err != nil {
-			return markFailed(fmt.Errorf("commit final transaction: %w", err))
+			return markFailed(fmt.Errorf("final transaction: %w", err))
 		}
 
 		// Summary
