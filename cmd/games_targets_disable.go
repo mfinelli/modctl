@@ -28,7 +28,6 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/lock"
-	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -61,34 +60,15 @@ the only enabled target.`,
 
 		name := args[0]
 
-		if err := internal.EnsureDBExists(); err != nil {
-			return err
-		}
-
-		db, err := internal.SetupDB()
+		db, err := internal.OpenDB(ctx)
 		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
+			return err
 		}
 		defer db.Close()
 
-		if err := internal.MigrateDB(ctx, db); err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
-
 		q := dbq.New(db)
 
-		if gamesTargetsDisableGame == "" {
-			active, err := state.LoadActive()
-			if err != nil {
-				return fmt.Errorf("load active selection: %w", err)
-			}
-			if active.ActiveGameInstallID == 0 {
-				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
-			}
-			gamesTargetsDisableGame = fmt.Sprintf("%d", active.ActiveGameInstallID)
-		}
-
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, gamesTargetsDisableGame)
+		gi, err := argresolver.ResolveGameInstall(ctx, q, gamesTargetsDisableGame)
 		if err != nil {
 			return err
 		}

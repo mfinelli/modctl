@@ -33,7 +33,6 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/nexusclient"
-	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/mfinelli/modctl/internal/updatechain"
 	"github.com/spf13/cobra"
@@ -76,21 +75,11 @@ to proceed even if the operation would exhaust your API quota.`,
 			return fmt.Errorf("nexus api key not configured; set nexus.apikey in your config file")
 		}
 
-		err := internal.EnsureDBExists()
+		db, err := internal.OpenDB(ctx)
 		if err != nil {
 			return err
 		}
-
-		db, err := internal.SetupDB()
-		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
-		}
 		defer db.Close()
-
-		err = internal.MigrateDB(ctx, db)
-		if err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
 
 		client, err := nexusclient.New(ctx, apiKey, logger, rootCmd.Version)
 		if err != nil {
@@ -101,18 +90,7 @@ to proceed even if the operation would exhaust your API quota.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		if modsNexusCheckUpdatesGame == "" {
-			active, err := state.LoadActive()
-			if err != nil {
-				return fmt.Errorf("load active selection: %w", err)
-			}
-			if active.ActiveGameInstallID == 0 {
-				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
-			}
-			modsNexusCheckUpdatesGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
-		}
-
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, modsNexusCheckUpdatesGame)
+		gi, err := argresolver.ResolveGameInstall(ctx, q, modsNexusCheckUpdatesGame)
 		if err != nil {
 			return err
 		}

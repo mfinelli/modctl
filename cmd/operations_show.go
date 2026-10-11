@@ -49,17 +49,11 @@ action taken, content hashes before and after, and backup references.`,
 			return fmt.Errorf("invalid operation id %q (expected a positive integer)", args[0])
 		}
 
-		if err := internal.EnsureDBExists(); err != nil {
+		db, err := internal.OpenDB(ctx)
+		if err != nil {
 			return err
 		}
-		db, err := internal.SetupDB()
-		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
-		}
 		defer db.Close()
-		if err := internal.MigrateDB(ctx, db); err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
 
 		q := dbq.New(db)
 

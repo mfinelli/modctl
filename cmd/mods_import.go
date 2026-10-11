@@ -30,7 +30,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -44,7 +43,6 @@ import (
 	"github.com/mfinelli/modctl/internal/importer"
 	"github.com/mfinelli/modctl/internal/nexus"
 	"github.com/mfinelli/modctl/internal/nexusclient"
-	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -96,21 +94,11 @@ has been safely stored and the database has been updated successfully.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		err := internal.EnsureDBExists()
+		db, err := internal.OpenDB(ctx)
 		if err != nil {
 			return err
 		}
-
-		db, err := internal.SetupDB()
-		if err != nil {
-			return fmt.Errorf("error setting up database: %w", err)
-		}
 		defer db.Close()
-
-		err = internal.MigrateDB(ctx, db)
-		if err != nil {
-			return fmt.Errorf("error migrating database: %w", err)
-		}
 
 		inputPath := args[0]
 		archivesDir := viper.GetString("archives_dir")
@@ -171,18 +159,7 @@ has been safely stored and the database has been updated successfully.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		if modsImportGame == "" {
-			active, err := state.LoadActive()
-			if err != nil {
-				return fmt.Errorf("load active selection: %w", err)
-			}
-			if active.ActiveGameInstallID == 0 {
-				return fmt.Errorf("no active game selected; run `modctl games set-active ...` or pass --game")
-			}
-			modsImportGame = strconv.FormatInt(active.ActiveGameInstallID, 10)
-		}
-
-		gi, err := argresolver.ResolveGameInstallArg(ctx, q, modsImportGame)
+		gi, err := argresolver.ResolveGameInstall(ctx, q, modsImportGame)
 		if err != nil {
 			return err
 		}
