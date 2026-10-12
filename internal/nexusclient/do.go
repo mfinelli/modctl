@@ -111,6 +111,8 @@ func (c *Client) doRequest(method, path string, dst any, rawBody *[]byte) error 
 		state, err := LoadRateLimitState(c.stateDir)
 		if err != nil {
 			c.logger.Warn("failed to load rate limit state for 429 error", "error", err)
+			// there is no state to say how many are left
+			state = &RateLimitState{}
 		}
 		hourly, daily := state.EffectiveRemaining()
 		return fmt.Errorf("nexus api rate limit exceeded (hourly remaining: %d, daily remaining: %d)", hourly, daily)

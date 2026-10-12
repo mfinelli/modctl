@@ -131,6 +131,25 @@ func TestDoRequest(t *testing.T) {
 		assert.Contains(t, err.Error(), "daily remaining: 12")
 	})
 
+	t.Run("a request that is too many is an error when the limits can't be read, too", func(t *testing.T) {
+		t.Parallel()
+
+		c, _ := newTestClient(t, func(*http.Request) (*http.Response, error) {
+			return answer(http.StatusTooManyRequests, ``, nil), nil
+		})
+		// there is a directory where the file of the limits should be
+		require.NoError(t, os.Mkdir(filepath.Join(c.stateDir, "nexus.json"), 0o755))
+
+		var err error
+		require.NotPanics(t, func() {
+			err = c.doRequest(http.MethodGet, "/x", &struct{}{}, nil)
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "rate limit exceeded")
+		assert.Contains(t, err.Error(), "hourly remaining: 0")
+	})
+
 	t.Run("a limit that is over is all of it again", func(t *testing.T) {
 		t.Parallel()
 
