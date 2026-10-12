@@ -21,6 +21,8 @@ package testbuilder
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -69,20 +71,52 @@ func NewProvider(t *testing.T, db *sql.DB) *goose.Provider {
 	return p
 }
 
+// MigrationsFS is what main gives to database.Migrations in the binary: the
+// repository, which has its migrations in a "migrations" directory. The
+// embedded copy is not there in a test, so a package whose tests need to
+// migrate a database sets this once, in its TestMain, before any test runs:
+//
+//	func TestMain(m *testing.M) {
+//		database.Migrations = testbuilder.MigrationsFS()
+//		os.Exit(m.Run())
+//	}
+//
+// It is not set by a test for as long as the test runs, since that is a change
+// of something that is global, which the tests that run at the same time would
+// see.
+func MigrationsFS() fs.FS {
+	dir, err := migrationsDir()
+	if err != nil {
+		panic(err)
+	}
+
+	return os.DirFS(filepath.Dir(dir))
+}
+
 func findMigrationsDir(t *testing.T) string {
 	t.Helper()
+
+	dir, err := migrationsDir()
+	require.NoError(t, err)
+
+	return dir
+}
+
+func migrationsDir() (string, error) {
 	_, filename, _, ok := runtime.Caller(0)
-	require.True(t, ok, "runtime.Caller failed")
+	if !ok {
+		return "", fmt.Errorf("runtime.Caller failed")
+	}
 	// filename is the absolute path to this source file;
 	// walk up until we find a directory containing "migrations/"
 	dir := filepath.Dir(filename)
 	for {
 		if _, err := os.Stat(filepath.Join(dir, "migrations")); err == nil {
-			return filepath.Join(dir, "migrations")
+			return filepath.Join(dir, "migrations"), nil
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			t.Fatal("could not find migrations directory")
+			return "", fmt.Errorf("could not find migrations directory")
 		}
 		dir = parent
 	}

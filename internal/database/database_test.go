@@ -149,6 +149,85 @@ func TestDSNReadOnly(t *testing.T) {
 	})
 }
 
+func TestSetupAt(t *testing.T) {
+	t.Parallel()
+
+	t.Run("it opens a database that can be written, with foreign keys enforced", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.TempDir(), "modctl.db")
+
+		db, err := SetupAt(path)
+		require.NoError(t, err)
+		defer db.Close()
+
+		_, err = db.Exec(`CREATE TABLE things (id INTEGER PRIMARY KEY)`)
+		require.NoError(t, err)
+		assert.FileExists(t, path)
+
+		var enabled int
+		require.NoError(t, db.QueryRow(`PRAGMA foreign_keys`).Scan(&enabled))
+		assert.Equal(t, 1, enabled)
+	})
+
+	t.Run("what it opens is the database at the path it is given", func(t *testing.T) {
+		t.Parallel()
+
+		first, err := SetupAt(filepath.Join(t.TempDir(), "first.db"))
+		require.NoError(t, err)
+		defer first.Close()
+		second, err := SetupAt(filepath.Join(t.TempDir(), "second.db"))
+		require.NoError(t, err)
+		defer second.Close()
+
+		_, err = first.Exec(`CREATE TABLE things (id INTEGER PRIMARY KEY)`)
+		require.NoError(t, err)
+
+		_, err = second.Exec(`SELECT * FROM things`)
+		assert.Error(t, err, "the other database has no such table")
+	})
+}
+
+func TestSetupReadOnlyAt(t *testing.T) {
+	t.Parallel()
+
+	t.Run("it reads what is there and can not change it", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.TempDir(), "modctl.db")
+		rw, err := SetupAt(path)
+		require.NoError(t, err)
+		defer rw.Close()
+		_, err = rw.Exec(`CREATE TABLE things (id INTEGER PRIMARY KEY)`)
+		require.NoError(t, err)
+		_, err = rw.Exec(`INSERT INTO things (id) VALUES (1)`)
+		require.NoError(t, err)
+
+		db, err := SetupReadOnlyAt(path)
+		require.NoError(t, err)
+		defer db.Close()
+
+		var n int
+		require.NoError(t, db.QueryRow(`SELECT COUNT(*) FROM things`).Scan(&n))
+		assert.Equal(t, 1, n)
+		_, err = db.Exec(`INSERT INTO things (id) VALUES (2)`)
+		assert.Error(t, err)
+	})
+
+	t.Run("it does not make a database that is not there", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.TempDir(), "nothing.db")
+
+		db, err := SetupReadOnlyAt(path)
+		require.NoError(t, err)
+		defer db.Close()
+
+		assert.Error(t, db.Ping())
+		assert.NoFileExists(t, path)
+	})
+}
+
 // useMigrationsOfRepository has Migrations be the ones of the repository for the
 // length of a test, as they are in the binary. It changes something that is
 // global, so the tests that use it are not run in parallel.

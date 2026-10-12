@@ -30,7 +30,6 @@ import (
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/exporter"
 	"github.com/mfinelli/modctl/internal/testbuilder"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -47,18 +46,6 @@ func fileDatabase(t *testing.T, path string) *sql.DB {
 	_, err = testbuilder.NewProvider(t, db).Up(context.Background())
 	require.NoError(t, err)
 	return db
-}
-
-// useDatabase has viper say where the database is for the length of a test,
-// which is where a full restore opens the database that it has restored. It
-// changes something that is global, so the tests that use it are not run in
-// parallel.
-func useDatabase(t *testing.T, path string) {
-	t.Helper()
-
-	old := viper.GetString("database")
-	viper.Set("database", path)
-	t.Cleanup(func() { viper.Set("database", old) })
 }
 
 func gameNames(t *testing.T, db *sql.DB) []string {
@@ -92,7 +79,6 @@ func newFullRestoreFixture(t *testing.T) fullRestoreFixture {
 	dbPath := filepath.Join(t.TempDir(), "modctl.db")
 	db := fileDatabase(t, dbPath)
 	newBundleGame(t, db, "1").rename("The game that was there")
-	useDatabase(t, dbPath)
 
 	bundleDir := t.TempDir()
 	bundleDB := fileDatabase(t, filepath.Join(bundleDir, exporter.DatabaseFilename))
@@ -109,8 +95,9 @@ func newFullRestoreFixture(t *testing.T) fullRestoreFixture {
 }
 
 func TestFullReplacesTheDatabase(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
-	useMigrationsOfRepository(t)
 	f := newFullRestoreFixture(t)
 
 	_, err := Full(ctx, f.db, dbq.New(f.db), blobstore.Store{}, f.bundle, Options{Force: true}, f.dbPath, "test", quietLogger())
@@ -124,8 +111,9 @@ func TestFullReplacesTheDatabase(t *testing.T) {
 }
 
 func TestFullThatCannotCopyTheBundleLeavesTheDatabase(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
-	useMigrationsOfRepository(t)
 	f := newFullRestoreFixture(t)
 	// a bundle that is cut short: its database is not there to be copied
 	require.NoError(t, f.bundle.BundleDB.Close())

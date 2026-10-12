@@ -302,18 +302,6 @@ func TestValidateFullPaths(t *testing.T) {
 	})
 }
 
-// A restore has to refuse a bundle like this before it changes anything. These
-// need migrations that are not embedded in a test, so they are not run in
-// parallel.
-
-func useMigrationsOfRepository(t *testing.T) {
-	t.Helper()
-
-	old := database.Migrations
-	database.Migrations = os.DirFS("../..")
-	t.Cleanup(func() { database.Migrations = old })
-}
-
 func testBundle(t *testing.T, bundleDB *sql.DB, game dbq.GameInstall, kind exporter.ExportKind) *Bundle {
 	t.Helper()
 
@@ -340,9 +328,11 @@ func quietLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
+// A restore has to refuse a bundle like this before it changes anything.
 func TestGameRefusesAnUnsafeBundle(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
-	useMigrationsOfRepository(t)
 
 	// the game is already there, with something of its own
 	dest := testbuilder.SetupDB(t)
@@ -375,8 +365,9 @@ func TestGameRefusesAnUnsafeBundle(t *testing.T) {
 }
 
 func TestGameLetsASafeBundleBeLookedAt(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
-	useMigrationsOfRepository(t)
 
 	dest := testbuilder.SetupDB(t)
 	bundleDB := testbuilder.SetupDB(t)
@@ -390,8 +381,9 @@ func TestGameLetsASafeBundleBeLookedAt(t *testing.T) {
 }
 
 func TestFullRefusesAnUnsafeBundle(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
-	useMigrationsOfRepository(t)
 
 	for _, tc := range []struct {
 		name string
@@ -405,6 +397,8 @@ func TestFullRefusesAnUnsafeBundle(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			dest := testbuilder.SetupDB(t)
 			bundleDB := testbuilder.SetupDB(t)
 			g := newBundleGame(t, bundleDB, "1")

@@ -120,8 +120,9 @@ func (g *bundleGame) target0Root(t *testing.T, db *sql.DB) string {
 }
 
 func TestGameImportsTargetsDisabled(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
-	useMigrationsOfRepository(t)
 
 	dest := testbuilder.SetupDB(t)
 	bundleDB := testbuilder.SetupDB(t)
@@ -149,8 +150,9 @@ func TestGameImportsTargetsDisabled(t *testing.T) {
 }
 
 func TestFullImportsTargetsDisabledUnlessItIsTheSameMachine(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
-	useMigrationsOfRepository(t)
 
 	for _, tc := range []struct {
 		name        string
@@ -161,6 +163,8 @@ func TestFullImportsTargetsDisabledUnlessItIsTheSameMachine(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			f := newFullRestoreFixture(t)
 			// the bundle has its own game with the targets that matter
 			bundleDB := f.bundle.BundleDB

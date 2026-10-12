@@ -114,7 +114,7 @@ func Full(
 	}
 
 	// Reopen and migrate (handles case where bundle schema is older than binary)
-	newDB, err := database.Setup()
+	newDB, err := database.SetupAt(dbPath)
 	if err != nil {
 		return res, fmt.Errorf("reopen database: %w", err)
 	}

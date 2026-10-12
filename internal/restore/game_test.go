@@ -49,12 +49,10 @@ func gameInstallID(t *testing.T, q *dbq.Queries, game dbq.GameInstall) (int64, e
 	})
 }
 
-// These need migrations that are not embedded in a test, so they are not run in
-// parallel.
-
 func TestGameImportsABundle(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
-	useMigrationsOfRepository(t)
 
 	dest := testbuilder.SetupDB(t)
 	bundleDB := testbuilder.SetupDB(t)
@@ -77,8 +75,9 @@ func TestGameImportsABundle(t *testing.T) {
 }
 
 func TestGameWithAGameThatIsThere(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
-	useMigrationsOfRepository(t)
 
 	newBundle := func(t *testing.T) (dest *sql.DB, existing *bundleGame, bundle *Bundle, inBundle *bundleGame) {
 		dest = testbuilder.SetupDB(t)
@@ -92,6 +91,8 @@ func TestGameWithAGameThatIsThere(t *testing.T) {
 	}
 
 	t.Run("it is not replaced without --force", func(t *testing.T) {
+		t.Parallel()
+
 		dest, existing, bundle, _ := newBundle(t)
 
 		_, err := Game(ctx, dest, existing.q, blobstore.Store{}, bundle, Options{SkipInventory: true}, "test", quietLogger())
@@ -105,6 +106,8 @@ func TestGameWithAGameThatIsThere(t *testing.T) {
 	})
 
 	t.Run("it is replaced with --force", func(t *testing.T) {
+		t.Parallel()
+
 		dest, existing, bundle, inBundle := newBundle(t)
 
 		_, err := Game(ctx, dest, existing.q, blobstore.Store{}, bundle, Options{Force: true, SkipInventory: true}, "test", quietLogger())
@@ -121,8 +124,9 @@ func TestGameWithAGameThatIsThere(t *testing.T) {
 }
 
 func TestGameThatCannotBeImportedToTheEndChangesNothing(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
-	useMigrationsOfRepository(t)
 
 	// the game is there, with something of its own
 	dest := testbuilder.SetupDB(t)
