@@ -156,7 +156,11 @@ func TestInTx(t *testing.T) {
 		})
 
 		require.Error(t, err)
-		assert.ErrorIs(t, err, context.Canceled, "what went wrong is what it wraps")
+		// database/sql rolls the transaction back by itself when its context
+		// is canceled, and whether the commit that follows finds the context
+		// canceled or the transaction already rolled back is a matter of timing
+		assert.True(t, errors.Is(err, context.Canceled) || errors.Is(err, sql.ErrTxDone),
+			"what went wrong is what it wraps: %v", err)
 		assert.Contains(t, err.Error(), "commit: ")
 		assert.Equal(t, 0, blobCount(t, db))
 	})
