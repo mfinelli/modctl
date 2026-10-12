@@ -81,6 +81,7 @@ Examples:
 			SkipInventory: exportSkipInventory,
 			NoVerify:      exportNoVerify,
 			CacheDBPath:   nexusCacheDBPath(),
+			ScratchDir:    scratchDir(),
 			Progress:      printExportProgress,
 		}
 

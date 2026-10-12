@@ -22,6 +22,7 @@ import (
 	"context"
 	"database/sql"
 	"log/slog"
+	"os"
 	"path/filepath"
 
 	"github.com/adrg/xdg"
@@ -58,6 +59,16 @@ func cacheDir() string {
 // nexusCacheDBPath is the file of the cache of what Nexus Mods said.
 func nexusCacheDBPath() string {
 	return nexusclient.CacheDBPath(cacheDir())
+}
+
+// scratchDir is the directory that has room for a copy of what is exported or
+// imported: the snapshots of the databases that are made for an export, and the
+// bundle that is extracted for an import (which has all of the blobs in it).
+// It is the temporary directory of the system, and not tmp_dir: that one is for
+// the staging of the archives that are applied, and is by default on tmpfs,
+// which is not where a bundle that is as big as all of the mods has to go.
+func scratchDir() string {
+	return os.TempDir()
 }
 
 // openDB opens the database that is configured, which has to be there (it is

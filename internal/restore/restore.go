@@ -85,9 +85,18 @@ func (b *Bundle) Close() {
 
 // OpenAndValidate extracts the bundle, verifies integrity, and returns a
 // validated Bundle ready for import. Caller must call Close() when done.
-func OpenAndValidate(ctx context.Context, bundlePath string) (*Bundle, error) {
+//
+// The bundle is extracted to a directory of its own in scratchDir, which has to
+// be there and to have room for all of the bundle (the blobs are in it, and
+// that is most of it). It is not found by this function: nothing is made
+// anywhere that it was not told.
+func OpenAndValidate(ctx context.Context, bundlePath string, scratchDir string) (*Bundle, error) {
+	if scratchDir == "" {
+		return nil, errors.New("no scratch directory to extract the bundle in")
+	}
+
 	// Extract bundle to temp dir
-	tmpDir, err := os.MkdirTemp("", "modctl-import-*")
+	tmpDir, err := os.MkdirTemp(scratchDir, "modctl-import-*")
 	if err != nil {
 		return nil, fmt.Errorf("create temp dir: %w", err)
 	}
