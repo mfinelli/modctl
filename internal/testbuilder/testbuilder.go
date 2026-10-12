@@ -53,6 +53,26 @@ func SetupDB(t *testing.T) *sql.DB {
 	return db
 }
 
+// SetupDBFile is SetupDB for a database in a file, which is what something that
+// opens its database by its path needs (a database that is not in memory is
+// one for every connection, which is what lets the code that is tested open it
+// for itself). It returns the database, for what the test puts in it, and the
+// path to it. The file is in a directory of the test, and the database is
+// closed when the test completes.
+func SetupDBFile(t *testing.T) (*sql.DB, string) {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "modctl.db")
+	db, err := sql.Open("sqlite3", database.DSN(path, false))
+	require.NoError(t, err, "open sqlite file")
+	t.Cleanup(func() { db.Close() })
+
+	_, err = NewProvider(t, db).Up(context.Background())
+	require.NoError(t, err, "run migrations")
+
+	return db, path
+}
+
 // NewProvider returns a goose provider for db that reads migrations from the
 // filesystem, for tests that need to control how far a database is migrated.
 func NewProvider(t *testing.T, db *sql.DB) *goose.Provider {
