@@ -74,6 +74,15 @@ const (
 	sha2 = "0000000000000000000000000000000000000000000000000000000000000002"
 )
 
+// isCanceledCommit is whether err is what a commit fails with when the context
+// of its transaction was canceled while it was open. database/sql rolls such a
+// transaction back by itself, in a goroutine of its own, so the commit that
+// follows finds either the context canceled or the transaction already rolled
+// back, which one is a matter of timing.
+func isCanceledCommit(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, sql.ErrTxDone)
+}
+
 func TestInTx(t *testing.T) {
 	t.Parallel()
 
@@ -156,11 +165,7 @@ func TestInTx(t *testing.T) {
 		})
 
 		require.Error(t, err)
-		// database/sql rolls the transaction back by itself when its context
-		// is canceled, and whether the commit that follows finds the context
-		// canceled or the transaction already rolled back is a matter of timing
-		assert.True(t, errors.Is(err, context.Canceled) || errors.Is(err, sql.ErrTxDone),
-			"what went wrong is what it wraps: %v", err)
+		assert.True(t, isCanceledCommit(err), "what went wrong is what it wraps: %v", err)
 		assert.Contains(t, err.Error(), "commit: ")
 		assert.Equal(t, 0, blobCount(t, db))
 	})
@@ -292,7 +297,7 @@ func TestWithTx(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "commit: ")
-		assert.ErrorIs(t, err, context.Canceled)
+		assert.True(t, isCanceledCommit(err), "what went wrong is what it wraps: %v", err)
 		assert.Equal(t, 0, blobCount(t, db))
 	})
 
