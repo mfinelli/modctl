@@ -21,7 +21,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/mfinelli/modctl/dbq"
@@ -81,7 +80,7 @@ Examples:
 			ModctlVersion: rootCmd.Version,
 			SkipInventory: exportSkipInventory,
 			NoVerify:      exportNoVerify,
-			CacheDBPath:   filepath.Join(viper.GetString("cache_dir"), "nexus_cache.db"),
+			CacheDBPath:   nexusCacheDBPath(),
 			Progress:      printExportProgress,
 		}
 

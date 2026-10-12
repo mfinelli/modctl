@@ -21,6 +21,7 @@ package cmd
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"path/filepath"
 
 	"github.com/adrg/xdg"
@@ -28,6 +29,7 @@ import (
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
+	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/spf13/viper"
 )
 
@@ -46,6 +48,16 @@ func databasePath() string {
 // locks, in a directory of their own).
 func stateDir() string {
 	return filepath.Join(xdg.StateHome, "modctl")
+}
+
+// cacheDir is the directory that the cache of what Nexus Mods said is kept in.
+func cacheDir() string {
+	return viper.GetString("cache_dir")
+}
+
+// nexusCacheDBPath is the file of the cache of what Nexus Mods said.
+func nexusCacheDBPath() string {
+	return nexusclient.CacheDBPath(cacheDir())
 }
 
 // openDB opens the database that is configured, which has to be there (it is
@@ -68,4 +80,21 @@ func completer() completion.Completer {
 		DatabasePath: databasePath(),
 		StateDir:     stateDir(),
 	}
+}
+
+// nexusClient is the client of the API of Nexus Mods, with the cache and the
+// rate limits that are configured.
+func nexusClient(ctx context.Context, apiKey string, logger *slog.Logger) (*nexusclient.Client, error) {
+	return nexusclient.New(ctx, apiKey, logger, rootCmd.Version, cacheDir(), stateDir())
+}
+
+// nexusCacheReader is what reads the cache of what Nexus Mods said, for the
+// commands that don't need the API.
+func nexusCacheReader(ctx context.Context, logger *slog.Logger) (*nexusclient.CacheReader, error) {
+	return nexusclient.NewCacheReader(ctx, logger, cacheDir())
+}
+
+// loadRateLimitState is the rate limits that the API said last.
+func loadRateLimitState() (*nexusclient.RateLimitState, error) {
+	return nexusclient.LoadRateLimitState(stateDir())
 }

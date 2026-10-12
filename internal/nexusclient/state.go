@@ -23,9 +23,11 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-
-	"github.com/adrg/xdg"
 )
+
+// rateLimitFilename is the file, in the state directory, that has the rate
+// limits that the last response of the API said.
+const rateLimitFilename = "nexus.json"
 
 type RateLimitState struct {
 	HourlyLimit     int       `json:"hourly_limit"`
@@ -51,13 +53,13 @@ func (r *RateLimitState) EffectiveRemaining() (hourly, daily int) {
 	return
 }
 
-func LoadRateLimitState() (*RateLimitState, error) {
-	path, err := xdg.StateFile(filepath.Join("modctl", "nexus.json"))
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := os.ReadFile(path)
+// LoadRateLimitState reads the rate limits from the state directory dir. There
+// are none until a response of the API has said what they are, which is a state
+// with nothing in it and not an error, and nothing is made by looking: not the
+// directory, and not the file. A file that is not what it should be is no
+// state either.
+func LoadRateLimitState(dir string) (*RateLimitState, error) {
+	data, err := os.ReadFile(filepath.Join(dir, rateLimitFilename))
 	if os.IsNotExist(err) {
 		// No state yet, return a zeroed state (first API call will
 		// populate it)
@@ -75,9 +77,10 @@ func LoadRateLimitState() (*RateLimitState, error) {
 	return &state, nil
 }
 
-func SaveRateLimitState(state *RateLimitState) error {
-	path, err := xdg.StateFile(filepath.Join("modctl", "nexus.json"))
-	if err != nil {
+// SaveRateLimitState writes the rate limits to the state directory dir, which
+// is made if it is not there.
+func SaveRateLimitState(dir string, state *RateLimitState) error {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
 
@@ -86,5 +89,5 @@ func SaveRateLimitState(state *RateLimitState) error {
 		return err
 	}
 
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(filepath.Join(dir, rateLimitFilename), data, 0o644)
 }

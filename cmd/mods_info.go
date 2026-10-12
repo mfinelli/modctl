@@ -29,7 +29,6 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/nexusclient/dbc"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/mfinelli/modctl/internal/updatechain"
@@ -179,7 +178,7 @@ func runModsInfo(
 		}
 	}
 	if mp.SourceKind == "nexus" && mp.NexusGameDomain.Valid && mp.NexusModID.Valid {
-		cacheReader, err := nexusclient.NewCacheReader(ctx, logger)
+		cacheReader, err := nexusCacheReader(ctx, logger)
 		if err != nil {
 			logger.Warn("failed to open nexus cache", "error", err)
 		} else {

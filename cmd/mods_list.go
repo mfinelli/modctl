@@ -163,7 +163,7 @@ only reads the cache: use ` + "`modctl mods nexus check-updates`" + ` to refresh
 
 		for _, p := range pages {
 			if p.NexusDomain.Valid && p.NexusModID.Valid {
-				c, err := nexusclient.NewCacheReader(ctx, logger)
+				c, err := nexusCacheReader(ctx, logger)
 				if err != nil {
 					logger.Warn("failed to open nexus cache", "error", err)
 					break

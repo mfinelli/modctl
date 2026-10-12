@@ -37,8 +37,10 @@ type CacheReader struct {
 	logger *slog.Logger
 }
 
-func NewCacheReader(ctx context.Context, logger *slog.Logger) (*CacheReader, error) {
-	db, err := openCacheDB(ctx)
+// NewCacheReader opens the cache of what the API said, in the directory
+// cacheDir (which has to be there).
+func NewCacheReader(ctx context.Context, logger *slog.Logger, cacheDir string) (*CacheReader, error) {
+	db, err := openCacheDB(ctx, cacheDir)
 	if err != nil {
 		return nil, fmt.Errorf("opening nexus cache db: %w", err)
 	}

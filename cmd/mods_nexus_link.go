@@ -69,7 +69,7 @@ version for manual linking.`,
 		}
 		defer db.Close()
 
-		client, err := nexusclient.New(ctx, apiKey, logger, rootCmd.Version)
+		client, err := nexusClient(ctx, apiKey, logger)
 		if err != nil {
 			return fmt.Errorf("initializing nexus client: %w", err)
 		}

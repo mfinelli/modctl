@@ -298,7 +298,7 @@ func checkPaths() error {
 	required := []string{
 		viper.GetString("archives_dir"),
 		viper.GetString("backups_dir"),
-		viper.GetString("cache_dir"),
+		cacheDir(),
 		viper.GetString("locks_dir"),
 		viper.GetString("overrides_dir"),
 		// viper.GetString("tmp_dir"),

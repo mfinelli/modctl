@@ -66,7 +66,7 @@ on the same path - run 'modctl apply --dry-run' for a precise diff.`,
 		}
 		defer db.Close()
 
-		cacheReader, err := nexusclient.NewCacheReader(ctx, logger)
+		cacheReader, err := nexusCacheReader(ctx, logger)
 		if err != nil {
 			// non-fatal, just means we can't show nexus version info
 			logger.Warn("failed to open nexus cache", "error", err)

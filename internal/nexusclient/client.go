@@ -31,7 +31,6 @@ import (
 
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/nexusclient/dbc"
-	"github.com/spf13/viper"
 	"golang.org/x/time/rate"
 )
 
@@ -50,12 +49,18 @@ type Client struct {
 	version    string
 	httpClient *http.Client
 	limiter    *rate.Limiter
+
+	// stateDir is the directory that the rate limits are kept in.
+	stateDir string
 }
 
-func New(ctx context.Context, apiKey string, logger *slog.Logger, version string) (*Client, error) {
+// New makes a client for the API, with the cache of what it said in the
+// directory cacheDir (which has to be there), and the rate limits that it said
+// in the state directory stateDir.
+func New(ctx context.Context, apiKey string, logger *slog.Logger, version string, cacheDir string, stateDir string) (*Client, error) {
 	ua := buildUserAgent(version)
 
-	reader, err := NewCacheReader(ctx, logger)
+	reader, err := NewCacheReader(ctx, logger, cacheDir)
 	if err != nil {
 		return nil, fmt.Errorf("opening nexus cache db: %w", err)
 	}
@@ -74,11 +79,12 @@ func New(ctx context.Context, apiKey string, logger *slog.Logger, version string
 		version:     version,
 		httpClient:  httpClient,
 		limiter:     limiter,
+		stateDir:    stateDir,
 	}, nil
 }
 
 func (c *Client) RateLimitState() (*RateLimitState, error) {
-	return LoadRateLimitState()
+	return LoadRateLimitState(c.stateDir)
 }
 
 func buildUserAgent(version string) string {
@@ -89,8 +95,13 @@ func buildUserAgent(version string) string {
 	)
 }
 
-func openCacheDB(ctx context.Context) (*sql.DB, error) {
-	path := filepath.Join(viper.GetString("cache_dir"), "nexus_cache.db")
+// CacheDBPath is the file of the cache, in the cache directory cacheDir.
+func CacheDBPath(cacheDir string) string {
+	return filepath.Join(cacheDir, "nexus_cache.db")
+}
+
+func openCacheDB(ctx context.Context, cacheDir string) (*sql.DB, error) {
+	path := CacheDBPath(cacheDir)
 
 	db, err := sql.Open("sqlite3", database.DSN(path, false))
 	if err != nil {

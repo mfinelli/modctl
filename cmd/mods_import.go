@@ -185,7 +185,7 @@ has been safely stored and the database has been updated successfully.`,
 		if modsImportNexusUrl != "" && !modsImportSkipNexusLink {
 			apiKey := viper.GetString("nexus.apikey")
 			if apiKey != "" {
-				client, err := nexusclient.New(ctx, apiKey, logger, rootCmd.Version)
+				client, err := nexusClient(ctx, apiKey, logger)
 				if err != nil {
 					style.Println(style.Warning.Render(fmt.Sprintf("  ⚠ failed to initialize nexus client: %s", err)))
 				} else {
@@ -240,7 +240,7 @@ has been safely stored and the database has been updated successfully.`,
 			if apiKey == "" {
 				style.Println(style.Subtle.Render("  nexus api key not configured, skipping link"))
 			} else {
-				client, err := nexusclient.New(ctx, apiKey, logger, rootCmd.Version)
+				client, err := nexusClient(ctx, apiKey, logger)
 				if err != nil {
 					// Non-fatal, warn and continue
 					style.Println(style.Warning.Render(fmt.Sprintf("  ⚠ failed to initialize nexus client: %s", err)))

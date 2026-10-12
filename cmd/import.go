@@ -22,7 +22,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/blobstore"
@@ -133,7 +132,7 @@ Use --dry-run to preview what would be imported without making any changes.`,
 			SkipInventory: importSkipInventory,
 			SameMachine:   importSameMachine,
 			Game:          importGame,
-			CacheDBPath:   filepath.Join(viper.GetString("cache_dir"), "nexus_cache.db"),
+			CacheDBPath:   nexusCacheDBPath(),
 		}
 
 		// Warn if bundle modctl version is newer
