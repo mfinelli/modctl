@@ -28,8 +28,6 @@ import (
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/pmezard/go-difflib/difflib"
@@ -67,7 +65,7 @@ is passed.`,
 			return err
 		}
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -75,7 +73,7 @@ is passed.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.GameInstall(ctx, q, gamesBackupsDiffGame)
+		gi, err := gameInstall(ctx, q, gamesBackupsDiffGame)
 		if err != nil {
 			return err
 		}
@@ -198,13 +196,13 @@ func init() {
 		"Override the currently active game")
 	gamesBackupsDiffCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 	gamesBackupsDiffCmd.Flags().StringVarP(&gamesBackupsDiffTarget, "target", "t", "",
 		"Install target (default: game_dir)")
 	gamesBackupsDiffCmd.RegisterFlagCompletionFunc("target",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.TargetNames(cmd, toComplete)
+			return completer().TargetNames(cmd, toComplete)
 		})
 
 	gamesBackupsDiffCmd.Flags().BoolVar(&gamesBackupsDiffForce, "force", false,

@@ -27,9 +27,7 @@ import (
 	"time"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
-	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/extractor"
 	"github.com/mfinelli/modctl/internal/lock"
@@ -63,7 +61,7 @@ Use --dry-run to preview the plan without making any changes.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -72,7 +70,7 @@ Use --dry-run to preview the plan without making any changes.`,
 		q := dbq.New(db)
 
 		// Resolve game install
-		gi, err := argresolver.GameInstall(ctx, q, unapplyGame)
+		gi, err := gameInstall(ctx, q, unapplyGame)
 		if err != nil {
 			return err
 		}
@@ -344,7 +342,7 @@ func init() {
 		"Override the currently active game")
 	unapplyCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	unapplyCmd.Flags().BoolVar(&unapplyDryRun, "dry-run", false,

@@ -183,7 +183,7 @@ func TestCompleterProfileNames(t *testing.T) {
 		testbuilder.NewProfile(t, db).WithGame(active).WithName("Hardcore").Build()
 		other := testbuilder.NewGame(t, db).WithName("Other").WithStoreGameID("2").Build()
 		testbuilder.NewProfile(t, db).WithGame(other).WithName("Of the other game").Build()
-		require.NoError(t, state.SaveActiveIn(c.StateDir, state.Active{ActiveGameInstallID: active.ID}))
+		require.NoError(t, state.SaveActive(c.StateDir, state.Active{ActiveGameInstallID: active.ID}))
 
 		got, directive := c.ProfileNames(commandWithGame(t, ""), "")
 
@@ -198,7 +198,7 @@ func TestCompleterProfileNames(t *testing.T) {
 		active := testbuilder.NewGame(t, db).WithName("Active").WithStoreGameID("1").Build()
 		other := testbuilder.NewGame(t, db).WithName("Other").WithStoreGameID("2").Build()
 		testbuilder.NewProfile(t, db).WithGame(other).WithName("Of the other game").Build()
-		require.NoError(t, state.SaveActiveIn(c.StateDir, state.Active{ActiveGameInstallID: active.ID}))
+		require.NoError(t, state.SaveActive(c.StateDir, state.Active{ActiveGameInstallID: active.ID}))
 
 		got, _ := c.ProfileNames(commandWithGame(t, "2"), "of")
 
@@ -211,7 +211,7 @@ func TestCompleterProfileNames(t *testing.T) {
 		c, db := newCompleter(t)
 		active := testbuilder.NewGame(t, db).Build()
 		testbuilder.NewProfile(t, db).WithGame(active).WithName("Hardcore").Build()
-		require.NoError(t, state.SaveActiveIn(c.StateDir, state.Active{ActiveGameInstallID: active.ID}))
+		require.NoError(t, state.SaveActive(c.StateDir, state.Active{ActiveGameInstallID: active.ID}))
 
 		got, _ := c.ProfileNames(commandWithGame(t, ""), "HARD")
 
@@ -248,7 +248,7 @@ func TestCompleterProfileNames(t *testing.T) {
 
 		c, db := newCompleter(t)
 		active := testbuilder.NewGame(t, db).Build()
-		require.NoError(t, state.SaveActiveIn(c.StateDir, state.Active{ActiveGameInstallID: active.ID}))
+		require.NoError(t, state.SaveActive(c.StateDir, state.Active{ActiveGameInstallID: active.ID}))
 
 		got, _ := c.ProfileNames(commandWithGame(t, "-5"), "")
 

@@ -126,11 +126,11 @@ func init() {
 // are pending. Returns error only for non-recoverable failures.
 func checkDb(ctx context.Context) error {
 	style.Println(style.Header.Render("Database Checks"))
-	style.Println(style.Subtle.Render("  db: " + viper.GetString("database")))
+	style.Println(style.Subtle.Render("  db: " + databasePath()))
 	style.Println()
 
 	// 1) DB file existence
-	dbPath := viper.GetString("database")
+	dbPath := databasePath()
 	info, err := os.Stat(dbPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -156,7 +156,7 @@ func checkDb(ctx context.Context) error {
 	defer cancel()
 
 	// 2) Open DB + trivial query
-	db, err := database.Setup()
+	db, err := database.Setup(databasePath())
 	if err != nil {
 		style.Println(style.Failure.Render("  ✗ could not open database"))
 		style.Println(style.Subtle.Render("    " + err.Error()))
@@ -417,7 +417,7 @@ func checkGameInstalls(ctx context.Context) error {
 	style.Println(style.Header.Render("Game Install Checks"))
 	style.Println()
 
-	db, err := database.Setup()
+	db, err := database.Setup(databasePath())
 	if err != nil {
 		style.Println(style.Failure.Render("  ✗ could not open database"))
 		style.Println(style.Subtle.Render("    " + err.Error()))
@@ -495,7 +495,7 @@ func checkBlobs(ctx context.Context) error {
 	style.Println(style.Subtle.Render("  overrides: " + viper.GetString("overrides_dir")))
 	style.Println()
 
-	db, err := database.Setup()
+	db, err := database.Setup(databasePath())
 	if err != nil {
 		style.Println(style.Failure.Render("  ✗ could not open database"))
 		style.Println(style.Subtle.Render("    " + err.Error()))
@@ -712,7 +712,7 @@ func checkInstalledFiles(ctx context.Context) error {
 	style.Println(style.Header.Render("Installed File Checks"))
 	style.Println()
 
-	db, err := database.Setup()
+	db, err := database.Setup(databasePath())
 	if err != nil {
 		style.Println(style.Failure.Render("  ✗ could not open database"))
 		style.Println(style.Subtle.Render("    " + err.Error()))

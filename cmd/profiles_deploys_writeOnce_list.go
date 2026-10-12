@@ -23,8 +23,6 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -41,7 +39,7 @@ var profilesDeploysWriteOnceListCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
-			return completion.ModFileVersionIDs(cmd, toComplete)
+			return completer().ModFileVersionIDs(cmd, toComplete)
 		}
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
@@ -49,7 +47,7 @@ var profilesDeploysWriteOnceListCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -57,7 +55,7 @@ var profilesDeploysWriteOnceListCmd = &cobra.Command{
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.GameInstall(ctx, q, profilesDeploysWriteOnceListGame)
+		gi, err := gameInstall(ctx, q, profilesDeploysWriteOnceListGame)
 		if err != nil {
 			return err
 		}
@@ -102,13 +100,13 @@ func init() {
 		"Override the currently active game")
 	profilesDeploysWriteOnceListCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	profilesDeploysWriteOnceListCmd.PersistentFlags().StringVarP(&profilesDeploysWriteOnceListProfile, "profile", "p", "",
 		"Override the currently active profile")
 	profilesDeploysWriteOnceListCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ProfileNames(cmd, toComplete)
+			return completer().ProfileNames(cmd, toComplete)
 		})
 }

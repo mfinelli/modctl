@@ -23,9 +23,6 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
-	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -40,7 +37,7 @@ var gamesTargetsListCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -48,7 +45,7 @@ var gamesTargetsListCmd = &cobra.Command{
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.GameInstall(ctx, q, gamesTargetsListGame)
+		gi, err := gameInstall(ctx, q, gamesTargetsListGame)
 		if err != nil {
 			return err
 		}
@@ -90,6 +87,6 @@ func init() {
 		"Override the currently active game")
 	gamesTargetsListCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 }

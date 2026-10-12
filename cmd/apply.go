@@ -30,7 +30,6 @@ import (
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
-	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/extractor"
 	"github.com/mfinelli/modctl/internal/lock"
@@ -77,7 +76,7 @@ Use --dry-run to preview the plan without making any changes. Add the
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -86,7 +85,7 @@ Use --dry-run to preview the plan without making any changes. Add the
 		q := dbq.New(db)
 
 		// Resolve game install
-		gi, err := argresolver.GameInstall(ctx, q, applyGame)
+		gi, err := gameInstall(ctx, q, applyGame)
 		if err != nil {
 			return err
 		}
@@ -510,14 +509,14 @@ func init() {
 		"Override the currently active game")
 	applyCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	applyCmd.Flags().StringVarP(&applyProfile, "profile", "p", "",
 		"Override the currently active profile")
 	applyCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ProfileNames(cmd, toComplete)
+			return completer().ProfileNames(cmd, toComplete)
 		})
 
 	applyCmd.Flags().BoolVar(&applyDryRun, "dry-run", false,

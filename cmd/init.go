@@ -72,7 +72,7 @@ multiple times and will not overwrite existing data.`,
 			return fmt.Errorf("error creating tmp directory: %w", err)
 		}
 
-		db, err := database.Setup()
+		db, err := database.Setup(databasePath())
 		if err != nil {
 			return fmt.Errorf("error opening database: %w", err)
 		}

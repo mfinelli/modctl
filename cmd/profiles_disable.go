@@ -24,8 +24,6 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
@@ -49,7 +47,7 @@ versions are ignored when computing the applied mod set.`,
 		if len(args) != 0 || profilesDisableAll {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return completion.ModFileVersionIDs(cmd, toComplete)
+		return completer().ModFileVersionIDs(cmd, toComplete)
 	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -62,7 +60,7 @@ versions are ignored when computing the applied mod set.`,
 			return fmt.Errorf("must specify a mod file version ID or pass --all")
 		}
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -71,7 +69,7 @@ versions are ignored when computing the applied mod set.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.GameInstall(ctx, q, profilesDisableGame)
+		gi, err := gameInstall(ctx, q, profilesDisableGame)
 		if err != nil {
 			return err
 		}
@@ -113,14 +111,14 @@ func init() {
 		"Override the currently active game")
 	profilesDisableCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	profilesDisableCmd.Flags().StringVarP(&profilesDisableProfile, "profile", "p", "",
 		"Override the currently active profile")
 	profilesDisableCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ProfileNames(cmd, toComplete)
+			return completer().ProfileNames(cmd, toComplete)
 		})
 
 	profilesDisableCmd.Flags().BoolVarP(&profilesDisableAll, "all", "A", false,

@@ -36,7 +36,7 @@ import (
 // a "Mod Page › File Label (version)" description.
 func (c Completer) ModFileVersionIDs(cmd *cobra.Command, toComplete string) ([]string, cobra.ShellCompDirective) {
 	ctx := context.Background()
-	db, err := database.SetupReadOnlyAt(c.DatabasePath)
+	db, err := database.SetupReadOnly(c.DatabasePath)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -71,7 +71,7 @@ func (c Completer) ModFileVersionIDs(cmd *cobra.Command, toComplete string) ([]s
 // Returns candidates as numeric IDs with a "File Label (version)" description.
 func (c Completer) ModFileVersionIDsForPage(cmd *cobra.Command, modPageArg string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	ctx := context.Background()
-	db, err := database.SetupReadOnlyAt(c.DatabasePath)
+	db, err := database.SetupReadOnly(c.DatabasePath)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -147,7 +147,7 @@ func (c Completer) resolveGameInstallForCompletion(cmd *cobra.Command, ctx conte
 	if f := cmd.Flags().Lookup("game"); f != nil && f.Changed {
 		gameArg = f.Value.String()
 	} else {
-		active, err := state.LoadActiveIn(c.StateDir)
+		active, err := state.LoadActive(c.StateDir)
 		if err != nil || active.ActiveGameInstallID <= 0 {
 			return dbq.GameInstall{}, fmt.Errorf("no active game")
 		}

@@ -24,7 +24,6 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -58,7 +57,7 @@ Use --multiple to assign priorities as N, 2N, 3N, ... (for example, --multiple
 			return fmt.Errorf("--multiple must be > 0")
 		}
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -67,7 +66,7 @@ Use --multiple to assign priorities as N, 2N, 3N, ... (for example, --multiple
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.GameInstall(ctx, q, profilesOrderCompactGame)
+		gi, err := gameInstall(ctx, q, profilesOrderCompactGame)
 		if err != nil {
 			return err
 		}
@@ -119,14 +118,14 @@ func init() {
 		"Override the currently active game")
 	profilesOrderCompactCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	profilesOrderCompactCmd.Flags().StringVarP(&profilesOrderCompactProfile, "profile", "p", "",
 		"Override the currently active profile")
 	profilesOrderCompactCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ProfileNames(cmd, toComplete)
+			return completer().ProfileNames(cmd, toComplete)
 		})
 
 	profilesOrderCompactCmd.Flags().Int64VarP(&profilesOrderCompactMultiple, "multiple", "m", 1,

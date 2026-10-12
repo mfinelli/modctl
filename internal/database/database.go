@@ -31,7 +31,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
 	goosedb "github.com/pressly/goose/v3/database"
-	"github.com/spf13/viper"
 )
 
 // DB_PRAGMAS are the connection parameters for a read-write database:
@@ -77,35 +76,18 @@ func DSN(path string, readOnly bool) string {
 	return fmt.Sprintf("file:%s%s", url.PathEscape(path), pragmas)
 }
 
-// SetupAt opens the read-write database at path, with the migrations not
-// applied (see Migrate and OpenAt). Nothing is done to the file until the
+// Setup opens the read-write database at path, with the migrations not
+// applied (see Migrate and Open). Nothing is done to the file until the
 // first statement is: the driver is lazy, so a path that is not there is no
 // error here.
-func SetupAt(path string) (*sql.DB, error) {
+func Setup(path string) (*sql.DB, error) {
 	return sql.Open("sqlite3", DSN(path, false))
 }
 
-// SetupReadOnlyAt is SetupAt for a database that is only read: the connection
+// SetupReadOnly is Setup for a database that is only read: the connection
 // can't change it, and it is not created by looking for it.
-func SetupReadOnlyAt(path string) (*sql.DB, error) {
+func SetupReadOnly(path string) (*sql.DB, error) {
 	return sql.Open("sqlite3", DSN(path, true))
-}
-
-// Setup is SetupAt for the database that is configured.
-//
-// Transitional: it reads the global configuration, which nothing in this
-// package or in the ones that use it may do. It is only here for the callers
-// that do not have the path of the database of their own to give to SetupAt
-// yet, and goes with them.
-func Setup() (*sql.DB, error) {
-	return SetupAt(viper.GetString("database"))
-}
-
-// SetupReadOnly is SetupReadOnlyAt for the database that is configured.
-//
-// Transitional: see Setup.
-func SetupReadOnly() (*sql.DB, error) {
-	return SetupReadOnlyAt(viper.GetString("database"))
 }
 
 func GooseProvider(db *sql.DB) (*goose.Provider, error) {
@@ -211,28 +193,21 @@ func latestMigrationVersion(fsys fs.FS) (int64, error) {
 	return latest, nil
 }
 
-// OpenAt opens the database that the commands use, at path: it has to be there
+// Open opens the database that the commands use, at path: it has to be there
 // (it is made by init), and it is migrated to the latest schema before it is
 // handed over. The caller closes it.
-func OpenAt(ctx context.Context, path string) (*sql.DB, error) {
+func Open(ctx context.Context, path string) (*sql.DB, error) {
 	return openWith(ctx, path, Migrate)
 }
 
-// Open is OpenAt for the database that is configured.
-//
-// Transitional: see Setup.
-func Open(ctx context.Context) (*sql.DB, error) {
-	return OpenAt(ctx, viper.GetString("database"))
-}
-
-// openWith is OpenAt with the migrating done by migrate, so that a test can
+// openWith is Open with the migrating done by migrate, so that a test can
 // have migrations that are not the ones that are embedded in the binary.
 func openWith(ctx context.Context, path string, migrate func(context.Context, *sql.DB) error) (*sql.DB, error) {
-	if err := EnsureExistsAt(path); err != nil {
+	if err := EnsureExists(path); err != nil {
 		return nil, err
 	}
 
-	db, err := SetupAt(path)
+	db, err := Setup(path)
 	if err != nil {
 		return nil, fmt.Errorf("error setting up database: %w", err)
 	}
@@ -245,16 +220,9 @@ func openWith(ctx context.Context, path string, migrate func(context.Context, *s
 	return db, nil
 }
 
-// EnsureExists is EnsureExistsAt for the database that is configured.
-//
-// Transitional: see Setup.
-func EnsureExists() error {
-	return EnsureExistsAt(viper.GetString("database"))
-}
-
-// EnsureExistsAt verifies that the database file at path exists and is a
+// EnsureExists verifies that the database file at path exists and is a
 // regular file. If not, it returns a user-friendly error.
-func EnsureExistsAt(path string) error {
+func EnsureExists(path string) error {
 	if path == "" {
 		return fmt.Errorf("database path is not configured")
 	}

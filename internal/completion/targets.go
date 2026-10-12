@@ -37,7 +37,7 @@ import (
 // each target points without having to run a separate command.
 func (c Completer) TargetNames(cmd *cobra.Command, toComplete string) ([]string, cobra.ShellCompDirective) {
 	ctx := context.Background()
-	db, err := database.SetupReadOnlyAt(c.DatabasePath)
+	db, err := database.SetupReadOnly(c.DatabasePath)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -51,7 +51,7 @@ func (c Completer) TargetNames(cmd *cobra.Command, toComplete string) ([]string,
 		}
 		gameID = v
 	} else {
-		active, err := state.LoadActiveIn(c.StateDir)
+		active, err := state.LoadActive(c.StateDir)
 		if err != nil || active.ActiveGameInstallID <= 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}

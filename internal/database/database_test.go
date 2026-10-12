@@ -149,7 +149,7 @@ func TestDSNReadOnly(t *testing.T) {
 	})
 }
 
-func TestSetupAt(t *testing.T) {
+func TestSetup(t *testing.T) {
 	t.Parallel()
 
 	t.Run("it opens a database that can be written, with foreign keys enforced", func(t *testing.T) {
@@ -157,7 +157,7 @@ func TestSetupAt(t *testing.T) {
 
 		path := filepath.Join(t.TempDir(), "modctl.db")
 
-		db, err := SetupAt(path)
+		db, err := Setup(path)
 		require.NoError(t, err)
 		defer db.Close()
 
@@ -173,10 +173,10 @@ func TestSetupAt(t *testing.T) {
 	t.Run("what it opens is the database at the path it is given", func(t *testing.T) {
 		t.Parallel()
 
-		first, err := SetupAt(filepath.Join(t.TempDir(), "first.db"))
+		first, err := Setup(filepath.Join(t.TempDir(), "first.db"))
 		require.NoError(t, err)
 		defer first.Close()
-		second, err := SetupAt(filepath.Join(t.TempDir(), "second.db"))
+		second, err := Setup(filepath.Join(t.TempDir(), "second.db"))
 		require.NoError(t, err)
 		defer second.Close()
 
@@ -188,14 +188,14 @@ func TestSetupAt(t *testing.T) {
 	})
 }
 
-func TestSetupReadOnlyAt(t *testing.T) {
+func TestSetupReadOnly(t *testing.T) {
 	t.Parallel()
 
 	t.Run("it reads what is there and can not change it", func(t *testing.T) {
 		t.Parallel()
 
 		path := filepath.Join(t.TempDir(), "modctl.db")
-		rw, err := SetupAt(path)
+		rw, err := Setup(path)
 		require.NoError(t, err)
 		defer rw.Close()
 		_, err = rw.Exec(`CREATE TABLE things (id INTEGER PRIMARY KEY)`)
@@ -203,7 +203,7 @@ func TestSetupReadOnlyAt(t *testing.T) {
 		_, err = rw.Exec(`INSERT INTO things (id) VALUES (1)`)
 		require.NoError(t, err)
 
-		db, err := SetupReadOnlyAt(path)
+		db, err := SetupReadOnly(path)
 		require.NoError(t, err)
 		defer db.Close()
 
@@ -219,7 +219,7 @@ func TestSetupReadOnlyAt(t *testing.T) {
 
 		path := filepath.Join(t.TempDir(), "nothing.db")
 
-		db, err := SetupReadOnlyAt(path)
+		db, err := SetupReadOnly(path)
 		require.NoError(t, err)
 		defer db.Close()
 

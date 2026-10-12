@@ -28,13 +28,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoadActiveIn(t *testing.T) {
+func TestLoadActive(t *testing.T) {
 	t.Parallel()
 
 	t.Run("there is none until one is saved", func(t *testing.T) {
 		t.Parallel()
 
-		got, err := LoadActiveIn(t.TempDir())
+		got, err := LoadActive(t.TempDir())
 
 		require.NoError(t, err)
 		assert.Equal(t, Active{}, got)
@@ -45,7 +45,7 @@ func TestLoadActiveIn(t *testing.T) {
 
 		dir := filepath.Join(t.TempDir(), "not", "there", "yet")
 
-		got, err := LoadActiveIn(dir)
+		got, err := LoadActive(dir)
 
 		require.NoError(t, err)
 		assert.Equal(t, Active{}, got)
@@ -62,9 +62,9 @@ func TestLoadActiveIn(t *testing.T) {
 			ActiveGameInstallID:       7,
 			ActiveGameInstallSelector: "steam:123#default",
 		}
-		require.NoError(t, SaveActiveIn(dir, saved))
+		require.NoError(t, SaveActive(dir, saved))
 
-		got, err := LoadActiveIn(dir)
+		got, err := LoadActive(dir)
 
 		require.NoError(t, err)
 		saved.UpdatedAt = got.UpdatedAt // which is when it was saved
@@ -79,7 +79,7 @@ func TestLoadActiveIn(t *testing.T) {
 		path := filepath.Join(dir, "active.json")
 		require.NoError(t, os.WriteFile(path, []byte("{ not json"), 0o644))
 
-		_, err := LoadActiveIn(dir)
+		_, err := LoadActive(dir)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "parse "+path)
@@ -93,7 +93,7 @@ func TestLoadActiveIn(t *testing.T) {
 		path := filepath.Join(dir, "active.json")
 		require.NoError(t, os.Mkdir(path, 0o755))
 
-		_, err := LoadActiveIn(dir)
+		_, err := LoadActive(dir)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "read "+path)
@@ -103,12 +103,12 @@ func TestLoadActiveIn(t *testing.T) {
 		t.Parallel()
 
 		first, second := t.TempDir(), t.TempDir()
-		require.NoError(t, SaveActiveIn(first, Active{ActiveGameInstallID: 1}))
-		require.NoError(t, SaveActiveIn(second, Active{ActiveGameInstallID: 2}))
+		require.NoError(t, SaveActive(first, Active{ActiveGameInstallID: 1}))
+		require.NoError(t, SaveActive(second, Active{ActiveGameInstallID: 2}))
 
-		a, err := LoadActiveIn(first)
+		a, err := LoadActive(first)
 		require.NoError(t, err)
-		b, err := LoadActiveIn(second)
+		b, err := LoadActive(second)
 		require.NoError(t, err)
 
 		assert.Equal(t, int64(1), a.ActiveGameInstallID)
@@ -116,7 +116,7 @@ func TestLoadActiveIn(t *testing.T) {
 	})
 }
 
-func TestSaveActiveIn(t *testing.T) {
+func TestSaveActive(t *testing.T) {
 	t.Parallel()
 
 	t.Run("the directory is made if it is not there", func(t *testing.T) {
@@ -124,7 +124,7 @@ func TestSaveActiveIn(t *testing.T) {
 
 		dir := filepath.Join(t.TempDir(), "state", "modctl")
 
-		require.NoError(t, SaveActiveIn(dir, Active{ActiveGameInstallID: 3}))
+		require.NoError(t, SaveActive(dir, Active{ActiveGameInstallID: 3}))
 
 		assert.FileExists(t, filepath.Join(dir, "active.json"))
 	})
@@ -133,11 +133,11 @@ func TestSaveActiveIn(t *testing.T) {
 		t.Parallel()
 
 		dir := t.TempDir()
-		require.NoError(t, SaveActiveIn(dir, Active{ActiveGameInstallID: 1, ActiveStoreID: "steam"}))
+		require.NoError(t, SaveActive(dir, Active{ActiveGameInstallID: 1, ActiveStoreID: "steam"}))
 
-		require.NoError(t, SaveActiveIn(dir, Active{ActiveGameInstallID: 2}))
+		require.NoError(t, SaveActive(dir, Active{ActiveGameInstallID: 2}))
 
-		got, err := LoadActiveIn(dir)
+		got, err := LoadActive(dir)
 		require.NoError(t, err)
 		assert.Equal(t, int64(2), got.ActiveGameInstallID)
 		assert.Empty(t, got.ActiveStoreID, "what is not in it any more is gone")
@@ -149,9 +149,9 @@ func TestSaveActiveIn(t *testing.T) {
 		dir := t.TempDir()
 		before := time.Now().UTC().Add(-time.Second)
 
-		require.NoError(t, SaveActiveIn(dir, Active{UpdatedAt: "1999-01-01T00:00:00.000Z"}))
+		require.NoError(t, SaveActive(dir, Active{UpdatedAt: "1999-01-01T00:00:00.000Z"}))
 
-		got, err := LoadActiveIn(dir)
+		got, err := LoadActive(dir)
 		require.NoError(t, err)
 		at, err := time.Parse("2006-01-02T15:04:05.000Z", got.UpdatedAt)
 		require.NoError(t, err)
@@ -162,7 +162,7 @@ func TestSaveActiveIn(t *testing.T) {
 		t.Parallel()
 
 		dir := t.TempDir()
-		require.NoError(t, SaveActiveIn(dir, Active{ActiveGameInstallID: 7}))
+		require.NoError(t, SaveActive(dir, Active{ActiveGameInstallID: 7}))
 
 		b, err := os.ReadFile(filepath.Join(dir, "active.json"))
 
@@ -177,8 +177,8 @@ func TestSaveActiveIn(t *testing.T) {
 
 		dir := t.TempDir()
 
-		require.NoError(t, SaveActiveIn(dir, Active{ActiveGameInstallID: 7}))
-		require.NoError(t, SaveActiveIn(dir, Active{ActiveGameInstallID: 8}))
+		require.NoError(t, SaveActive(dir, Active{ActiveGameInstallID: 7}))
+		require.NoError(t, SaveActive(dir, Active{ActiveGameInstallID: 8}))
 
 		entries, err := os.ReadDir(dir)
 		require.NoError(t, err)
@@ -195,7 +195,7 @@ func TestSaveActiveIn(t *testing.T) {
 		require.NoError(t, os.WriteFile(blocker, nil, 0o644))
 		dir := filepath.Join(blocker, "modctl")
 
-		err := SaveActiveIn(dir, Active{ActiveGameInstallID: 1})
+		err := SaveActive(dir, Active{ActiveGameInstallID: 1})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "make "+dir)

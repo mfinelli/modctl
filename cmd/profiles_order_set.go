@@ -26,7 +26,6 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -46,7 +45,7 @@ Higher priority wins conflicts. Priorities must be unique within a profile.`,
 	Args: cobra.ExactArgs(2),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
-			return completion.ModFileVersionIDs(cmd, toComplete)
+			return completer().ModFileVersionIDs(cmd, toComplete)
 		}
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
@@ -59,7 +58,7 @@ Higher priority wins conflicts. Priorities must be unique within a profile.`,
 			return fmt.Errorf("invalid priority %q (expected a positive integer)", args[1])
 		}
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -68,7 +67,7 @@ Higher priority wins conflicts. Priorities must be unique within a profile.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.GameInstall(ctx, q, profilesOrderSetGame)
+		gi, err := gameInstall(ctx, q, profilesOrderSetGame)
 		if err != nil {
 			return err
 		}
@@ -148,13 +147,13 @@ func init() {
 		"Override the currently active game")
 	profilesOrderSetCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	profilesOrderSetCmd.Flags().StringVarP(&profilesOrderSetProfile, "profile", "p", "",
 		"Override the currently active profile")
 	profilesOrderSetCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ProfileNames(cmd, toComplete)
+			return completer().ProfileNames(cmd, toComplete)
 		})
 }

@@ -23,8 +23,6 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -42,13 +40,13 @@ The order of the two IDs does not matter.`,
 		if len(args) >= 2 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return completion.ModPageIDs(cmd, toComplete)
+		return completer().ModPageIDs(cmd, toComplete)
 	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -57,7 +55,7 @@ The order of the two IDs does not matter.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.GameInstall(ctx, q, modsIncompatibleRemoveGame)
+		gi, err := gameInstall(ctx, q, modsIncompatibleRemoveGame)
 		if err != nil {
 			return err
 		}
@@ -112,6 +110,6 @@ func init() {
 		"Override the currently active game")
 	modsIncompatibleRemoveCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 }

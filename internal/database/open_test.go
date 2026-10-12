@@ -166,7 +166,7 @@ func TestOpenDB(t *testing.T) {
 
 		// Migrations is only filled in by the binary, so in a test there is
 		// nothing to migrate with, which is an error and not an empty schema
-		db, err := OpenAt(ctx, emptyDatabaseFile(t))
+		db, err := Open(ctx, emptyDatabaseFile(t))
 
 		require.Error(t, err)
 		assert.Nil(t, db)

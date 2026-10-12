@@ -25,7 +25,6 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -56,13 +55,13 @@ preserved.`,
 		if len(args) != 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return completion.ModPageIDs(cmd, toComplete)
+		return completer().ModPageIDs(cmd, toComplete)
 	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -70,7 +69,7 @@ preserved.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.GameInstall(ctx, q, profilesUpgradeGame)
+		gi, err := gameInstall(ctx, q, profilesUpgradeGame)
 		if err != nil {
 			return err
 		}
@@ -189,20 +188,20 @@ func init() {
 		"Override the currently active game")
 	profilesUpgradeCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	profilesUpgradeCmd.Flags().StringVarP(&profilesUpgradeProfile, "profile", "p", "",
 		"Override the currently active profile")
 	profilesUpgradeCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ProfileNames(cmd, toComplete)
+			return completer().ProfileNames(cmd, toComplete)
 		})
 
 	profilesUpgradeCmd.Flags().StringVar(&profilesUpgradeTo, "to", "",
 		"Specific mod file version ID to upgrade to")
 	profilesUpgradeCmd.RegisterFlagCompletionFunc("to",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ModFileVersionIDs(cmd, toComplete)
+			return completer().ModFileVersionIDs(cmd, toComplete)
 		})
 }

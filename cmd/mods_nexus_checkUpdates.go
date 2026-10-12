@@ -29,9 +29,6 @@ import (
 	"time"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/mfinelli/modctl/internal/updatechain"
@@ -75,7 +72,7 @@ to proceed even if the operation would exhaust your API quota.`,
 			return fmt.Errorf("nexus api key not configured; set nexus.apikey in your config file")
 		}
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -90,7 +87,7 @@ to proceed even if the operation would exhaust your API quota.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.GameInstall(ctx, q, modsNexusCheckUpdatesGame)
+		gi, err := gameInstall(ctx, q, modsNexusCheckUpdatesGame)
 		if err != nil {
 			return err
 		}
@@ -465,7 +462,7 @@ func init() {
 		"Override the currently active game")
 	modsNexusCheckUpdatesCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	modsNexusCheckUpdatesCmd.Flags().BoolVar(&modsNexusCheckUpdatesForce, "force", false,

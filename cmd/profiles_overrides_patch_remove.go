@@ -24,7 +24,6 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -59,7 +58,7 @@ For ini patches, use --section to identify entries in a specific section.`,
 		}
 		entryKey := args[1]
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -67,7 +66,7 @@ For ini patches, use --section to identify entries in a specific section.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesPatchRemoveGame)
+		gi, err := gameInstall(ctx, q, profilesOverridesPatchRemoveGame)
 		if err != nil {
 			return err
 		}
@@ -174,13 +173,13 @@ func init() {
 		"Override the currently active game")
 	profilesOverridesPatchRemoveCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 	profilesOverridesPatchRemoveCmd.Flags().StringVarP(&profilesOverridesPatchRemoveProfile, "profile", "p", "",
 		"Override the currently active profile")
 	profilesOverridesPatchRemoveCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ProfileNames(cmd, toComplete)
+			return completer().ProfileNames(cmd, toComplete)
 		})
 	profilesOverridesPatchRemoveCmd.Flags().StringVar(&profilesOverridesPatchRemoveSection, "section", "",
 		"Section name (ini patches only)")

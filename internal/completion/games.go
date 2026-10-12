@@ -34,7 +34,7 @@ import (
 func (c Completer) GameInstallSelectors(cmd *cobra.Command, toComplete string) ([]string, cobra.ShellCompDirective) {
 	ctx := context.Background()
 
-	db, err := database.SetupReadOnlyAt(c.DatabasePath)
+	db, err := database.SetupReadOnly(c.DatabasePath)
 	if err != nil {
 		// No DB (not initialized) or error: don't fall back to file completion.
 		return nil, cobra.ShellCompDirectiveNoFileComp

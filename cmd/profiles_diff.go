@@ -26,8 +26,6 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 	"go.finelli.dev/util"
@@ -65,13 +63,13 @@ directional: profile A is the source and profile B is the target.`,
 		if len(args) >= 2 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return completion.ProfileNames(cmd, toComplete)
+		return completer().ProfileNames(cmd, toComplete)
 	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -80,7 +78,7 @@ directional: profile A is the source and profile B is the target.`,
 		q := dbq.New(db)
 
 		// Resolve game install
-		gi, err := argresolver.GameInstall(ctx, q, profilesDiffGame)
+		gi, err := gameInstall(ctx, q, profilesDiffGame)
 		if err != nil {
 			return err
 		}
@@ -141,7 +139,7 @@ func init() {
 		"Override the currently active game")
 	profilesDiffCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	profilesDiffCmd.Flags().BoolVar(&profilesDiffNoUnchanged, "no-unchanged", false,

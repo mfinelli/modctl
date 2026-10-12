@@ -24,8 +24,6 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-
-	"github.com/adrg/xdg"
 )
 
 // activeFilename is the file, in the state directory, that has the active
@@ -39,10 +37,10 @@ type Active struct {
 	UpdatedAt                 string `json:"updated_at,omitempty"`
 }
 
-// LoadActiveIn reads the active selection from the state directory dir. There
+// LoadActive reads the active selection from the state directory dir. There
 // is none until one is saved, which is an empty Active and not an error, and
 // nothing is made by looking: not the directory, and not the file.
-func LoadActiveIn(dir string) (Active, error) {
+func LoadActive(dir string) (Active, error) {
 	p := filepath.Join(dir, activeFilename)
 
 	b, err := os.ReadFile(p)
@@ -60,9 +58,9 @@ func LoadActiveIn(dir string) (Active, error) {
 	return a, nil
 }
 
-// SaveActiveIn writes the active selection a to the state directory dir, which
+// SaveActive writes the active selection a to the state directory dir, which
 // is made if it is not there. UpdatedAt is set to now, whatever a has in it.
-func SaveActiveIn(dir string, a Active) error {
+func SaveActive(dir string, a Active) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("make %s: %w", dir, err)
 	}
@@ -88,29 +86,4 @@ func SaveActiveIn(dir string, a Active) error {
 	}
 
 	return nil
-}
-
-// DefaultDir is the state directory of the user: where the active selection is
-// kept, and what LoadActive and SaveActive use.
-//
-// Transitional: it reads the environment, which nothing in this package or in
-// the ones that use it may do. It is only here for the callers that do not
-// have the state directory of their own to give to LoadActiveIn and
-// SaveActiveIn yet, and goes with them.
-func DefaultDir() string {
-	return filepath.Join(xdg.StateHome, "modctl")
-}
-
-// LoadActive is LoadActiveIn for the state directory of the user.
-//
-// Transitional: see DefaultDir.
-func LoadActive() (Active, error) {
-	return LoadActiveIn(DefaultDir())
-}
-
-// SaveActive is SaveActiveIn for the state directory of the user.
-//
-// Transitional: see DefaultDir.
-func SaveActive(a Active) error {
-	return SaveActiveIn(DefaultDir(), a)
 }

@@ -29,7 +29,6 @@ import (
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
-	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/extractor"
 	"github.com/mfinelli/modctl/internal/style"
@@ -72,7 +71,7 @@ archives.`,
 			return err
 		}
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -80,7 +79,7 @@ archives.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesEditGame)
+		gi, err := gameInstall(ctx, q, profilesOverridesEditGame)
 		if err != nil {
 			return err
 		}
@@ -302,13 +301,13 @@ func init() {
 		"Override the currently active game")
 	profilesOverridesEditCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 	profilesOverridesEditCmd.Flags().StringVarP(&profilesOverridesEditProfile, "profile", "p", "",
 		"Override the currently active profile")
 	profilesOverridesEditCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ProfileNames(cmd, toComplete)
+			return completer().ProfileNames(cmd, toComplete)
 		})
 
 	profilesOverridesEditCmd.Flags().BoolVar(&profilesOverridesEditReset, "reset", false,

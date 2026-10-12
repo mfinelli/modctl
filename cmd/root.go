@@ -118,8 +118,7 @@ func initConfig() {
 		filepath.Join(xdg.DataHome, "modctl", "backups"))
 	viper.SetDefault("overrides_dir",
 		filepath.Join(xdg.DataHome, "modctl", "overrides"))
-	viper.SetDefault("locks_dir",
-		filepath.Join(xdg.StateHome, "modctl", "locks"))
+	viper.SetDefault("locks_dir", filepath.Join(stateDir(), "locks"))
 	viper.SetDefault("cache_dir",
 		filepath.Join(xdg.CacheHome, "modctl"))
 	viper.SetDefault("tmp_dir",

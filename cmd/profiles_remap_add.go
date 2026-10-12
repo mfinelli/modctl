@@ -26,8 +26,6 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -72,7 +70,7 @@ Examples:
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		switch len(args) {
 		case 0:
-			return completion.ModFileVersionIDs(cmd, toComplete)
+			return completer().ModFileVersionIDs(cmd, toComplete)
 		case 1:
 			return []string{
 				"strip_components",
@@ -101,7 +99,7 @@ Examples:
 			return err
 		}
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -109,7 +107,7 @@ Examples:
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.GameInstall(ctx, q, profilesRemapAddGame)
+		gi, err := gameInstall(ctx, q, profilesRemapAddGame)
 		if err != nil {
 			return err
 		}
@@ -145,13 +143,13 @@ func init() {
 		"Override the currently active game")
 	profilesRemapAddCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 	profilesRemapAddCmd.PersistentFlags().StringVarP(&profilesRemapAddProfile, "profile", "p", "",
 		"Override the currently active profile")
 	profilesRemapAddCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ProfileNames(cmd, toComplete)
+			return completer().ProfileNames(cmd, toComplete)
 		})
 
 	profilesRemapAddCmd.Flags().Int64Var(&profilesRemapAddPosition, "position", -1,

@@ -44,19 +44,12 @@ import (
 	"github.com/mfinelli/modctl/internal/state"
 )
 
-// GameInstall is GameInstallIn for the state directory of the user.
-//
-// Transitional: see state.DefaultDir.
-func GameInstall(ctx context.Context, q *dbq.Queries, arg string) (dbq.GameInstall, error) {
-	return GameInstallIn(ctx, q, state.DefaultDir(), arg)
-}
-
-// GameInstallIn resolves the game install that a command is for: the one
+// GameInstall resolves the game install that a command is for: the one
 // that arg says (see ExplicitGameInstall), or the active one, from the state
 // directory stateDir, if arg is empty, which is what leaving out --game means.
-func GameInstallIn(ctx context.Context, q *dbq.Queries, stateDir string, arg string) (dbq.GameInstall, error) {
+func GameInstall(ctx context.Context, q *dbq.Queries, stateDir string, arg string) (dbq.GameInstall, error) {
 	if arg == "" {
-		active, err := state.LoadActiveIn(stateDir)
+		active, err := state.LoadActive(stateDir)
 		if err != nil {
 			return dbq.GameInstall{}, fmt.Errorf("load active selection: %w", err)
 		}

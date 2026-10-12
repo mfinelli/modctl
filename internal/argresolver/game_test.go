@@ -167,7 +167,7 @@ func TestExplicitGameInstall(t *testing.T) {
 	})
 }
 
-func TestGameInstallIn(t *testing.T) {
+func TestGameInstall(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -180,13 +180,13 @@ func TestGameInstallIn(t *testing.T) {
 		q := dbq.New(db)
 		asked := testbuilder.NewGame(t, db).WithName("Cyberpunk 2077").WithStoreGameID("1").Build()
 		active := testbuilder.NewGame(t, db).WithName("Skyrim").WithStoreGameID("2").Build()
-		require.NoError(t, state.SaveActiveIn(dir, state.Active{ActiveGameInstallID: active.ID}))
+		require.NoError(t, state.SaveActive(dir, state.Active{ActiveGameInstallID: active.ID}))
 
-		byID, err := GameInstallIn(ctx, q, dir, fmt.Sprintf("%d", asked.ID))
+		byID, err := GameInstall(ctx, q, dir, fmt.Sprintf("%d", asked.ID))
 		require.NoError(t, err)
 		assert.Equal(t, asked.ID, byID.ID, "not the active one")
 
-		byName, err := GameInstallIn(ctx, q, dir, "Cyberpunk 2077")
+		byName, err := GameInstall(ctx, q, dir, "Cyberpunk 2077")
 		require.NoError(t, err)
 		assert.Equal(t, asked.ID, byName.ID)
 	})
@@ -197,9 +197,9 @@ func TestGameInstallIn(t *testing.T) {
 		dir := t.TempDir()
 		db := testbuilder.SetupDB(t)
 		active := testbuilder.NewGame(t, db).Build()
-		require.NoError(t, state.SaveActiveIn(dir, state.Active{ActiveGameInstallID: active.ID}))
+		require.NoError(t, state.SaveActive(dir, state.Active{ActiveGameInstallID: active.ID}))
 
-		_, err := GameInstallIn(ctx, dbq.New(db), dir, "999999")
+		_, err := GameInstall(ctx, dbq.New(db), dir, "999999")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no game install with id 999999")
@@ -213,9 +213,9 @@ func TestGameInstallIn(t *testing.T) {
 		q := dbq.New(db)
 		testbuilder.NewGame(t, db).WithName("Not Active").WithStoreGameID("1").Build()
 		active := testbuilder.NewGame(t, db).WithName("Active").WithStoreGameID("2").Build()
-		require.NoError(t, state.SaveActiveIn(dir, state.Active{ActiveGameInstallID: active.ID}))
+		require.NoError(t, state.SaveActive(dir, state.Active{ActiveGameInstallID: active.ID}))
 
-		got, err := GameInstallIn(ctx, q, dir, "")
+		got, err := GameInstall(ctx, q, dir, "")
 
 		require.NoError(t, err)
 		assert.Equal(t, active.ID, got.ID)
@@ -229,7 +229,7 @@ func TestGameInstallIn(t *testing.T) {
 		db := testbuilder.SetupDB(t)
 		testbuilder.NewGame(t, db).Build()
 
-		_, err := GameInstallIn(ctx, dbq.New(db), dir, "")
+		_, err := GameInstall(ctx, dbq.New(db), dir, "")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no active game selected")
@@ -243,9 +243,9 @@ func TestGameInstallIn(t *testing.T) {
 		dir := t.TempDir()
 		db := testbuilder.SetupDB(t)
 		// a store has been chosen, but not a game
-		require.NoError(t, state.SaveActiveIn(dir, state.Active{ActiveStoreID: "steam"}))
+		require.NoError(t, state.SaveActive(dir, state.Active{ActiveStoreID: "steam"}))
 
-		_, err := GameInstallIn(ctx, dbq.New(db), dir, "")
+		_, err := GameInstall(ctx, dbq.New(db), dir, "")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no active game selected")
@@ -256,9 +256,9 @@ func TestGameInstallIn(t *testing.T) {
 
 		dir := t.TempDir()
 		db := testbuilder.SetupDB(t)
-		require.NoError(t, state.SaveActiveIn(dir, state.Active{ActiveGameInstallID: 424242}))
+		require.NoError(t, state.SaveActive(dir, state.Active{ActiveGameInstallID: 424242}))
 
-		_, err := GameInstallIn(ctx, dbq.New(db), dir, "")
+		_, err := GameInstall(ctx, dbq.New(db), dir, "")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no game install with id 424242")
@@ -273,7 +273,7 @@ func TestGameInstallIn(t *testing.T) {
 		path := filepath.Join(dir, "active.json")
 		require.NoError(t, os.WriteFile(path, []byte("{ not json"), 0o644))
 
-		_, err := GameInstallIn(ctx, dbq.New(db), dir, "")
+		_, err := GameInstall(ctx, dbq.New(db), dir, "")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "load active selection")
@@ -289,7 +289,7 @@ func TestGameInstallIn(t *testing.T) {
 		path := filepath.Join(dir, "active.json")
 		require.NoError(t, os.WriteFile(path, []byte("{ not json"), 0o644))
 
-		got, err := GameInstallIn(ctx, dbq.New(db), dir, fmt.Sprintf("%d", gi.ID))
+		got, err := GameInstall(ctx, dbq.New(db), dir, fmt.Sprintf("%d", gi.ID))
 
 		require.NoError(t, err)
 		assert.Equal(t, gi.ID, got.ID)

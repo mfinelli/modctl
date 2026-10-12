@@ -26,7 +26,6 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -62,13 +61,13 @@ targets cannot be used.`,
 		if len(args) != 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return completion.ModFileVersionIDs(cmd, toComplete)
+		return completer().ModFileVersionIDs(cmd, toComplete)
 	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -77,7 +76,7 @@ targets cannot be used.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.GameInstall(ctx, q, profilesAddGame)
+		gi, err := gameInstall(ctx, q, profilesAddGame)
 		if err != nil {
 			return err
 		}
@@ -193,21 +192,21 @@ func init() {
 		"Override the currently active game")
 	profilesAddCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	profilesAddCmd.Flags().StringVarP(&profilesAddProfile, "profile", "p", "",
 		"Override the currently active profile")
 	profilesAddCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ProfileNames(cmd, toComplete)
+			return completer().ProfileNames(cmd, toComplete)
 		})
 
 	profilesAddCmd.Flags().StringVarP(&profilesAddTarget, "target", "t", "",
 		`Install target to deploy this mod to (default "game_dir", or the only enabled target)`)
 	profilesAddCmd.RegisterFlagCompletionFunc("target",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.TargetNames(cmd, toComplete)
+			return completer().TargetNames(cmd, toComplete)
 		})
 
 	profilesAddCmd.Flags().Int64Var(&profilesAddPriority, "priority", 0,

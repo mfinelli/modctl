@@ -23,8 +23,6 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -54,7 +52,7 @@ not immediately removed from disk; run 'modctl gc' to reclaim space.`,
 			return err
 		}
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -62,7 +60,7 @@ not immediately removed from disk; run 'modctl gc' to reclaim space.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.GameInstall(ctx, q, gamesBackupsDeleteGame)
+		gi, err := gameInstall(ctx, q, gamesBackupsDeleteGame)
 		if err != nil {
 			return err
 		}
@@ -109,12 +107,12 @@ func init() {
 		"Override the currently active game")
 	gamesBackupsDeleteCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 	gamesBackupsDeleteCmd.Flags().StringVarP(&gamesBackupsDeleteTarget, "target", "t", "",
 		"Install target (default: game_dir)")
 	gamesBackupsDeleteCmd.RegisterFlagCompletionFunc("target",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.TargetNames(cmd, toComplete)
+			return completer().TargetNames(cmd, toComplete)
 		})
 }

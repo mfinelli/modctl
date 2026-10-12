@@ -25,8 +25,6 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -51,12 +49,12 @@ provided.`,
 		if len(args) != 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return completion.GameInstallSelectors(cmd, toComplete)
+		return completer().GameInstallSelectors(cmd, toComplete)
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -78,7 +76,7 @@ provided.`,
 			return fmt.Errorf("list profiles: %w", err)
 		}
 
-		a, err := state.LoadActive()
+		a, err := state.LoadActive(stateDir())
 		if err != nil {
 			return err
 		}

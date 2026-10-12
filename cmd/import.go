@@ -105,10 +105,10 @@ Use --dry-run to preview what would be imported without making any changes.`,
 		style.Println(style.Success.Render("  ✓ bundle integrity OK"))
 		style.Println()
 
-		if err := database.EnsureExists(); err != nil {
+		if err := database.EnsureExists(databasePath()); err != nil {
 			return err
 		}
-		db, err := database.Setup()
+		db, err := database.Setup(databasePath())
 		if err != nil {
 			return fmt.Errorf("error setting up database: %w", err)
 		}
@@ -169,7 +169,7 @@ Use --dry-run to preview what would be imported without making any changes.`,
 				style.Println(style.Bold.Render("Importing (full)..."))
 				result, importErr = restore.Full(
 					ctx, db, q, bs, bundle, opts,
-					viper.GetString("database"),
+					databasePath(),
 					rootCmd.Version,
 					logger,
 				)

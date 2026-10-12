@@ -23,8 +23,6 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -48,7 +46,7 @@ The active game install (if any) is marked with an asterisk (*).`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -56,7 +54,7 @@ The active game install (if any) is marked with an asterisk (*).`,
 
 		// the active selection is what is marked in the list (and, without
 		// --all or --store, what decides which store to list)
-		active, err := state.LoadActive()
+		active, err := state.LoadActive(stateDir())
 		if err != nil {
 			return fmt.Errorf("load active selection: %w", err)
 		}
@@ -125,7 +123,7 @@ func init() {
 		"List games from the given store")
 	gamesListCmd.RegisterFlagCompletionFunc("store",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.StoreIDs(cmd, toComplete)
+			return completer().StoreIDs(cmd, toComplete)
 		})
 
 	gamesListCmd.MarkFlagsMutuallyExclusive("all", "store")
