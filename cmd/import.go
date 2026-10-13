@@ -75,7 +75,7 @@ Use --dry-run to preview what would be imported without making any changes.`,
 
 		// Open and validate bundle before touching the DB
 		style.Println(style.Bold.Render("Validating bundle..."))
-		bundle, err := restore.OpenAndValidate(ctx, bundlePath, scratchDir())
+		bundle, err := restore.OpenAndValidate(ctx, bundlePath, scratchDir(), Schema)
 		if err != nil {
 			return fmt.Errorf("invalid bundle: %w", err)
 		}
@@ -113,7 +113,7 @@ Use --dry-run to preview what would be imported without making any changes.`,
 		}
 		defer db.Close() // NB if we do a full restore we'll close this
 		//    twice, but it shouldn't be a problem
-		if err := database.Migrate(ctx, db); err != nil {
+		if err := Schema.Migrate(ctx, db); err != nil {
 			return fmt.Errorf("error migrating database: %w", err)
 		}
 
@@ -133,6 +133,7 @@ Use --dry-run to preview what would be imported without making any changes.`,
 			SameMachine:   importSameMachine,
 			Game:          importGame,
 			CacheDBPath:   nexusCacheDBPath(),
+			Schema:        Schema,
 		}
 
 		// Warn if bundle modctl version is newer

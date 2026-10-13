@@ -96,7 +96,7 @@ func Game(
 
 	// 1. Build the scoped SQLite database
 	scopedDBPath, dbSha256, archiveCount, backupCount, overrideCount, err := buildGameScopedDB(
-		ctx, q, gi, opts.SkipInventory, opts.ScratchDir,
+		ctx, q, gi, opts.SkipInventory, opts.ScratchDir, opts.Schema,
 	)
 	if err != nil {
 		return Result{}, fmt.Errorf("build game-scoped database: %w", err)
@@ -115,7 +115,7 @@ func Game(
 	}
 
 	// 2. Get schema version from source DB
-	schemaVersion, err := database.CurrentSchemaVersion(ctx, db)
+	schemaVersion, err := opts.Schema.CurrentVersion(ctx, db)
 	if err != nil {
 		return Result{}, fmt.Errorf("get schema version: %w", err)
 	}
@@ -204,14 +204,16 @@ func Game(
 }
 
 // buildGameScopedDB constructs a fresh SQLite database containing only rows
-// relevant to the given game install, in the directory scratchDir. Returns the
-// path to the temp file, the sha256 of the database, and blob counts.
+// relevant to the given game install, in the directory scratchDir, with the
+// schema schema. Returns the path to the temp file, the sha256 of the database,
+// and blob counts.
 func buildGameScopedDB(
 	ctx context.Context,
 	q *dbq.Queries,
 	gi dbq.GameInstall,
 	skipInventory bool,
 	scratchDir string,
+	schema *database.Schema,
 ) (path string, dbSha256 string, archiveCount int, backupCount int, overrideCount int, err error) {
 	tmp, err := os.CreateTemp(scratchDir, "modctl-export-*.sqlite")
 	if err != nil {
@@ -227,7 +229,7 @@ func buildGameScopedDB(
 	}
 	defer scopedDB.Close()
 
-	if err := database.Migrate(ctx, scopedDB); err != nil {
+	if err := schema.Migrate(ctx, scopedDB); err != nil {
 		os.Remove(tmpPath)
 		return "", "", 0, 0, 0, fmt.Errorf("migrate scoped db: %w", err)
 	}

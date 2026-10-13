@@ -19,7 +19,6 @@
 package database
 
 import (
-	"context"
 	"database/sql"
 	"os"
 	"path/filepath"
@@ -225,56 +224,5 @@ func TestSetupReadOnly(t *testing.T) {
 
 		assert.Error(t, db.Ping())
 		assert.NoFileExists(t, path)
-	})
-}
-
-// useMigrationsOfRepository has Migrations be the ones of the repository for the
-// length of a test, as they are in the binary. It changes something that is
-// global, so the tests that use it are not run in parallel.
-func useMigrationsOfRepository(t *testing.T) {
-	t.Helper()
-
-	old := Migrations
-	Migrations = os.DirFS("../..")
-	t.Cleanup(func() { Migrations = old })
-}
-
-func TestMigrations(t *testing.T) {
-	t.Run("there are none until there are some", func(t *testing.T) {
-		_, err := LatestSchemaVersion()
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no migrations are embedded")
-
-		db, err := sql.Open("sqlite3", ":memory:")
-		require.NoError(t, err)
-		defer db.Close()
-		_, err = GooseProvider(db)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no migrations are embedded")
-	})
-
-	t.Run("the ones that are set are the ones that are used", func(t *testing.T) {
-		useMigrationsOfRepository(t)
-
-		latest, err := LatestSchemaVersion()
-		require.NoError(t, err)
-		want, err := latestMigrationVersion(os.DirFS("../../migrations"))
-		require.NoError(t, err)
-		assert.Equal(t, want, latest)
-		assert.Positive(t, latest)
-
-		db, err := sql.Open("sqlite3", DSN(filepath.Join(t.TempDir(), "modctl.db"), false))
-		require.NoError(t, err)
-		defer db.Close()
-		require.NoError(t, Migrate(context.Background(), db))
-
-		current, err := CurrentSchemaVersion(context.Background(), db)
-		require.NoError(t, err)
-		assert.Equal(t, latest, current)
-	})
-
-	t.Run("they are only there for the length of the test", func(t *testing.T) {
-		_, err := LatestSchemaVersion()
-		require.Error(t, err)
 	})
 }

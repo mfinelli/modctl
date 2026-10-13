@@ -57,6 +57,10 @@ func Game(
 ) (Result, error) {
 	var res Result
 
+	if opts.Schema == nil {
+		return res, errors.New("no schema to restore the game with")
+	}
+
 	// Resolve game identity: opts.Game takes precedence (set when extracting
 	// a single game from a full bundle), otherwise use the bundle manifest.
 	var storeID, storeGameID, displayName string
@@ -76,7 +80,7 @@ func Game(
 	}
 
 	// Validate schema version
-	currentSchema, err := database.CurrentSchemaVersion(ctx, db)
+	currentSchema, err := opts.Schema.CurrentVersion(ctx, db)
 	if err != nil {
 		return res, fmt.Errorf("get current schema version: %w", err)
 	}

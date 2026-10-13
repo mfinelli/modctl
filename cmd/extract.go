@@ -73,7 +73,7 @@ Examples:
 
 		bundlePath := args[0]
 
-		bundle, err := restore.OpenAndValidate(ctx, bundlePath, scratchDir())
+		bundle, err := restore.OpenAndValidate(ctx, bundlePath, scratchDir(), Schema)
 		if err != nil {
 			return fmt.Errorf("invalid bundle: %w", err)
 		}

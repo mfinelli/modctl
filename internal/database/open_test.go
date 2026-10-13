@@ -26,7 +26,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -34,13 +33,7 @@ import (
 // migrateFromFiles is a migrate for openWith that applies the migrations of the
 // repository, which are not embedded in the binary of a test.
 func migrateFromFiles(ctx context.Context, db *sql.DB) error {
-	p, err := goose.NewProvider(goose.DialectSQLite3, db, os.DirFS("../../migrations"))
-	if err != nil {
-		return err
-	}
-
-	_, err = p.Up(ctx)
-	return err
+	return repositorySchema().Migrate(ctx, db)
 }
 
 // emptyDatabaseFile makes a database file that has nothing in it yet, which is
@@ -161,14 +154,29 @@ func TestOpenDB(t *testing.T) {
 		assert.Error(t, migrated.PingContext(ctx), "it is not left open")
 	})
 
-	t.Run("the migrations that are embedded are the ones that are used", func(t *testing.T) {
+	t.Run("the schema that is given is the one that is migrated to", func(t *testing.T) {
 		t.Parallel()
 
-		// Migrations is only filled in by the binary, so in a test there is
-		// nothing to migrate with, which is an error and not an empty schema
-		db, err := Open(ctx, emptyDatabaseFile(t))
+		db, err := repositorySchema().Open(ctx, emptyDatabaseFile(t))
+
+		require.NoError(t, err)
+		defer db.Close()
+		current, err := repositorySchema().CurrentVersion(ctx, db)
+		require.NoError(t, err)
+		latest, err := repositorySchema().LatestVersion()
+		require.NoError(t, err)
+		assert.Equal(t, latest, current)
+	})
+
+	t.Run("a schema that has no migrations is an error, and not an empty schema", func(t *testing.T) {
+		t.Parallel()
+
+		path := emptyDatabaseFile(t)
+
+		db, err := NewSchema(nil).Open(ctx, path)
 
 		require.Error(t, err)
 		assert.Nil(t, db)
+		assert.Contains(t, err.Error(), "no migrations are embedded")
 	})
 }

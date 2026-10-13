@@ -82,6 +82,7 @@ Examples:
 			NoVerify:      exportNoVerify,
 			CacheDBPath:   nexusCacheDBPath(),
 			ScratchDir:    scratchDir(),
+			Schema:        Schema,
 			Progress:      printExportProgress,
 		}
 

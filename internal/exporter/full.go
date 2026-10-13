@@ -113,7 +113,7 @@ func Full(
 	}
 
 	// 2. Get schema version
-	schemaVersion, err := database.CurrentSchemaVersion(ctx, db)
+	schemaVersion, err := opts.Schema.CurrentVersion(ctx, db)
 	if err != nil {
 		return Result{}, fmt.Errorf("get schema version: %w", err)
 	}

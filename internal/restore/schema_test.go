@@ -19,19 +19,36 @@
 package restore
 
 import (
-	"os"
+	"context"
 	"testing"
 
-	"github.com/mfinelli/modctl/internal/database"
+	"github.com/mfinelli/modctl/dbq"
+	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/testbuilder"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// The restores migrate the databases that they make, with the migrations that
-// are embedded in the binary, which a test does not have. They are the ones of
-// the repository for all of the tests, set before any of them runs: they are
-// not set by each test, since that would change something that is global while
-// the other tests are using it.
-func TestMain(m *testing.M) {
-	database.Migrations = testbuilder.MigrationsFS()
-	os.Exit(m.Run())
+func TestFullNeedsASchema(t *testing.T) {
+	t.Parallel()
+
+	db := testbuilder.SetupDB(t)
+
+	res, err := Full(context.Background(), db, dbq.New(db), blobstore.Store{}, nil, Options{Force: true}, "", "test", quietLogger())
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no schema")
+	assert.Equal(t, Result{}, res)
+}
+
+func TestGameNeedsASchema(t *testing.T) {
+	t.Parallel()
+
+	db := testbuilder.SetupDB(t)
+
+	res, err := Game(context.Background(), db, dbq.New(db), blobstore.Store{}, nil, Options{Force: true}, "test", quietLogger())
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no schema")
+	assert.Equal(t, Result{}, res)
 }

@@ -129,7 +129,7 @@ func TestGameImportsTargetsDisabled(t *testing.T) {
 	g := targetsOfABundle(t, bundleDB)
 	bundle := testBundle(t, bundleDB, g.game, exporter.ExportKindGame)
 
-	res, err := Game(ctx, dest, dbq.New(dest), blobstore.Store{}, bundle, Options{SkipInventory: true}, "test", quietLogger())
+	res, err := Game(ctx, dest, dbq.New(dest), blobstore.Store{}, bundle, Options{Schema: testbuilder.Schema(), SkipInventory: true}, "test", quietLogger())
 
 	require.NoError(t, err)
 	got := targetStates(t, dest)
@@ -175,7 +175,7 @@ func TestFullImportsTargetsDisabledUnlessItIsTheSameMachine(t *testing.T) {
 			_, err := bundleDB.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`)
 			require.NoError(t, err)
 
-			res, err := Full(ctx, f.db, dbq.New(f.db), blobstore.Store{}, f.bundle, Options{Force: true, SameMachine: tc.sameMachine}, f.dbPath, "test", quietLogger())
+			res, err := Full(ctx, f.db, dbq.New(f.db), blobstore.Store{}, f.bundle, Options{Schema: testbuilder.Schema(), Force: true, SameMachine: tc.sameMachine}, f.dbPath, "test", quietLogger())
 
 			require.NoError(t, err)
 			restored, err := sql.Open("sqlite3", databaseDSN(f.dbPath))

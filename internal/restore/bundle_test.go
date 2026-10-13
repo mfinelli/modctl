@@ -31,7 +31,6 @@ import (
 	"github.com/klauspost/compress/zstd"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/blobstore"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/exporter"
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/testbuilder"
@@ -40,9 +39,8 @@ import (
 )
 
 // The bundles that are opened here are the ones that the exporter makes, so what
-// is tested is the way there and back. They are in this package because the
-// export migrates a database too, which needs the migrations that TestMain
-// has set up for the tests of this package.
+// is tested is the way there and back: that is why the tests of the export that
+// need what is opened are in this package, and not in the one of the exporter.
 
 // exportOptions are the options of an export to a bundle in a directory of the
 // test, whose snapshots are made in scratch.
@@ -55,6 +53,7 @@ func exportOptions(t *testing.T, scratch string) exporter.Options {
 		// there is no cache of what Nexus Mods said, unless a test makes one
 		CacheDBPath: filepath.Join(t.TempDir(), "nexus_cache.db"),
 		ScratchDir:  scratch,
+		Schema:      testbuilder.Schema(),
 	}
 }
 
@@ -141,11 +140,11 @@ func TestExportThenOpenAndValidate(t *testing.T) {
 		require.NoError(t, err)
 		assertEmpty(t, scratch, "what the export made in the scratch directory is gone")
 
-		bundle, err := OpenAndValidate(ctx, opts.OutputPath, scratch)
+		bundle, err := OpenAndValidate(ctx, opts.OutputPath, scratch, testbuilder.Schema())
 		require.NoError(t, err)
 		defer bundle.Close()
 
-		latest, err := database.LatestSchemaVersion()
+		latest, err := testbuilder.Schema().LatestVersion()
 		require.NoError(t, err)
 		assert.Equal(t, exporter.ExportKindFull, bundle.Manifest.ExportKind)
 		assert.Equal(t, "9.9.9", bundle.Manifest.ModctlVersion)
@@ -167,7 +166,7 @@ func TestExportThenOpenAndValidate(t *testing.T) {
 		require.NoError(t, err)
 		assertEmpty(t, scratch, "what the export made in the scratch directory is gone")
 
-		bundle, err := OpenAndValidate(ctx, opts.OutputPath, scratch)
+		bundle, err := OpenAndValidate(ctx, opts.OutputPath, scratch, testbuilder.Schema())
 		require.NoError(t, err)
 		defer bundle.Close()
 
@@ -194,7 +193,7 @@ func TestExportThenOpenAndValidate(t *testing.T) {
 		require.NoError(t, err)
 		assertEmpty(t, scratch, "the snapshot of the cache is gone, too")
 
-		bundle, err := OpenAndValidate(ctx, opts.OutputPath, scratch)
+		bundle, err := OpenAndValidate(ctx, opts.OutputPath, scratch, testbuilder.Schema())
 		require.NoError(t, err)
 		defer bundle.Close()
 
@@ -211,7 +210,7 @@ func TestExportThenOpenAndValidate(t *testing.T) {
 		opts := exportOptions(t, scratch)
 		_, err := exporter.Full(ctx, db, dbq.New(db), storeInTestDir(t), opts)
 		require.NoError(t, err)
-		bundle, err := OpenAndValidate(ctx, opts.OutputPath, scratch)
+		bundle, err := OpenAndValidate(ctx, opts.OutputPath, scratch, testbuilder.Schema())
 		require.NoError(t, err)
 		require.DirExists(t, bundle.BundleDir)
 
@@ -268,6 +267,66 @@ func TestExportNeedsAScratchDirectory(t *testing.T) {
 	}
 }
 
+func TestExportNeedsASchema(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	t.Run("full without one is an error, and nothing is made", func(t *testing.T) {
+		t.Parallel()
+
+		db, _ := testbuilder.SetupDBFile(t)
+		opts := exportOptions(t, t.TempDir())
+		opts.Schema = nil
+
+		_, err := exporter.Full(ctx, db, dbq.New(db), storeInTestDir(t), opts)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no schema")
+		assert.NoFileExists(t, opts.OutputPath)
+	})
+
+	t.Run("game without one is an error, and nothing is made", func(t *testing.T) {
+		t.Parallel()
+
+		db, _ := testbuilder.SetupDBFile(t)
+		gi := testbuilder.NewGame(t, db).Build()
+		opts := exportOptions(t, t.TempDir())
+		opts.Schema = nil
+
+		_, err := exporter.Game(ctx, db, dbq.New(db), storeInTestDir(t), gi, opts)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no schema")
+		assert.NoFileExists(t, opts.OutputPath)
+	})
+
+	t.Run("what is exported is at the version of the schema that it is given", func(t *testing.T) {
+		t.Parallel()
+
+		db, _ := testbuilder.SetupDBFile(t)
+		gi := testbuilder.NewGame(t, db).Build()
+		scratch := t.TempDir()
+		opts := exportOptions(t, scratch)
+
+		_, err := exporter.Game(ctx, db, dbq.New(db), storeInTestDir(t), gi, opts)
+		require.NoError(t, err)
+		bundle, err := OpenAndValidate(ctx, opts.OutputPath, scratch, opts.Schema)
+		require.NoError(t, err)
+		defer bundle.Close()
+
+		// the database of the bundle is only read, so what it says it is at is
+		// read from the migrations that were applied to it
+		var applied int64
+		require.NoError(t, bundle.BundleDB.QueryRow(
+			`SELECT MAX(version_id) FROM schema_migrations WHERE is_applied`).Scan(&applied))
+		latest, err := opts.Schema.LatestVersion()
+		require.NoError(t, err)
+		assert.Equal(t, latest, applied, "the database of a game is made with the schema")
+		assert.Equal(t, latest, bundle.Manifest.SchemaVersion)
+	})
+}
+
 func TestOpenAndValidate(t *testing.T) {
 	t.Parallel()
 
@@ -279,11 +338,24 @@ func TestOpenAndValidate(t *testing.T) {
 
 		bundle := writeBundle(t)
 
-		got, err := OpenAndValidate(ctx, bundle, "")
+		got, err := OpenAndValidate(ctx, bundle, "", testbuilder.Schema())
 
 		require.Error(t, err)
 		assert.Nil(t, got)
 		assert.Contains(t, err.Error(), "no scratch directory")
+	})
+
+	t.Run("without a schema it is an error, and nothing is left", func(t *testing.T) {
+		t.Parallel()
+
+		scratch := t.TempDir()
+
+		got, err := OpenAndValidate(ctx, writeBundle(t), scratch, nil)
+
+		require.Error(t, err)
+		assert.Nil(t, got)
+		assert.Contains(t, err.Error(), "no schema")
+		assertEmpty(t, scratch)
 	})
 
 	t.Run("a scratch directory that is not there is an error that says so", func(t *testing.T) {
@@ -291,7 +363,7 @@ func TestOpenAndValidate(t *testing.T) {
 
 		bundle := writeBundle(t)
 
-		got, err := OpenAndValidate(ctx, bundle, filepath.Join(t.TempDir(), "not-there"))
+		got, err := OpenAndValidate(ctx, bundle, filepath.Join(t.TempDir(), "not-there"), testbuilder.Schema())
 
 		require.Error(t, err)
 		assert.Nil(t, got)
@@ -303,7 +375,7 @@ func TestOpenAndValidate(t *testing.T) {
 
 		scratch := t.TempDir()
 
-		got, err := OpenAndValidate(ctx, filepath.Join(t.TempDir(), "nothing.tar.zst"), scratch)
+		got, err := OpenAndValidate(ctx, filepath.Join(t.TempDir(), "nothing.tar.zst"), scratch, testbuilder.Schema())
 
 		require.Error(t, err)
 		assert.Nil(t, got)
@@ -318,7 +390,7 @@ func TestOpenAndValidate(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("this is not zstd"), 0o644))
 		scratch := t.TempDir()
 
-		got, err := OpenAndValidate(ctx, path, scratch)
+		got, err := OpenAndValidate(ctx, path, scratch, testbuilder.Schema())
 
 		require.Error(t, err)
 		assert.Nil(t, got)
@@ -392,7 +464,7 @@ func TestOpenAndValidate(t *testing.T) {
 
 			scratch := t.TempDir()
 
-			got, err := OpenAndValidate(ctx, writeBundle(t, tc.entries(t)...), scratch)
+			got, err := OpenAndValidate(ctx, writeBundle(t, tc.entries(t)...), scratch, testbuilder.Schema())
 
 			require.Error(t, err)
 			assert.Nil(t, got)
@@ -413,7 +485,7 @@ func TestOpenAndValidate(t *testing.T) {
 			bundleEntry{"../../../escaped-too.txt", []byte("not here")},
 		)
 
-		_, err := OpenAndValidate(ctx, bundle, scratch)
+		_, err := OpenAndValidate(ctx, bundle, scratch, testbuilder.Schema())
 
 		require.Error(t, err, "there is no manifest in it")
 		assert.NoFileExists(t, filepath.Join(parent, "escaped.txt"))

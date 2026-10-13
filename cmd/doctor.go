@@ -177,7 +177,7 @@ func checkDb(ctx context.Context) error {
 	style.Println(style.Success.Render("  ✓ basic query OK (SELECT 1)"))
 
 	// 3) migrations status
-	p, err := database.GooseProvider(db)
+	p, err := Schema.Provider(db)
 	if err != nil {
 		// if we can't determine migration state treat it as fatal
 		style.Println(style.Failure.Render("  ✗ could not determine migration status"))

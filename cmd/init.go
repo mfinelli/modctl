@@ -78,7 +78,7 @@ multiple times and will not overwrite existing data.`,
 		}
 		defer db.Close()
 
-		err = database.Migrate(ctx, db)
+		err = Schema.Migrate(ctx, db)
 		if err != nil {
 			return fmt.Errorf("error migrating database: %w", err)
 		}

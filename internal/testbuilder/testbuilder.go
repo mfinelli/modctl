@@ -22,7 +22,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -31,7 +30,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/pressly/goose/v3"
-	goosedb "github.com/pressly/goose/v3/database"
 	"github.com/stretchr/testify/require"
 )
 
@@ -78,48 +76,23 @@ func SetupDBFile(t *testing.T) (*sql.DB, string) {
 func NewProvider(t *testing.T, db *sql.DB) *goose.Provider {
 	t.Helper()
 
-	fsys := os.DirFS(findMigrationsDir(t))
-
-	base, err := goosedb.NewStore(goosedb.DialectSQLite3, "schema_migrations")
-	require.NoError(t, err, "create goose store")
-
-	p, err := goose.NewProvider(goose.DialectCustom, db, fsys,
-		goose.WithStore(&database.SqliteStore{Store: base}),
-	)
+	p, err := Schema().Provider(db)
 	require.NoError(t, err, "create goose provider")
 
 	return p
 }
 
-// MigrationsFS is what main gives to database.Migrations in the binary: the
-// repository, which has its migrations in a "migrations" directory. The
-// embedded copy is not there in a test, so a package whose tests need to
-// migrate a database sets this once, in its TestMain, before any test runs:
-//
-//	func TestMain(m *testing.M) {
-//		database.Migrations = testbuilder.MigrationsFS()
-//		os.Exit(m.Run())
-//	}
-//
-// It is not set by a test for as long as the test runs, since that is a change
-// of something that is global, which the tests that run at the same time would
-// see.
-func MigrationsFS() fs.FS {
+// Schema is the schema of the repository: what main makes with the migrations
+// that are embedded in the binary, which a test does not have, so it is made
+// with the migrations in the directory that they are in. A test gives it to
+// what migrates a database, since nothing finds one by itself.
+func Schema() *database.Schema {
 	dir, err := migrationsDir()
 	if err != nil {
 		panic(err)
 	}
 
-	return os.DirFS(filepath.Dir(dir))
-}
-
-func findMigrationsDir(t *testing.T) string {
-	t.Helper()
-
-	dir, err := migrationsDir()
-	require.NoError(t, err)
-
-	return dir
+	return database.NewSchema(os.DirFS(filepath.Dir(dir)))
 }
 
 func migrationsDir() (string, error) {

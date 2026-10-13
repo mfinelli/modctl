@@ -59,7 +59,7 @@ func TestGameImportsABundle(t *testing.T) {
 	inBundle := newBundleGame(t, bundleDB, "1")
 	bundle := testBundle(t, bundleDB, inBundle.game, exporter.ExportKindGame)
 
-	res, err := Game(ctx, dest, dbq.New(dest), blobstore.Store{}, bundle, Options{SkipInventory: true}, "test", quietLogger())
+	res, err := Game(ctx, dest, dbq.New(dest), blobstore.Store{}, bundle, Options{Schema: testbuilder.Schema(), SkipInventory: true}, "test", quietLogger())
 
 	require.NoError(t, err)
 	newID, err := gameInstallID(t, dbq.New(dest), inBundle.game)
@@ -95,7 +95,7 @@ func TestGameWithAGameThatIsThere(t *testing.T) {
 
 		dest, existing, bundle, _ := newBundle(t)
 
-		_, err := Game(ctx, dest, existing.q, blobstore.Store{}, bundle, Options{SkipInventory: true}, "test", quietLogger())
+		_, err := Game(ctx, dest, existing.q, blobstore.Store{}, bundle, Options{Schema: testbuilder.Schema(), SkipInventory: true}, "test", quietLogger())
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "already exists; use --force")
@@ -110,7 +110,7 @@ func TestGameWithAGameThatIsThere(t *testing.T) {
 
 		dest, existing, bundle, inBundle := newBundle(t)
 
-		_, err := Game(ctx, dest, existing.q, blobstore.Store{}, bundle, Options{Force: true, SkipInventory: true}, "test", quietLogger())
+		_, err := Game(ctx, dest, existing.q, blobstore.Store{}, bundle, Options{Schema: testbuilder.Schema(), Force: true, SkipInventory: true}, "test", quietLogger())
 
 		require.NoError(t, err)
 		id, getErr := gameInstallID(t, existing.q, inBundle.game)
@@ -149,7 +149,7 @@ func TestGameThatCannotBeImportedToTheEndChangesNothing(t *testing.T) {
 	inBundle.override("user.cfg")
 	bundle := testBundle(t, bundleDB, inBundle.game, exporter.ExportKindGame)
 
-	_, err := Game(ctx, dest, existing.q, blobstore.Store{}, bundle, Options{Force: true, SkipInventory: true}, "test", quietLogger())
+	_, err := Game(ctx, dest, existing.q, blobstore.Store{}, bundle, Options{Schema: testbuilder.Schema(), Force: true, SkipInventory: true}, "test", quietLogger())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "import overrides", "that is where it failed")

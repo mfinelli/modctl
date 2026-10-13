@@ -35,6 +35,12 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Schema is the schema of the database, which main makes with the migrations
+// that are embedded in the binary (they are not in a directory that
+// internal/database can embed them from). It is what every command that migrates
+// a database brings it to.
+var Schema *database.Schema
+
 // The packages in internal/ are given what they work on: they don't look for
 // the database, or the directory of the state, by themselves. This is where the
 // commands get it from, for what they do all the time, so that a command
@@ -86,7 +92,7 @@ func userDirs() internal.UserDirs {
 // openDB opens the database that is configured, which has to be there (it is
 // made by init) and is migrated to the latest schema. The caller closes it.
 func openDB(ctx context.Context) (*sql.DB, error) {
-	return database.Open(ctx, databasePath())
+	return Schema.Open(ctx, databasePath())
 }
 
 // gameInstall resolves the game install that a command is for, from what it was

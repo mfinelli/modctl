@@ -21,6 +21,7 @@ package restore
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -48,8 +49,12 @@ func Full(
 ) (Result, error) {
 	var res Result
 
+	if opts.Schema == nil {
+		return res, errors.New("no schema to restore the database with")
+	}
+
 	// Validate schema version
-	currentSchema, err := database.CurrentSchemaVersion(ctx, db)
+	currentSchema, err := opts.Schema.CurrentVersion(ctx, db)
 	if err != nil {
 		return res, fmt.Errorf("get current schema version: %w", err)
 	}
@@ -119,7 +124,7 @@ func Full(
 		return res, fmt.Errorf("reopen database: %w", err)
 	}
 	defer newDB.Close()
-	if err := database.Migrate(ctx, newDB); err != nil {
+	if err := opts.Schema.Migrate(ctx, newDB); err != nil {
 		return res, fmt.Errorf("migrate restored database: %w", err)
 	}
 	newQ := dbq.New(newDB)

@@ -31,7 +31,6 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/blobstore"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/exporter"
 	"github.com/mfinelli/modctl/internal/testbuilder"
 	"github.com/stretchr/testify/assert"
@@ -305,7 +304,7 @@ func TestValidateFullPaths(t *testing.T) {
 func testBundle(t *testing.T, bundleDB *sql.DB, game dbq.GameInstall, kind exporter.ExportKind) *Bundle {
 	t.Helper()
 
-	latest, err := database.LatestSchemaVersion()
+	latest, err := testbuilder.Schema().LatestVersion()
 	require.NoError(t, err)
 
 	return &Bundle{
@@ -346,6 +345,7 @@ func TestGameRefusesAnUnsafeBundle(t *testing.T) {
 	bundle := testBundle(t, bundleDB, inBundle.game, exporter.ExportKindGame)
 
 	for _, opts := range []Options{{Force: true}, {Force: true, DryRun: true}, {}} {
+		opts.Schema = testbuilder.Schema()
 		_, err := Game(ctx, dest, existing.q, blobstore.Store{}, bundle, opts, "test", quietLogger())
 
 		require.ErrorIs(t, err, ErrUnsafePaths, "%+v", opts)
@@ -375,7 +375,7 @@ func TestGameLetsASafeBundleBeLookedAt(t *testing.T) {
 	inBundle.override("user.cfg")
 	bundle := testBundle(t, bundleDB, inBundle.game, exporter.ExportKindGame)
 
-	_, err := Game(ctx, dest, dbq.New(dest), blobstore.Store{}, bundle, Options{DryRun: true}, "test", quietLogger())
+	_, err := Game(ctx, dest, dbq.New(dest), blobstore.Store{}, bundle, Options{Schema: testbuilder.Schema(), DryRun: true}, "test", quietLogger())
 
 	assert.NoError(t, err)
 }
@@ -390,10 +390,10 @@ func TestFullRefusesAnUnsafeBundle(t *testing.T) {
 		fill func(g *bundleGame)
 		opts Options
 	}{
-		{"an override", func(g *bundleGame) { g.override("../escape.cfg") }, Options{Force: true}},
-		{"an override, in a dry run", func(g *bundleGame) { g.override("../escape.cfg") }, Options{DryRun: true}},
-		{"a backup that is kept", func(g *bundleGame) { g.backup("../escape.cfg") }, Options{Force: true, SameMachine: true}},
-		{"a file that is installed and kept", func(g *bundleGame) { g.installed("../escape.cfg") }, Options{Force: true, SameMachine: true}},
+		{"an override", func(g *bundleGame) { g.override("../escape.cfg") }, Options{Schema: testbuilder.Schema(), Force: true}},
+		{"an override, in a dry run", func(g *bundleGame) { g.override("../escape.cfg") }, Options{Schema: testbuilder.Schema(), DryRun: true}},
+		{"a backup that is kept", func(g *bundleGame) { g.backup("../escape.cfg") }, Options{Schema: testbuilder.Schema(), Force: true, SameMachine: true}},
+		{"a file that is installed and kept", func(g *bundleGame) { g.installed("../escape.cfg") }, Options{Schema: testbuilder.Schema(), Force: true, SameMachine: true}},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
