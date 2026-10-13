@@ -27,6 +27,7 @@ import (
 
 	"github.com/adrg/xdg"
 	"github.com/mfinelli/modctl/dbq"
+	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
@@ -69,6 +70,17 @@ func nexusCacheDBPath() string {
 // which is not where a bundle that is as big as all of the mods has to go.
 func scratchDir() string {
 	return os.TempDir()
+}
+
+// userDirs are the directories of the user that the stores are looked for in.
+func userDirs() internal.UserDirs {
+	// a user that has no home has nothing in it to look for
+	home, _ := os.UserHomeDir()
+
+	return internal.UserDirs{
+		Home:     home,
+		DataHome: xdg.DataHome,
+	}
 }
 
 // openDB opens the database that is configured, which has to be there (it is

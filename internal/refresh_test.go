@@ -293,6 +293,11 @@ func writeVDF(t *testing.T, root, content string) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "libraryfolders.vdf"), []byte(content), 0o644))
 }
 
+// testHome is the home directory of the user in the tests of discovery, which
+// is not a directory that is there: what is looked at is in the directories of
+// the test, and none of it is under the home.
+const testHome = "/home/tester"
+
 func TestDiscoverSteamLibrariesIn(t *testing.T) {
 	t.Parallel()
 
@@ -304,7 +309,7 @@ func TestDiscoverSteamLibrariesIn(t *testing.T) {
 		ext := filepath.Join(dir, "games")
 		writeSteamRoot(t, root, root, ext)
 
-		got := discoverSteamLibrariesIn([]string{root})
+		got := discoverSteamLibrariesIn([]string{root}, testHome)
 
 		assert.True(t, got.DidScan)
 		assert.Equal(t, sortedPaths(ext, root), got.Libs, "in order of path")
@@ -315,7 +320,7 @@ func TestDiscoverSteamLibrariesIn(t *testing.T) {
 	t.Run("a place that is not a Steam installation is passed over", func(t *testing.T) {
 		t.Parallel()
 
-		got := discoverSteamLibrariesIn([]string{filepath.Join(t.TempDir(), "nothing")})
+		got := discoverSteamLibrariesIn([]string{filepath.Join(t.TempDir(), "nothing")}, testHome)
 
 		assert.False(t, got.DidScan)
 		assert.Empty(t, got.Libs)
@@ -325,7 +330,7 @@ func TestDiscoverSteamLibrariesIn(t *testing.T) {
 	t.Run("no places at all", func(t *testing.T) {
 		t.Parallel()
 
-		got := discoverSteamLibrariesIn(nil)
+		got := discoverSteamLibrariesIn(nil, testHome)
 
 		assert.False(t, got.DidScan)
 		assert.Empty(t, got.Libs)
@@ -342,7 +347,7 @@ func TestDiscoverSteamLibrariesIn(t *testing.T) {
 		writeSteamRoot(t, native, native, shared)
 		writeSteamRoot(t, flatpak, flatpak, shared)
 
-		got := discoverSteamLibrariesIn([]string{flatpak, native})
+		got := discoverSteamLibrariesIn([]string{flatpak, native}, testHome)
 
 		assert.Equal(t, []string{flatpak, native}, got.Roots)
 		assert.Equal(t, sortedPaths(flatpak, native, shared), got.Libs, "a library that both list is there once")
@@ -357,7 +362,7 @@ func TestDiscoverSteamLibrariesIn(t *testing.T) {
 		link := filepath.Join(dir, "link-to-steam")
 		require.NoError(t, os.Symlink(root, link))
 
-		got := discoverSteamLibrariesIn([]string{root, link})
+		got := discoverSteamLibrariesIn([]string{root, link}, testHome)
 
 		assert.Equal(t, []string{root}, got.Roots)
 		assert.Equal(t, []string{root}, got.Libs)
@@ -372,7 +377,7 @@ func TestDiscoverSteamLibrariesIn(t *testing.T) {
 		require.NoError(t, os.MkdirAll(ext, 0o755))
 		writeSteamRoot(t, root, root+"/", ext+"/", filepath.Join(ext, "..", "games"))
 
-		got := discoverSteamLibrariesIn([]string{root})
+		got := discoverSteamLibrariesIn([]string{root}, testHome)
 
 		assert.Equal(t, sortedPaths(ext, root), got.Libs)
 	})
@@ -383,7 +388,7 @@ func TestDiscoverSteamLibrariesIn(t *testing.T) {
 		root := filepath.Join(t.TempDir(), "Steam")
 		writeVDF(t, root, "not vdf at all <<<>>>")
 
-		got := discoverSteamLibrariesIn([]string{root})
+		got := discoverSteamLibrariesIn([]string{root}, testHome)
 
 		assert.False(t, got.DidScan)
 		assert.Empty(t, got.Roots)
@@ -397,7 +402,7 @@ func TestDiscoverSteamLibrariesIn(t *testing.T) {
 		root := filepath.Join(t.TempDir(), "Steam")
 		writeVDF(t, root, "\"libraryfolders\"\n{\n}\n")
 
-		got := discoverSteamLibrariesIn([]string{root})
+		got := discoverSteamLibrariesIn([]string{root}, testHome)
 
 		assert.True(t, got.DidScan)
 		assert.Empty(t, got.Libs)
@@ -416,7 +421,7 @@ func TestDiscoverSteamLibrariesIn(t *testing.T) {
 		last := filepath.Join(dir, "Z-games")
 		writeSteamRoot(t, root, root, last, first)
 
-		found := discoverSteamLibrariesIn([]string{root})
+		found := discoverSteamLibrariesIn([]string{root}, testHome)
 		got := assignSteamInstanceIDs(found.Libs, found.Roots, nil, nil)
 
 		assert.Equal(t, map[string]string{
@@ -1090,7 +1095,7 @@ func TestDiscoverSteamLibrariesInContentIDs(t *testing.T) {
 			steamLibraryEntry{Path: ext, ContentID: "-222"},
 			steamLibraryEntry{Path: bare})
 
-		got := discoverSteamLibrariesIn([]string{root})
+		got := discoverSteamLibrariesIn([]string{root}, testHome)
 
 		assert.Equal(t, map[string]string{root: "111", ext: "-222"}, got.ContentIDs)
 		assert.Equal(t, sortedPaths(root, ext, bare), got.Libs)
@@ -1104,7 +1109,7 @@ func TestDiscoverSteamLibrariesInContentIDs(t *testing.T) {
 		root := filepath.Join(dir, "Steam")
 		writeSteamRoot(t, root, root)
 
-		got := discoverSteamLibrariesIn([]string{root})
+		got := discoverSteamLibrariesIn([]string{root}, testHome)
 
 		assert.Empty(t, got.ContentIDs)
 	})
@@ -1123,7 +1128,7 @@ func TestDiscoverSteamLibrariesInContentIDs(t *testing.T) {
 			steamLibraryEntry{Path: flatpak, ContentID: "2"},
 			steamLibraryEntry{Path: shared, ContentID: "9"})
 
-		got := discoverSteamLibrariesIn([]string{native, flatpak})
+		got := discoverSteamLibrariesIn([]string{native, flatpak}, testHome)
 
 		assert.Equal(t, map[string]string{native: "1", flatpak: "2", shared: "9"}, got.ContentIDs)
 		assert.Empty(t, got.Warnings, "it is one library, not two that look alike")
@@ -1139,7 +1144,7 @@ func TestDiscoverSteamLibrariesInContentIDs(t *testing.T) {
 		writeSteamRootWithIDs(t, native, steamLibraryEntry{Path: shared, ContentID: "9"})
 		writeSteamRootWithIDs(t, flatpak, steamLibraryEntry{Path: shared, ContentID: "10"})
 
-		got := discoverSteamLibrariesIn([]string{native, flatpak})
+		got := discoverSteamLibrariesIn([]string{native, flatpak}, testHome)
 
 		assert.Equal(t, "9", got.ContentIDs[shared])
 		require.Len(t, got.Warnings, 1)
@@ -1159,7 +1164,7 @@ func TestDiscoverSteamLibrariesInContentIDs(t *testing.T) {
 			steamLibraryEntry{Path: b, ContentID: "77"},
 			steamLibraryEntry{Path: a, ContentID: "77"})
 
-		got := discoverSteamLibrariesIn([]string{root})
+		got := discoverSteamLibrariesIn([]string{root}, testHome)
 
 		assert.Equal(t, "77", got.ContentIDs[a])
 		assert.Equal(t, "77", got.ContentIDs[b])

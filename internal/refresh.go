@@ -31,7 +31,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/adrg/xdg"
 	"github.com/andygrunwald/vdf"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/database"
@@ -156,10 +155,25 @@ type steamInstall struct {
 	steamappsDir string // e.g. ~/.local/share/Steam/steamapps
 }
 
-// ScanStores rescans every enabled store and updates the game installs in the
-// database. It prints nothing: what it found is in the result. If it fails
-// part way, the result still holds the warnings found up to then.
-func ScanStores(ctx context.Context, db *sql.DB) (RefreshResult, error) {
+// UserDirs are the directories of the user that the stores are looked for in.
+// They are what a store is told, and not something that it finds out: a scan
+// looks nowhere that it is not told to, so a test can have a user of its own.
+type UserDirs struct {
+	// Home is the home directory of the user, which is what "~" is in the
+	// paths that the stores keep. It is empty for a user that has none, and
+	// then what is in it is not looked for.
+	Home string
+
+	// DataHome is the directory for the data of the programs of the user
+	// ($XDG_DATA_HOME). It is empty if it is not known.
+	DataHome string
+}
+
+// ScanStores rescans every enabled store, in the directories of the user dirs,
+// and updates the game installs in the database. It prints nothing: what it
+// found is in the result. If it fails part way, the result still holds the
+// warnings found up to then.
+func ScanStores(ctx context.Context, db *sql.DB, dirs UserDirs) (RefreshResult, error) {
 	q := dbq.New(db)
 	stores, err := q.ListEnabledStores(ctx)
 	if err != nil {
@@ -170,7 +184,7 @@ func ScanStores(ctx context.Context, db *sql.DB) (RefreshResult, error) {
 	for _, store := range stores {
 		switch store.Implementation {
 		case "steam":
-			result, err := refreshSteam(ctx, db, q)
+			result, err := refreshSteam(ctx, db, q, dirs)
 
 			combined.New = append(combined.New, result.New...)
 			combined.Updated = append(combined.Updated, result.Updated...)
@@ -192,8 +206,8 @@ func ScanStores(ctx context.Context, db *sql.DB) (RefreshResult, error) {
 	return combined, nil
 }
 
-func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries) (RefreshResult, error) {
-	steam, err := discoverSteamLibraries()
+func refreshSteam(ctx context.Context, db *sql.DB, q *dbq.Queries, dirs UserDirs) (RefreshResult, error) {
+	steam, err := discoverSteamLibraries(dirs)
 	if err != nil {
 		return RefreshResult{Warnings: steam.Warnings},
 			fmt.Errorf("error scanning for steam libraries: %w", err)
@@ -323,14 +337,17 @@ type steamLibraries struct {
 }
 
 // discoverSteamLibraries finds Steam library roots by locating and parsing
-// steamapps/libraryfolders.vdf from common Steam installation roots.
-func discoverSteamLibraries() (steamLibraries, error) {
-	return discoverSteamLibrariesIn(candidateSteamRoots()), nil
+// steamapps/libraryfolders.vdf from common Steam installation roots, which are
+// in the directories of the user dirs.
+func discoverSteamLibraries(dirs UserDirs) (steamLibraries, error) {
+	return discoverSteamLibrariesIn(candidateSteamRoots(dirs), dirs.Home), nil
 }
 
 // discoverSteamLibrariesIn is discoverSteamLibraries for the given places to
-// look for Steam installations, instead of the usual ones.
-func discoverSteamLibrariesIn(candidates []string) steamLibraries {
+// look for Steam installations, instead of the usual ones. A "~" in them, or
+// in the paths of the libraries that the installations list, is the directory
+// home.
+func discoverSteamLibrariesIn(candidates []string, home string) steamLibraries {
 	seenRoots := make(map[string]struct{}, len(candidates))
 
 	didScan := false
@@ -341,7 +358,7 @@ func discoverSteamLibrariesIn(candidates []string) steamLibraries {
 	// Deduplicate candidate roots (after best-effort canonicalization)
 	var uniqRoots []string
 	for _, r := range candidates {
-		r = expandHome(r)
+		r = expandHome(r, home)
 		canon, err := canonicalizePathBestEffort(r)
 		if err != nil {
 			// root canonicalization failure isn't fatal; keep cleaned absolute
@@ -397,7 +414,7 @@ func discoverSteamLibrariesIn(candidates []string) steamLibraries {
 			if p == "" {
 				continue
 			}
-			p = expandHome(p)
+			p = expandHome(p, home)
 			canon, cerr := canonicalizePathBestEffort(p)
 			if cerr != nil {
 				// best-effort: still include cleaned absolute-ish path
@@ -977,32 +994,42 @@ func canonicalizePathBestEffort(p string) (string, error) {
 	return p, nil
 }
 
-func candidateSteamRoots() []string {
-	home, _ := os.UserHomeDir()
+// candidateSteamRoots are the places that Steam is installed in, for the user
+// with the directories dirs, in the order that they are preferred in. What is
+// under a directory that is not known is not a place.
+func candidateSteamRoots(dirs UserDirs) []string {
+	var roots []string
 
 	// Primary: XDG data home + Steam
-	roots := []string{
-		filepath.Join(xdg.DataHome, "Steam"),
-		// Common non-XDG path still seen in the wild:
-		filepath.Join(home, ".local", "share", "Steam"),
-		// Legacy symlink-style installs:
-		filepath.Join(home, ".steam", "steam"),
-		// Flatpak Steam:
-		filepath.Join(home, ".var", "app", "com.valvesoftware.Steam", "data", "Steam"),
+	if dirs.DataHome != "" {
+		roots = append(roots, filepath.Join(dirs.DataHome, "Steam"))
+	}
+
+	if dirs.Home != "" {
+		roots = append(roots,
+			// Common non-XDG path still seen in the wild:
+			filepath.Join(dirs.Home, ".local", "share", "Steam"),
+			// Legacy symlink-style installs:
+			filepath.Join(dirs.Home, ".steam", "steam"),
+			// Flatpak Steam:
+			filepath.Join(dirs.Home, ".var", "app", "com.valvesoftware.Steam", "data", "Steam"),
+		)
 	}
 
 	return roots
 }
 
-func expandHome(p string) string {
+// expandHome is p, with the home directory home for the "~" that it starts
+// with (and not for "~user", which is somebody else's). A path that does not
+// start with one, or a home that is not known, is as it is.
+func expandHome(p string, home string) string {
 	if p == "" {
 		return p
 	}
 	if p[0] != '~' {
 		return p
 	}
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
+	if home == "" {
 		return p
 	}
 	if p == "~" {

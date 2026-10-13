@@ -50,7 +50,7 @@ It is safe to run multiple times.`,
 		style.Println(style.Bold.Render("Scanning stores..."))
 		style.Println()
 
-		result, err := internal.ScanStores(ctx, db)
+		result, err := internal.ScanStores(ctx, db, userDirs())
 
 		// warnings are worth showing even if the scan then failed
 		for _, w := range result.Warnings {
