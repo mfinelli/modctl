@@ -26,7 +26,6 @@ import (
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var modsScanInventoryRescan bool
@@ -62,11 +61,11 @@ its existing inventory.`,
 		q := dbq.New(db)
 
 		bs := blobstore.Store{
-			ArchivesDir: viper.GetString("archives_dir"),
+			ArchivesDir: cfg.ArchivesDir,
 		}
 
 		scanner := archivescanner.Scanner{
-			BsdtarPath: viper.GetString("bsdtar"),
+			BsdtarPath: cfg.Bsdtar,
 		}
 
 		scanAll := archivescanner.ScanAll

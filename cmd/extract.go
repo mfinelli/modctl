@@ -31,7 +31,6 @@ import (
 	"github.com/mfinelli/modctl/internal/restore"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -476,7 +475,7 @@ func resolveOutputName(
 // determine the archive format and compression, returning a file extension.
 func detectArchiveExt(ctx context.Context, blobPath string) (string, error) {
 	format, compression, err := archivescanner.DetectFormat(
-		ctx, viper.GetString("bsdtar"), blobPath,
+		ctx, cfg.Bsdtar, blobPath,
 	)
 	if err != nil {
 		return "", err

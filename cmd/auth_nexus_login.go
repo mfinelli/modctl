@@ -22,14 +22,11 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 
-	"github.com/adrg/xdg"
+	"github.com/mfinelli/modctl/internal/config"
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/style"
-	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var authNexusLoginForce bool
@@ -49,7 +46,7 @@ you complete authorization.`,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if viper.GetString("nexus.apikey") != "" && !authNexusLoginForce {
+		if cfg.NexusAPIKey != "" && !authNexusLoginForce {
 			style.Println(style.Failure.Render("  ✗ a Nexus Mods API key is already configured"))
 			style.Println(style.Subtle.Render("    run with --force to replace it"))
 			style.Println()
@@ -70,36 +67,14 @@ you complete authorization.`,
 			return fmt.Errorf("nexus SSO login: %w", err)
 		}
 
-		configPath := viper.ConfigFileUsed()
-		if configPath == "" {
-			configPath = filepath.Join(xdg.ConfigHome, "modctl", "config.toml")
-		}
-		if err := ensureConfigFile(configPath); err != nil {
-			return fmt.Errorf("create config file: %w", err)
-		}
-		cfg, err := readOrCreateToml(configPath)
-		if err != nil {
-			return fmt.Errorf("read config file: %w", err)
-		}
-
-		nexusCfg, ok := cfg["nexus"].(map[string]any)
-		if !ok {
-			nexusCfg = make(map[string]any)
-		}
-		nexusCfg["apikey"] = apiKey
-		cfg["nexus"] = nexusCfg
-
-		data, err := toml.Marshal(cfg)
-		if err != nil {
-			return fmt.Errorf("marshal config: %w", err)
-		}
-		if err := os.WriteFile(configPath, data, 0o600); err != nil {
-			return fmt.Errorf("write config file: %w", err)
+		path := configPath()
+		if err := config.Set(path, "nexus.apikey", apiKey); err != nil {
+			return err
 		}
 
 		style.Println()
 		style.Println(style.Success.Render("  ✓ authenticated with Nexus Mods"))
-		style.Println(style.Subtle.Render("    API key saved to " + configPath))
+		style.Println(style.Subtle.Render("    API key saved to " + path))
 		style.Println(style.Subtle.Render("    Note: the key is stored in plain text (mode 0600)"))
 		style.Println()
 

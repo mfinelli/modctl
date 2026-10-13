@@ -29,7 +29,6 @@ import (
 	"github.com/mfinelli/modctl/internal/restore"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"golang.org/x/mod/semver"
 )
 
@@ -120,10 +119,10 @@ Use --dry-run to preview what would be imported without making any changes.`,
 		q := dbq.New(db)
 
 		bs := blobstore.Store{
-			ArchivesDir:  viper.GetString("archives_dir"),
-			BackupsDir:   viper.GetString("backups_dir"),
-			OverridesDir: viper.GetString("overrides_dir"),
-			TmpDir:       viper.GetString("tmp_dir"),
+			ArchivesDir:  cfg.ArchivesDir,
+			BackupsDir:   cfg.BackupsDir,
+			OverridesDir: cfg.OverridesDir,
+			TmpDir:       cfg.TmpDir,
 		}
 
 		opts := restore.Options{

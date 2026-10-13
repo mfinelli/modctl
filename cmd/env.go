@@ -23,16 +23,15 @@ import (
 	"database/sql"
 	"log/slog"
 	"os"
-	"path/filepath"
 
 	"github.com/adrg/xdg"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/completion"
+	"github.com/mfinelli/modctl/internal/config"
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/nexusclient"
-	"github.com/spf13/viper"
 )
 
 // Schema is the schema of the database, which main makes with the migrations
@@ -41,26 +40,52 @@ import (
 // a database brings it to.
 var Schema *database.Schema
 
+// cfg is the configuration, which is read once, before a command runs (see
+// initConfig). It is where what the commands are configured to comes from: what
+// the config file says, and the defaults for the rest.
+var cfg config.Config
+
 // The packages in internal/ are given what they work on: they don't look for
 // the database, or the directory of the state, by themselves. This is where the
 // commands get it from, for what they do all the time, so that a command
 // doesn't have to know where it is (and can't have it wrong).
 
+// configDirs are the directories of the user that the defaults of the
+// configuration are in.
+func configDirs() config.Dirs {
+	return config.Dirs{
+		ConfigHome: xdg.ConfigHome,
+		DataHome:   xdg.DataHome,
+		CacheHome:  xdg.CacheHome,
+		StateHome:  xdg.StateHome,
+		RuntimeDir: xdg.RuntimeDir,
+	}
+}
+
+// configPath is the config file that a command that changes it changes: the one
+// that was read, or the default one if there was none.
+func configPath() string {
+	if cfg.File != "" {
+		return cfg.File
+	}
+	return config.DefaultPath(configDirs())
+}
+
 // databasePath is the file of the database that is configured.
 func databasePath() string {
-	return viper.GetString("database")
+	return cfg.Database
 }
 
 // stateDir is the directory that modctl keeps its state in, which is the
 // active selection and what has to be there while something is being done (the
 // locks, in a directory of their own).
 func stateDir() string {
-	return filepath.Join(xdg.StateHome, "modctl")
+	return configDirs().State()
 }
 
 // cacheDir is the directory that the cache of what Nexus Mods said is kept in.
 func cacheDir() string {
-	return viper.GetString("cache_dir")
+	return cfg.CacheDir
 }
 
 // nexusCacheDBPath is the file of the cache of what Nexus Mods said.

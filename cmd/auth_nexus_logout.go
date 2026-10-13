@@ -19,15 +19,9 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
-
-	"github.com/adrg/xdg"
+	"github.com/mfinelli/modctl/internal/config"
 	"github.com/mfinelli/modctl/internal/style"
-	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var authNexusLogoutCmd = &cobra.Command{
@@ -43,40 +37,14 @@ visit your Nexus Mods account settings at:
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if viper.GetString("nexus.apikey") == "" {
+		if cfg.NexusAPIKey == "" {
 			style.Println(style.Warning.Render("  ⚠ no Nexus Mods API key is configured"))
 			style.Println()
 			return nil
 		}
 
-		configPath := viper.ConfigFileUsed()
-		if configPath == "" {
-			configPath = filepath.Join(xdg.ConfigHome, "modctl", "config.toml")
-		}
-		if err := ensureConfigFile(configPath); err != nil {
-			return fmt.Errorf("create config file: %w", err)
-		}
-		cfg, err := readOrCreateToml(configPath)
-		if err != nil {
-			return fmt.Errorf("read config file: %w", err)
-		}
-
-		if nexusCfg, ok := cfg["nexus"].(map[string]any); ok {
-			delete(nexusCfg, "apikey")
-			if len(nexusCfg) == 0 {
-				delete(cfg, "nexus")
-			} else {
-				cfg["nexus"] = nexusCfg
-			}
-		}
-
-		data, err := toml.Marshal(cfg)
-		if err != nil {
-			return fmt.Errorf("marshal config: %w", err)
-		}
-
-		if err := os.WriteFile(configPath, data, 0o600); err != nil {
-			return fmt.Errorf("write config file: %w", err)
+		if err := config.Unset(configPath(), "nexus.apikey"); err != nil {
+			return err
 		}
 
 		style.Println(style.Success.Render("  ✓ Nexus Mods API key removed"))

@@ -28,7 +28,6 @@ import (
 	"github.com/mfinelli/modctl/internal/blobstore"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -91,9 +90,9 @@ Binary files are detected automatically and refused unless --force is passed.`,
 		}
 
 		bs := blobstore.Store{
-			ArchivesDir: viper.GetString("archives_dir"),
-			BackupsDir:  viper.GetString("backups_dir"),
-			TmpDir:      viper.GetString("tmp_dir"),
+			ArchivesDir: cfg.ArchivesDir,
+			BackupsDir:  cfg.BackupsDir,
+			TmpDir:      cfg.TmpDir,
 		}
 
 		blobPath, err := bs.PathFor(blobstore.KindBackup, backup.BackupBlobSha256)

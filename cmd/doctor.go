@@ -37,7 +37,6 @@ import (
 	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"go.finelli.dev/util"
 )
 
@@ -296,12 +295,12 @@ func checkPaths() error {
 	style.Println()
 
 	required := []string{
-		viper.GetString("archives_dir"),
-		viper.GetString("backups_dir"),
+		cfg.ArchivesDir,
+		cfg.BackupsDir,
 		cacheDir(),
-		viper.GetString("locks_dir"),
-		viper.GetString("overrides_dir"),
-		// viper.GetString("tmp_dir"),
+		cfg.LocksDir,
+		cfg.OverridesDir,
+		// cfg.TmpDir,
 	}
 
 	var fatalErr error
@@ -339,7 +338,7 @@ func checkPaths() error {
 }
 
 func checkBsdtar(ctx context.Context) error {
-	bsdtar := viper.GetString("bsdtar")
+	bsdtar := cfg.Bsdtar
 	style.Println(style.Header.Render("bsdtar Checks"))
 	style.Println(style.Subtle.Render("  search: " + bsdtar))
 	style.Println()
@@ -490,9 +489,9 @@ func checkGameInstalls(ctx context.Context) error {
 // add a second pass later to stream-hash and update verified_at.
 func checkBlobs(ctx context.Context) error {
 	style.Println(style.Header.Render("Blob Store Checks"))
-	style.Println(style.Subtle.Render("  archives:  " + viper.GetString("archives_dir")))
-	style.Println(style.Subtle.Render("  backups:   " + viper.GetString("backups_dir")))
-	style.Println(style.Subtle.Render("  overrides: " + viper.GetString("overrides_dir")))
+	style.Println(style.Subtle.Render("  archives:  " + cfg.ArchivesDir))
+	style.Println(style.Subtle.Render("  backups:   " + cfg.BackupsDir))
+	style.Println(style.Subtle.Render("  overrides: " + cfg.OverridesDir))
 	style.Println()
 
 	db, err := database.Setup(databasePath())
@@ -507,9 +506,9 @@ func checkBlobs(ctx context.Context) error {
 	q := dbq.New(db)
 
 	bs := blobstore.Store{
-		ArchivesDir:  viper.GetString("archives_dir"),
-		BackupsDir:   viper.GetString("backups_dir"),
-		OverridesDir: viper.GetString("overrides_dir"),
+		ArchivesDir:  cfg.ArchivesDir,
+		BackupsDir:   cfg.BackupsDir,
+		OverridesDir: cfg.OverridesDir,
 	}
 
 	kinds := []blobstore.Kind{

@@ -30,7 +30,6 @@ import (
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -106,10 +105,10 @@ winner for this path in the active profile.`,
 		}
 
 		bs := blobstore.Store{
-			ArchivesDir:  viper.GetString("archives_dir"),
-			BackupsDir:   viper.GetString("backups_dir"),
-			OverridesDir: viper.GetString("overrides_dir"),
-			TmpDir:       viper.GetString("tmp_dir"),
+			ArchivesDir:  cfg.ArchivesDir,
+			BackupsDir:   cfg.BackupsDir,
+			OverridesDir: cfg.OverridesDir,
+			TmpDir:       cfg.TmpDir,
 		}
 
 		// ingest the file into the override blob store

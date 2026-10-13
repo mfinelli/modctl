@@ -28,7 +28,6 @@ import (
 	"github.com/mfinelli/modctl/internal/lock"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var gamesTargetsDisableGame string
@@ -73,7 +72,7 @@ the only enabled target.`,
 
 		// Hold the per-game lock so an apply can't record installed files for
 		// this target between the checks below and the update.
-		unlock, err := lock.GameInstall(viper.GetString("locks_dir"), gi.ID)
+		unlock, err := lock.GameInstall(cfg.LocksDir, gi.ID)
 		if err != nil {
 			return err
 		}

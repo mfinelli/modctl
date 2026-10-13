@@ -25,7 +25,6 @@ import (
 
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var authNexusStatusCmd = &cobra.Command{
@@ -41,7 +40,7 @@ not count against your API request quota.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		kv := style.KV{Indent: 2, Width: 16}
 
-		apiKey := viper.GetString("nexus.apikey")
+		apiKey := cfg.NexusAPIKey
 		if apiKey == "" {
 			style.Println(style.Warning.Render("  ⚠ not authenticated"))
 			style.Println(style.Subtle.Render("    run `modctl auth nexus login` to authenticate"))

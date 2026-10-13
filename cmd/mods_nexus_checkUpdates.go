@@ -33,7 +33,6 @@ import (
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/mfinelli/modctl/internal/updatechain"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"golang.org/x/term"
 )
 
@@ -67,7 +66,7 @@ to proceed even if the operation would exhaust your API quota.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		apiKey := viper.GetString("nexus.apikey")
+		apiKey := cfg.NexusAPIKey
 		if apiKey == "" {
 			return fmt.Errorf("nexus api key not configured; set nexus.apikey in your config file")
 		}

@@ -32,7 +32,6 @@ import (
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -101,9 +100,9 @@ is passed.`,
 		}
 
 		bs := blobstore.Store{
-			ArchivesDir: viper.GetString("archives_dir"),
-			BackupsDir:  viper.GetString("backups_dir"),
-			TmpDir:      viper.GetString("tmp_dir"),
+			ArchivesDir: cfg.ArchivesDir,
+			BackupsDir:  cfg.BackupsDir,
+			TmpDir:      cfg.TmpDir,
 		}
 
 		blobPath, err := bs.PathFor(blobstore.KindBackup, backup.BackupBlobSha256)

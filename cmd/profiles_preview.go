@@ -35,7 +35,6 @@ import (
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -125,16 +124,16 @@ Binary files are detected automatically and refused unless --force is passed.`,
 		winner := winnerOp.File.Winner()
 
 		bs := blobstore.Store{
-			ArchivesDir:  viper.GetString("archives_dir"),
-			BackupsDir:   viper.GetString("backups_dir"),
-			OverridesDir: viper.GetString("overrides_dir"),
-			TmpDir:       viper.GetString("tmp_dir"),
+			ArchivesDir:  cfg.ArchivesDir,
+			BackupsDir:   cfg.BackupsDir,
+			OverridesDir: cfg.OverridesDir,
+			TmpDir:       cfg.TmpDir,
 		}
 
 		ex := extractor.Extractor{
-			BsdtarPath: viper.GetString("bsdtar"),
+			BsdtarPath: cfg.Bsdtar,
 			BlobStore:  bs,
-			StagingDir: viper.GetString("tmp_dir"),
+			StagingDir: cfg.TmpDir,
 		}
 
 		stagingDir, err := ex.ExtractArchive(ctx, winner.Entry.ArchiveSha256)

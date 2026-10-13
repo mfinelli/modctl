@@ -33,7 +33,6 @@ import (
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -130,16 +129,16 @@ Note: requires archive extraction which may be slow for large archives.`,
 		}
 
 		bs := blobstore.Store{
-			ArchivesDir:  viper.GetString("archives_dir"),
-			BackupsDir:   viper.GetString("backups_dir"),
-			OverridesDir: viper.GetString("overrides_dir"),
-			TmpDir:       viper.GetString("tmp_dir"),
+			ArchivesDir:  cfg.ArchivesDir,
+			BackupsDir:   cfg.BackupsDir,
+			OverridesDir: cfg.OverridesDir,
+			TmpDir:       cfg.TmpDir,
 		}
 
 		ex := extractor.Extractor{
-			BsdtarPath: viper.GetString("bsdtar"),
+			BsdtarPath: cfg.Bsdtar,
 			BlobStore:  bs,
-			StagingDir: viper.GetString("tmp_dir"),
+			StagingDir: cfg.TmpDir,
 		}
 
 		// fetch base file content (extract from winning mod if available)

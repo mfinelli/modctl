@@ -37,7 +37,6 @@ import (
 	"github.com/mfinelli/modctl/internal/planner"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -125,7 +124,7 @@ Use --dry-run to preview the plan without making any changes. Add the
 		}
 
 		// Acquire per-game lock to prevent concurrent apply/unapply
-		unlock, err := lock.GameInstall(viper.GetString("locks_dir"), gi.ID)
+		unlock, err := lock.GameInstall(cfg.LocksDir, gi.ID)
 		if err != nil {
 			return err
 		}
@@ -180,16 +179,16 @@ Use --dry-run to preview the plan without making any changes. Add the
 		style.Println()
 
 		bs := blobstore.Store{
-			ArchivesDir:  viper.GetString("archives_dir"),
-			BackupsDir:   viper.GetString("backups_dir"),
-			OverridesDir: viper.GetString("overrides_dir"),
-			TmpDir:       viper.GetString("tmp_dir"),
+			ArchivesDir:  cfg.ArchivesDir,
+			BackupsDir:   cfg.BackupsDir,
+			OverridesDir: cfg.OverridesDir,
+			TmpDir:       cfg.TmpDir,
 		}
 
 		ext := extractor.Extractor{
-			BsdtarPath: viper.GetString("bsdtar"),
+			BsdtarPath: cfg.Bsdtar,
 			BlobStore:  bs,
-			StagingDir: viper.GetString("tmp_dir"),
+			StagingDir: cfg.TmpDir,
 		}
 
 		// Clear staging before starting.

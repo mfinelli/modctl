@@ -20,16 +20,13 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 
-	"github.com/adrg/xdg"
+	"github.com/mfinelli/modctl/internal/config"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -63,8 +60,8 @@ You should have received a copy of the GNU General Public License (version
 		}))
 		slog.SetDefault(logger)
 
-		if viper.ConfigFileUsed() != "" {
-			logger.Debug("using config file", "path", viper.ConfigFileUsed())
+		if cfg.File != "" {
+			logger.Debug("using config file", "path", cfg.File)
 		}
 
 		return nil
@@ -103,58 +100,13 @@ func init() {
 	)
 }
 
-// initConfig reads in config file and ENV variables if set.
+// initConfig reads in the config file, if there is one (the one that was asked
+// for must be there and be right, and the default one is only read if it is
+// there). It makes nothing: not the directories that the configuration names,
+// or the one that the config file would be in.
 func initConfig() {
-	// if unspecified just search $PATH
-	viper.SetDefault("bsdtar", "bsdtar")
-
-	dbPath, err := xdg.DataFile(filepath.Join("modctl", "modctl.db"))
-	cobra.CheckErr(err)
-	viper.SetDefault("database", dbPath)
-
-	viper.SetDefault("archives_dir",
-		filepath.Join(xdg.DataHome, "modctl", "archives"))
-	viper.SetDefault("backups_dir",
-		filepath.Join(xdg.DataHome, "modctl", "backups"))
-	viper.SetDefault("overrides_dir",
-		filepath.Join(xdg.DataHome, "modctl", "overrides"))
-	viper.SetDefault("locks_dir", filepath.Join(stateDir(), "locks"))
-	viper.SetDefault("cache_dir",
-		filepath.Join(xdg.CacheHome, "modctl"))
-	viper.SetDefault("tmp_dir",
-		filepath.Join(xdg.RuntimeDir, "modctl"))
-
-	if cfgFile != "" {
-		// User explicitly provided a config file: it must work.
-		viper.SetConfigFile(cfgFile)
-		viper.SetConfigType("toml")
-
-		if err := viper.ReadInConfig(); err != nil {
-			cobra.CheckErr(err)
-		}
-
-		return
-	}
-
-	defaultPath, err := xdg.ConfigFile(filepath.Join("modctl", "config.toml"))
+	c, err := config.Load(configDirs(), cfgFile)
 	cobra.CheckErr(err)
 
-	if _, err := os.Stat(defaultPath); errors.Is(err, os.ErrNotExist) {
-		return // default config file doesn't exist -- use defaults
-	}
-
-	viper.SetConfigFile(defaultPath)
-	viper.SetConfigType("toml")
-
-	if err := viper.ReadInConfig(); err != nil {
-		// missing config file is fine -- use the built-in defaults
-		var notFound viper.ConfigFileNotFoundError
-		if errors.As(err, &notFound) {
-			return
-		}
-
-		// parse/permission errors should fail loudly
-		cobra.CheckErr(err)
-		return
-	}
+	cfg = c
 }

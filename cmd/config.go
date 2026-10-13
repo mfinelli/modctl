@@ -20,7 +20,6 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var configCmd = &cobra.Command{
@@ -30,26 +29,4 @@ var configCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(configCmd)
-}
-
-var knownConfigKeys = []string{
-	"bsdtar",
-	"database",
-	"archives_dir",
-	"backups_dir",
-	"cache_dir",
-	"locks_dir",
-	"overrides_dir",
-	"tmp_dir",
-	"nexus.apikey",
-}
-
-// resolveConfigKey returns the effective value for a config key and whether
-// it was explicitly set in the config file (as opposed to being a default).
-func resolveConfigKey(key string) (value string, fromFile bool) {
-	value = viper.GetString(key)
-	// viper.IsSet returns true for defaults too, so we check the
-	// in-file settings directly
-	fromFile = viper.InConfig(key)
-	return value, fromFile
 }

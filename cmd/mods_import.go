@@ -42,7 +42,6 @@ import (
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -98,12 +97,12 @@ has been safely stored and the database has been updated successfully.`,
 		defer db.Close()
 
 		inputPath := args[0]
-		archivesDir := viper.GetString("archives_dir")
+		archivesDir := cfg.ArchivesDir
 
 		bs := blobstore.Store{
 			ArchivesDir:  archivesDir,
-			BackupsDir:   viper.GetString("backups_dir"),
-			OverridesDir: viper.GetString("overrides_dir"),
+			BackupsDir:   cfg.BackupsDir,
+			OverridesDir: cfg.OverridesDir,
 		}
 
 		// Optional nexus parse
@@ -183,7 +182,7 @@ has been safely stored and the database has been updated successfully.`,
 		// If we have a nexus URL and an API key, pre-fetch the file list to identify
 		// the correct label before creating the mod_file row
 		if modsImportNexusUrl != "" && !modsImportSkipNexusLink {
-			apiKey := viper.GetString("nexus.apikey")
+			apiKey := cfg.NexusAPIKey
 			if apiKey != "" {
 				client, err := nexusClient(ctx, apiKey, logger)
 				if err != nil {
@@ -236,7 +235,7 @@ has been safely stored and the database has been updated successfully.`,
 
 		// Attempt Nexus linking if we have a URL, an API key, and --skip-nexus-link was not set
 		if modsImportNexusUrl != "" && !modsImportSkipNexusLink {
-			apiKey := viper.GetString("nexus.apikey")
+			apiKey := cfg.NexusAPIKey
 			if apiKey == "" {
 				style.Println(style.Subtle.Render("  nexus api key not configured, skipping link"))
 			} else {
@@ -329,7 +328,7 @@ func prepareImportArchive(ctx context.Context, inputPath string, listTimeout tim
 	}
 
 	// Not an archive (or bsdtar couldn't list it) -- wrap into tar.gz.
-	tmpDir := viper.GetString("tmp_dir")
+	tmpDir := cfg.TmpDir
 	wrapped, cleanup, err := wrapIntoTarGz(tmpDir, inputPath)
 	if err != nil {
 		return prepareArchiveResult{}, err
@@ -348,7 +347,7 @@ func prepareImportArchive(ctx context.Context, inputPath string, listTimeout tim
 
 func bsdtarListOK(ctx context.Context, archivePath string) error {
 	// Keep output quiet on success; capture stderr for failure message.
-	cmd := exec.CommandContext(ctx, viper.GetString("bsdtar"), "-t", "-f", archivePath)
+	cmd := exec.CommandContext(ctx, cfg.Bsdtar, "-t", "-f", archivePath)
 	var stderr bytes.Buffer
 	cmd.Stdout = io.Discard
 	cmd.Stderr = &stderr

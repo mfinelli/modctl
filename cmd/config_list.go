@@ -19,13 +19,9 @@
 package cmd
 
 import (
-	"path/filepath"
-	"strings"
-
-	"github.com/adrg/xdg"
+	"github.com/mfinelli/modctl/internal/config"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var configListCmd = &cobra.Command{
@@ -41,25 +37,20 @@ default value.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		kv := style.KV{Indent: 2, Width: 16}
 
-		configPath := viper.ConfigFileUsed()
-		if configPath == "" {
-			configPath = filepath.Join(xdg.ConfigHome, "modctl", "config.toml")
-		}
-
 		style.Println(style.Header.Render("Configuration"))
-		style.Println(style.Subtle.Render("  file: " + configPath))
+		style.Println(style.Subtle.Render("  file: " + configPath()))
 		style.Println()
 
-		for _, key := range knownConfigKeys {
-			value, fromFile := resolveConfigKey(key)
+		for _, key := range config.Keys() {
+			value, _ := cfg.Value(key)
 
 			// mask the api key
 			if key == "nexus.apikey" && value != "" {
-				value = maskAPIKey(value)
+				value = config.Mask(value)
 			}
 
 			origin := style.Subtle.Render("(default)")
-			if fromFile {
+			if cfg.FromFile(key) {
 				origin = style.Subtle.Render("(set)")
 			}
 
@@ -72,11 +63,4 @@ default value.`,
 
 func init() {
 	configCmd.AddCommand(configListCmd)
-}
-
-func maskAPIKey(key string) string {
-	if len(key) <= 4 {
-		return strings.Repeat("*", len(key))
-	}
-	return strings.Repeat("*", len(key)-4) + key[len(key)-4:]
 }

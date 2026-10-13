@@ -19,10 +19,7 @@
 package cmd
 
 import (
-	"fmt"
-	"slices"
-	"strings"
-
+	"github.com/mfinelli/modctl/internal/config"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -40,18 +37,18 @@ Valid keys:
   locks_dir, tmp_dir, nexus.apikey`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
-	ValidArgs:    knownConfigKeys,
+	ValidArgs:    config.Keys(),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		kv := style.KV{Indent: 2, Width: 16}
 
 		key := args[0]
-		if !slices.Contains(knownConfigKeys, key) {
-			return fmt.Errorf("unknown config key %q\n  valid keys: %s", key, strings.Join(knownConfigKeys, ", "))
+		value, ok := cfg.Value(key)
+		if !ok {
+			return config.UnknownKeyError{Key: key}
 		}
 
-		value, fromFile := resolveConfigKey(key)
 		origin := style.Subtle.Render("(default)")
-		if fromFile {
+		if cfg.FromFile(key) {
 			origin = style.Subtle.Render("(set)")
 		}
 
