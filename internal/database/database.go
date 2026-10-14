@@ -31,7 +31,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
 	goosedb "github.com/pressly/goose/v3/database"
-	"github.com/spf13/viper"
 )
 
 // DB_PRAGMAS are the connection parameters for a read-write database:
@@ -47,19 +46,33 @@ const DB_PRAGMAS = "?_foreign_keys=ON&_journal_mode=WAL&_synchronous=NORMAL"
 // that way.
 const DB_PRAGMAS_READONLY = "?_foreign_keys=ON&mode=ro"
 
-// Migrations is where the migrations are read from, in a directory called
-// "migrations": the ones that are embedded in the binary, which main sets. A
-// test has none unless it sets some, which is what lets it have the ones of the
-// repository.
-var Migrations fs.FS
+// A Schema is the schema of the database: the migrations that make it. They
+// are in a directory called "migrations" of the file system that the Schema is
+// made with, which in the binary is the ones that are embedded in it (main has
+// them, since they are not in a directory that this package can embed them
+// from).
+//
+// What works on a database is given the Schema that it brings the database to,
+// and does not find one: a test has the Schema of the repository, or one of
+// its own, and none of them is anything but what it is given.
+type Schema struct {
+	root fs.FS
+}
 
-// migrationsFS is the "migrations" directory of Migrations.
-func migrationsFS() (fs.FS, error) {
-	if Migrations == nil {
+// NewSchema is the Schema that is made by the migrations in the "migrations"
+// directory of root. A root that is nil has no migrations: every use of the
+// Schema is an error that says so (and so is every use of a Schema that is nil).
+func NewSchema(root fs.FS) *Schema {
+	return &Schema{root: root}
+}
+
+// migrations is the "migrations" directory of the file system of s.
+func (s *Schema) migrations() (fs.FS, error) {
+	if s == nil || s.root == nil {
 		return nil, errors.New("no migrations are embedded")
 	}
 
-	return fs.Sub(Migrations, "migrations")
+	return fs.Sub(s.root, "migrations")
 }
 
 // DSN returns the connection string for the SQLite database at path, which
@@ -77,17 +90,24 @@ func DSN(path string, readOnly bool) string {
 	return fmt.Sprintf("file:%s%s", url.PathEscape(path), pragmas)
 }
 
-func Setup() (*sql.DB, error) {
-	return sql.Open("sqlite3", DSN(viper.GetString("database"), false))
+// Setup opens the read-write database at path, with the migrations not
+// applied (see Migrate and Open). Nothing is done to the file until the
+// first statement is: the driver is lazy, so a path that is not there is no
+// error here.
+func Setup(path string) (*sql.DB, error) {
+	return sql.Open("sqlite3", DSN(path, false))
 }
 
-func SetupReadOnly() (*sql.DB, error) {
-	return sql.Open("sqlite3", DSN(viper.GetString("database"), true))
+// SetupReadOnly is Setup for a database that is only read: the connection
+// can't change it, and it is not created by looking for it.
+func SetupReadOnly(path string) (*sql.DB, error) {
+	return sql.Open("sqlite3", DSN(path, true))
 }
 
-func GooseProvider(db *sql.DB) (*goose.Provider, error) {
-	// Make the provider FS point at the "migrations" directory within Migrations.
-	fsys, err := migrationsFS()
+// Provider is a goose provider for db that has the migrations of the Schema.
+func (s *Schema) Provider(db *sql.DB) (*goose.Provider, error) {
+	// Make the provider FS point at the "migrations" directory of the Schema.
+	fsys, err := s.migrations()
 	if err != nil {
 		return nil, fmt.Errorf("error preparing migrations fs: %w", err)
 	}
@@ -101,8 +121,9 @@ func GooseProvider(db *sql.DB) (*goose.Provider, error) {
 	)
 }
 
-func Migrate(ctx context.Context, db *sql.DB) error {
-	p, err := GooseProvider(db)
+// Migrate brings db to the latest migration of the Schema.
+func (s *Schema) Migrate(ctx context.Context, db *sql.DB) error {
+	p, err := s.Provider(db)
 	if err != nil {
 		return fmt.Errorf("error setting up goose provider: %w", err)
 	}
@@ -115,13 +136,12 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
-// CurrentSchemaVersion returns the version of the latest migration that has
-// been applied to db. This is what the database itself is at, which is not
-// necessarily the latest migration this build of modctl knows about: a new
-// database reports 0 and one that has not been migrated since an upgrade
-// reports its older version.
-func CurrentSchemaVersion(ctx context.Context, db *sql.DB) (int64, error) {
-	p, err := GooseProvider(db)
+// CurrentVersion returns the version of the latest migration that has been
+// applied to db. This is what the database itself is at, which is not
+// necessarily the latest migration of the Schema: a new database reports 0 and
+// one that has not been migrated since an upgrade reports its older version.
+func (s *Schema) CurrentVersion(ctx context.Context, db *sql.DB) (int64, error) {
+	p, err := s.Provider(db)
 	if err != nil {
 		return 0, fmt.Errorf("get goose provider: %w", err)
 	}
@@ -130,9 +150,8 @@ func CurrentSchemaVersion(ctx context.Context, db *sql.DB) (int64, error) {
 }
 
 // SchemaVersion returns the applied migration version as seen by p. It is
-// split out from CurrentSchemaVersion so that tests can supply a provider that
-// reads its migrations from the filesystem (the embedded copy is only
-// populated in the real binary).
+// split out from Schema.CurrentVersion so that a test can have a provider that
+// is controlled further than a Schema is (how far it has migrated, say).
 func SchemaVersion(ctx context.Context, p *goose.Provider) (int64, error) {
 	current, _, err := p.GetVersions(ctx)
 	if err != nil {
@@ -142,13 +161,13 @@ func SchemaVersion(ctx context.Context, p *goose.Provider) (int64, error) {
 	return current, nil
 }
 
-// LatestSchemaVersion returns the version of the latest migration known to
-// this build of modctl: the highest version among the embedded migrations. It
-// does not look at any database, so it is the version a database ends up at
-// once it has been fully migrated, and what a bundle's schema version has to
-// be compared against to tell whether this build can import it.
-func LatestSchemaVersion() (int64, error) {
-	fsys, err := migrationsFS()
+// LatestVersion returns the version of the latest migration of the Schema: the
+// highest version among its migrations. It does not look at any database, so
+// it is the version a database ends up at once it has been fully migrated, and
+// what a bundle's schema version has to be compared against to tell whether
+// this build can import it.
+func (s *Schema) LatestVersion() (int64, error) {
+	fsys, err := s.migrations()
 	if err != nil {
 		return 0, fmt.Errorf("error preparing migrations fs: %w", err)
 	}
@@ -157,9 +176,7 @@ func LatestSchemaVersion() (int64, error) {
 }
 
 // latestMigrationVersion returns the highest version among the .sql
-// migrations in the root of fsys. It is split out from LatestSchemaVersion so
-// that tests can supply their own migrations (the embedded copy is only
-// populated in the real binary).
+// migrations in the root of fsys.
 func latestMigrationVersion(fsys fs.FS) (int64, error) {
 	entries, err := fs.ReadDir(fsys, ".")
 	if err != nil {
@@ -188,21 +205,21 @@ func latestMigrationVersion(fsys fs.FS) (int64, error) {
 	return latest, nil
 }
 
-// Open opens the database that the commands use: it has to be there (it is
-// made by init), and it is migrated to the latest schema before it is handed
-// over. The caller closes it.
-func Open(ctx context.Context) (*sql.DB, error) {
-	return openWith(ctx, Migrate)
+// Open opens the database that the commands use, at path: it has to be there
+// (it is made by init), and it is migrated to the latest migration of the
+// Schema before it is handed over. The caller closes it.
+func (s *Schema) Open(ctx context.Context, path string) (*sql.DB, error) {
+	return openWith(ctx, path, s.Migrate)
 }
 
-// openWith is Open with the migrating done by migrate, so that a test can
-// have migrations that are not the ones that are embedded in the binary.
-func openWith(ctx context.Context, migrate func(context.Context, *sql.DB) error) (*sql.DB, error) {
-	if err := EnsureExists(); err != nil {
+// openWith is Schema.Open with the migrating done by migrate, so that a test
+// can have a migrating that fails, or that is watched.
+func openWith(ctx context.Context, path string, migrate func(context.Context, *sql.DB) error) (*sql.DB, error) {
+	if err := EnsureExists(path); err != nil {
 		return nil, err
 	}
 
-	db, err := Setup()
+	db, err := Setup(path)
 	if err != nil {
 		return nil, fmt.Errorf("error setting up database: %w", err)
 	}
@@ -215,10 +232,9 @@ func openWith(ctx context.Context, migrate func(context.Context, *sql.DB) error)
 	return db, nil
 }
 
-// EnsureExists verifies that the configured database file exists
-// and is a regular file. If not, it returns a user-friendly error.
-func EnsureExists() error {
-	path := viper.GetString("database")
+// EnsureExists verifies that the database file at path exists and is a
+// regular file. If not, it returns a user-friendly error.
+func EnsureExists(path string) error {
 	if path == "" {
 		return fmt.Errorf("database path is not configured")
 	}

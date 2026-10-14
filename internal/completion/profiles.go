@@ -40,10 +40,10 @@ import (
 //	update here to use cmd.InheritedFlags() instead of cmd.Flags().
 //
 // Returns candidates in "name\t(active)" format.
-func ProfileNames(cmd *cobra.Command, toComplete string) ([]string, cobra.ShellCompDirective) {
+func (c Completer) ProfileNames(cmd *cobra.Command, toComplete string) ([]string, cobra.ShellCompDirective) {
 	ctx := context.Background()
 
-	db, err := database.SetupReadOnly()
+	db, err := database.SetupReadOnly(c.DatabasePath)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -58,7 +58,7 @@ func ProfileNames(cmd *cobra.Command, toComplete string) ([]string, cobra.ShellC
 		}
 		gameID = v
 	} else {
-		active, err := state.LoadActive()
+		active, err := state.LoadActive(c.StateDir)
 		if err != nil || active.ActiveGameInstallID <= 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}

@@ -24,7 +24,6 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -56,7 +55,7 @@ Exactly one of --before or --after is required.`,
 			return fmt.Errorf("exactly one of --before or --after is required")
 		}
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -65,7 +64,7 @@ Exactly one of --before or --after is required.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.GameInstall(ctx, q, profilesOrderMoveGame)
+		gi, err := gameInstall(ctx, q, profilesOrderMoveGame)
 		if err != nil {
 			return err
 		}
@@ -197,26 +196,26 @@ func init() {
 		"Override the currently active game")
 	profilesOrderMoveCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	profilesOrderMoveCmd.Flags().StringVarP(&profilesOrderMoveProfile, "profile", "p", "",
 		"Override the currently active profile")
 	profilesOrderMoveCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ProfileNames(cmd, toComplete)
+			return completer().ProfileNames(cmd, toComplete)
 		})
 
 	profilesOrderMoveCmd.Flags().Int64VarP(&profilesOrderMoveAfter, "after", "a", 0,
 		"Move the mod after the specified mod")
 	profilesOrderMoveCmd.RegisterFlagCompletionFunc("after",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ModFileVersionIDs(cmd, toComplete)
+			return completer().ModFileVersionIDs(cmd, toComplete)
 		})
 	profilesOrderMoveCmd.Flags().Int64VarP(&profilesOrderMoveBefore, "before", "b", 0,
 		"Move the mod before the specified mod")
 	profilesOrderMoveCmd.RegisterFlagCompletionFunc("before",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ModFileVersionIDs(cmd, toComplete)
+			return completer().ModFileVersionIDs(cmd, toComplete)
 		})
 }

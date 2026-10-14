@@ -23,8 +23,6 @@ import (
 	"fmt"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -52,7 +50,7 @@ Note: modctl automatically creates a "default" profile during game refresh.`,
 
 		name := args[0]
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -61,7 +59,7 @@ Note: modctl automatically creates a "default" profile during game refresh.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.GameInstall(ctx, q, profilesCreateGame)
+		gi, err := gameInstall(ctx, q, profilesCreateGame)
 		if err != nil {
 			return err
 		}
@@ -97,7 +95,7 @@ func init() {
 		"Override the currently active game")
 	profilesCreateCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	profilesCreateCmd.Flags().StringVarP(&profilesCreateDescription, "description", "d", "",

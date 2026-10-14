@@ -25,7 +25,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/adrg/xdg"
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/testbuilder"
@@ -168,62 +167,55 @@ func TestExplicitGameInstall(t *testing.T) {
 	})
 }
 
-// useStateDir points the state directory (where the active game is kept) at a
-// directory of the test. The environment is global, so the tests that use it
-// are not run in parallel.
-func useStateDir(t *testing.T) string {
-	t.Helper()
-
-	// registered first so that it runs after the environment is put back
-	t.Cleanup(xdg.Reload)
-
-	dir := t.TempDir()
-	t.Setenv("XDG_STATE_HOME", dir)
-	xdg.Reload()
-	return dir
-}
-
 func TestGameInstall(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	t.Run("a game that is asked for is the one that is resolved", func(t *testing.T) {
-		useStateDir(t)
+		t.Parallel()
+
+		dir := t.TempDir()
 		db := testbuilder.SetupDB(t)
 		q := dbq.New(db)
 		asked := testbuilder.NewGame(t, db).WithName("Cyberpunk 2077").WithStoreGameID("1").Build()
 		active := testbuilder.NewGame(t, db).WithName("Skyrim").WithStoreGameID("2").Build()
-		require.NoError(t, state.SaveActive(state.Active{ActiveGameInstallID: active.ID}))
+		require.NoError(t, state.SaveActive(dir, state.Active{ActiveGameInstallID: active.ID}))
 
-		byID, err := GameInstall(ctx, q, fmt.Sprintf("%d", asked.ID))
+		byID, err := GameInstall(ctx, q, dir, fmt.Sprintf("%d", asked.ID))
 		require.NoError(t, err)
 		assert.Equal(t, asked.ID, byID.ID, "not the active one")
 
-		byName, err := GameInstall(ctx, q, "Cyberpunk 2077")
+		byName, err := GameInstall(ctx, q, dir, "Cyberpunk 2077")
 		require.NoError(t, err)
 		assert.Equal(t, asked.ID, byName.ID)
 	})
 
 	t.Run("a game that is asked for and is not there is an error that says so", func(t *testing.T) {
-		useStateDir(t)
+		t.Parallel()
+
+		dir := t.TempDir()
 		db := testbuilder.SetupDB(t)
 		active := testbuilder.NewGame(t, db).Build()
-		require.NoError(t, state.SaveActive(state.Active{ActiveGameInstallID: active.ID}))
+		require.NoError(t, state.SaveActive(dir, state.Active{ActiveGameInstallID: active.ID}))
 
-		_, err := GameInstall(ctx, dbq.New(db), "999999")
+		_, err := GameInstall(ctx, dbq.New(db), dir, "999999")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no game install with id 999999")
 	})
 
 	t.Run("without one it is the active game", func(t *testing.T) {
-		useStateDir(t)
+		t.Parallel()
+
+		dir := t.TempDir()
 		db := testbuilder.SetupDB(t)
 		q := dbq.New(db)
 		testbuilder.NewGame(t, db).WithName("Not Active").WithStoreGameID("1").Build()
 		active := testbuilder.NewGame(t, db).WithName("Active").WithStoreGameID("2").Build()
-		require.NoError(t, state.SaveActive(state.Active{ActiveGameInstallID: active.ID}))
+		require.NoError(t, state.SaveActive(dir, state.Active{ActiveGameInstallID: active.ID}))
 
-		got, err := GameInstall(ctx, q, "")
+		got, err := GameInstall(ctx, q, dir, "")
 
 		require.NoError(t, err)
 		assert.Equal(t, active.ID, got.ID)
@@ -231,11 +223,13 @@ func TestGameInstall(t *testing.T) {
 	})
 
 	t.Run("with no active game it says what to do", func(t *testing.T) {
-		useStateDir(t)
+		t.Parallel()
+
+		dir := t.TempDir()
 		db := testbuilder.SetupDB(t)
 		testbuilder.NewGame(t, db).Build()
 
-		_, err := GameInstall(ctx, dbq.New(db), "")
+		_, err := GameInstall(ctx, dbq.New(db), dir, "")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no active game selected")
@@ -244,37 +238,42 @@ func TestGameInstall(t *testing.T) {
 	})
 
 	t.Run("an active selection that has no game in it is no active game", func(t *testing.T) {
-		useStateDir(t)
+		t.Parallel()
+
+		dir := t.TempDir()
 		db := testbuilder.SetupDB(t)
 		// a store has been chosen, but not a game
-		require.NoError(t, state.SaveActive(state.Active{ActiveStoreID: "steam"}))
+		require.NoError(t, state.SaveActive(dir, state.Active{ActiveStoreID: "steam"}))
 
-		_, err := GameInstall(ctx, dbq.New(db), "")
+		_, err := GameInstall(ctx, dbq.New(db), dir, "")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no active game selected")
 	})
 
 	t.Run("an active game that is not there any more is an error that says so", func(t *testing.T) {
-		useStateDir(t)
-		db := testbuilder.SetupDB(t)
-		require.NoError(t, state.SaveActive(state.Active{ActiveGameInstallID: 424242}))
+		t.Parallel()
 
-		_, err := GameInstall(ctx, dbq.New(db), "")
+		dir := t.TempDir()
+		db := testbuilder.SetupDB(t)
+		require.NoError(t, state.SaveActive(dir, state.Active{ActiveGameInstallID: 424242}))
+
+		_, err := GameInstall(ctx, dbq.New(db), dir, "")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no game install with id 424242")
 	})
 
 	t.Run("a state file that can't be read is an error that says so", func(t *testing.T) {
-		dir := useStateDir(t)
+		t.Parallel()
+
+		dir := t.TempDir()
 		db := testbuilder.SetupDB(t)
 		testbuilder.NewGame(t, db).Build()
-		path := filepath.Join(dir, "modctl", "active.json")
-		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		path := filepath.Join(dir, "active.json")
 		require.NoError(t, os.WriteFile(path, []byte("{ not json"), 0o644))
 
-		_, err := GameInstall(ctx, dbq.New(db), "")
+		_, err := GameInstall(ctx, dbq.New(db), dir, "")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "load active selection")
@@ -282,14 +281,15 @@ func TestGameInstall(t *testing.T) {
 	})
 
 	t.Run("a state file that can't be read is not looked at when a game is asked for", func(t *testing.T) {
-		dir := useStateDir(t)
+		t.Parallel()
+
+		dir := t.TempDir()
 		db := testbuilder.SetupDB(t)
 		gi := testbuilder.NewGame(t, db).Build()
-		path := filepath.Join(dir, "modctl", "active.json")
-		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		path := filepath.Join(dir, "active.json")
 		require.NoError(t, os.WriteFile(path, []byte("{ not json"), 0o644))
 
-		got, err := GameInstall(ctx, dbq.New(db), fmt.Sprintf("%d", gi.ID))
+		got, err := GameInstall(ctx, dbq.New(db), dir, fmt.Sprintf("%d", gi.ID))
 
 		require.NoError(t, err)
 		assert.Equal(t, gi.ID, got.ID)

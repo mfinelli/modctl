@@ -24,10 +24,8 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/archivescanner"
 	"github.com/mfinelli/modctl/internal/blobstore"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var modsScanInventoryRescan bool
@@ -54,7 +52,7 @@ its existing inventory.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -63,11 +61,11 @@ its existing inventory.`,
 		q := dbq.New(db)
 
 		bs := blobstore.Store{
-			ArchivesDir: viper.GetString("archives_dir"),
+			ArchivesDir: cfg.ArchivesDir,
 		}
 
 		scanner := archivescanner.Scanner{
-			BsdtarPath: viper.GetString("bsdtar"),
+			BsdtarPath: cfg.Bsdtar,
 		}
 
 		scanAll := archivescanner.ScanAll

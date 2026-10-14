@@ -28,14 +28,11 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/extractor"
 	"github.com/mfinelli/modctl/internal/patchapply"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -64,7 +61,7 @@ Note: requires archive extraction which may be slow for large archives.`,
 			return err
 		}
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -72,7 +69,7 @@ Note: requires archive extraction which may be slow for large archives.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesPatchPreviewGame)
+		gi, err := gameInstall(ctx, q, profilesOverridesPatchPreviewGame)
 		if err != nil {
 			return err
 		}
@@ -132,16 +129,16 @@ Note: requires archive extraction which may be slow for large archives.`,
 		}
 
 		bs := blobstore.Store{
-			ArchivesDir:  viper.GetString("archives_dir"),
-			BackupsDir:   viper.GetString("backups_dir"),
-			OverridesDir: viper.GetString("overrides_dir"),
-			TmpDir:       viper.GetString("tmp_dir"),
+			ArchivesDir:  cfg.ArchivesDir,
+			BackupsDir:   cfg.BackupsDir,
+			OverridesDir: cfg.OverridesDir,
+			TmpDir:       cfg.TmpDir,
 		}
 
 		ex := extractor.Extractor{
-			BsdtarPath: viper.GetString("bsdtar"),
+			BsdtarPath: cfg.Bsdtar,
 			BlobStore:  bs,
-			StagingDir: viper.GetString("tmp_dir"),
+			StagingDir: cfg.TmpDir,
 		}
 
 		// fetch base file content (extract from winning mod if available)
@@ -244,13 +241,13 @@ func init() {
 		"Override the currently active game")
 	profilesOverridesPatchPreviewCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	profilesOverridesPatchPreviewCmd.Flags().StringVarP(&profilesOverridesPatchPreviewProfile, "profile", "p", "",
 		"Override the currently active profile")
 	profilesOverridesPatchPreviewCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ProfileNames(cmd, toComplete)
+			return completer().ProfileNames(cmd, toComplete)
 		})
 }

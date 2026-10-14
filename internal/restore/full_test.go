@@ -30,7 +30,6 @@ import (
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/exporter"
 	"github.com/mfinelli/modctl/internal/testbuilder"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -47,18 +46,6 @@ func fileDatabase(t *testing.T, path string) *sql.DB {
 	_, err = testbuilder.NewProvider(t, db).Up(context.Background())
 	require.NoError(t, err)
 	return db
-}
-
-// useDatabase has viper say where the database is for the length of a test,
-// which is where a full restore opens the database that it has restored. It
-// changes something that is global, so the tests that use it are not run in
-// parallel.
-func useDatabase(t *testing.T, path string) {
-	t.Helper()
-
-	old := viper.GetString("database")
-	viper.Set("database", path)
-	t.Cleanup(func() { viper.Set("database", old) })
 }
 
 func gameNames(t *testing.T, db *sql.DB) []string {
@@ -92,7 +79,6 @@ func newFullRestoreFixture(t *testing.T) fullRestoreFixture {
 	dbPath := filepath.Join(t.TempDir(), "modctl.db")
 	db := fileDatabase(t, dbPath)
 	newBundleGame(t, db, "1").rename("The game that was there")
-	useDatabase(t, dbPath)
 
 	bundleDir := t.TempDir()
 	bundleDB := fileDatabase(t, filepath.Join(bundleDir, exporter.DatabaseFilename))
@@ -109,11 +95,12 @@ func newFullRestoreFixture(t *testing.T) fullRestoreFixture {
 }
 
 func TestFullReplacesTheDatabase(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
-	useMigrationsOfRepository(t)
 	f := newFullRestoreFixture(t)
 
-	_, err := Full(ctx, f.db, dbq.New(f.db), blobstore.Store{}, f.bundle, Options{Force: true}, f.dbPath, "test", quietLogger())
+	_, err := Full(ctx, f.db, dbq.New(f.db), blobstore.Store{}, f.bundle, Options{Schema: testbuilder.Schema(), Force: true}, f.dbPath, "test", quietLogger())
 
 	require.NoError(t, err)
 	restored, err := sql.Open("sqlite3", database.DSN(f.dbPath, true))
@@ -123,16 +110,55 @@ func TestFullReplacesTheDatabase(t *testing.T) {
 	assert.NoFileExists(t, f.dbPath+".restoring", "the copy was moved into place")
 }
 
-func TestFullThatCannotCopyTheBundleLeavesTheDatabase(t *testing.T) {
+func TestFullMigratesTheDatabaseItRestores(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
-	useMigrationsOfRepository(t)
+	f := newFullRestoreFixture(t)
+	schema := testbuilder.Schema()
+	latest, err := schema.LatestVersion()
+	require.NoError(t, err)
+
+	// the database of the bundle is of the version of the schema before this one,
+	// as it is for a bundle that was exported before modctl was upgraded
+	olderPath := filepath.Join(t.TempDir(), exporter.DatabaseFilename)
+	older, err := sql.Open("sqlite3", database.DSN(olderPath, false))
+	require.NoError(t, err)
+	p := testbuilder.NewProvider(t, older)
+	sources := p.ListSources()
+	require.GreaterOrEqual(t, len(sources), 2)
+	before := sources[len(sources)-2].Version
+	_, err = p.UpTo(ctx, before)
+	require.NoError(t, err)
+	_, err = older.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`)
+	require.NoError(t, err)
+	require.NoError(t, older.Close())
+	require.NoError(t, os.Rename(olderPath, filepath.Join(f.bundle.BundleDir, exporter.DatabaseFilename)))
+
+	_, err = Full(ctx, f.db, dbq.New(f.db), blobstore.Store{}, f.bundle,
+		Options{Schema: schema, Force: true}, f.dbPath, "test", quietLogger())
+
+	require.NoError(t, err)
+	restored, err := database.Setup(f.dbPath)
+	require.NoError(t, err)
+	defer restored.Close()
+	current, err := schema.CurrentVersion(ctx, restored)
+	require.NoError(t, err)
+	assert.Equal(t, latest, current, "it is at the version of the schema that it is given, and not the one of the bundle")
+	assert.Less(t, before, latest)
+}
+
+func TestFullThatCannotCopyTheBundleLeavesTheDatabase(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
 	f := newFullRestoreFixture(t)
 	// a bundle that is cut short: its database is not there to be copied
 	require.NoError(t, f.bundle.BundleDB.Close())
 	require.NoError(t, os.Remove(filepath.Join(f.bundle.BundleDir, exporter.DatabaseFilename)))
 	f.bundle.BundleDB = testbuilder.SetupDB(t) // what it is checked with is not what is wrong
 
-	_, err := Full(ctx, f.db, dbq.New(f.db), blobstore.Store{}, f.bundle, Options{Force: true}, f.dbPath, "test", quietLogger())
+	_, err := Full(ctx, f.db, dbq.New(f.db), blobstore.Store{}, f.bundle, Options{Schema: testbuilder.Schema(), Force: true}, f.dbPath, "test", quietLogger())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "restore database")

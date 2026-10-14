@@ -24,8 +24,6 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -50,13 +48,13 @@ the skip-backup configuration from the old version.`,
 		if len(args) >= 2 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return completion.ModFileVersionIDs(cmd, toComplete)
+		return completer().ModFileVersionIDs(cmd, toComplete)
 	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -64,7 +62,7 @@ the skip-backup configuration from the old version.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.GameInstall(ctx, q, profilesDeploysSkipBackupCopyGame)
+		gi, err := gameInstall(ctx, q, profilesDeploysSkipBackupCopyGame)
 		if err != nil {
 			return err
 		}
@@ -115,12 +113,12 @@ func init() {
 		"Override the currently active game")
 	profilesDeploysSkipBackupCopyCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 	profilesDeploysSkipBackupCopyCmd.PersistentFlags().StringVarP(&profilesDeploysSkipBackupCopyProfile, "profile", "p", "",
 		"Override the currently active profile")
 	profilesDeploysSkipBackupCopyCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ProfileNames(cmd, toComplete)
+			return completer().ProfileNames(cmd, toComplete)
 		})
 }

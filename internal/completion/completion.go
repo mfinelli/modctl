@@ -20,6 +20,22 @@ package completion
 
 import "strings"
 
+// A Completer completes what a command is given, from the database and the
+// active selection that it is given: what it knows is what it is made with,
+// and nothing it can find by itself, so one is made for the place that a test
+// has set up as easily as for the one that the user has.
+//
+// A completion is not allowed to fail loudly, or to fall back to the files of
+// the directory it is in: if the database is not there, or the active game is
+// not known, there is nothing to complete.
+type Completer struct {
+	// DatabasePath is the file of the database, which is only read.
+	DatabasePath string
+
+	// StateDir is the directory that the active selection is kept in.
+	StateDir string
+}
+
 func likePrefixPattern(s string) string {
 	// Escape LIKE wildcards so user input is treated literally.
 	// Then append % for prefix match.

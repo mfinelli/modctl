@@ -23,8 +23,6 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -51,7 +49,7 @@ path back to the mod winner or remove it if no mod provides it.`,
 			return err
 		}
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -59,7 +57,7 @@ path back to the mod winner or remove it if no mod provides it.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesUnsetGame)
+		gi, err := gameInstall(ctx, q, profilesOverridesUnsetGame)
 		if err != nil {
 			return err
 		}
@@ -108,12 +106,12 @@ func init() {
 		"Override the currently active game")
 	profilesOverridesUnsetCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 	profilesOverridesUnsetCmd.Flags().StringVarP(&profilesOverridesUnsetProfile, "profile", "p", "",
 		"Override the currently active profile")
 	profilesOverridesUnsetCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ProfileNames(cmd, toComplete)
+			return completer().ProfileNames(cmd, toComplete)
 		})
 }

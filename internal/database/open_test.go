@@ -26,33 +26,14 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/pressly/goose/v3"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// useDatabase has viper say where the database is for the length of a test.
-// It changes something that is global, so the tests that use it are not run in
-// parallel.
-func useDatabase(t *testing.T, path string) {
-	t.Helper()
-
-	old := viper.GetString("database")
-	viper.Set("database", path)
-	t.Cleanup(func() { viper.Set("database", old) })
-}
-
 // migrateFromFiles is a migrate for openWith that applies the migrations of the
 // repository, which are not embedded in the binary of a test.
 func migrateFromFiles(ctx context.Context, db *sql.DB) error {
-	p, err := goose.NewProvider(goose.DialectSQLite3, db, os.DirFS("../../migrations"))
-	if err != nil {
-		return err
-	}
-
-	_, err = p.Up(ctx)
-	return err
+	return repositorySchema().Migrate(ctx, db)
 }
 
 // emptyDatabaseFile makes a database file that has nothing in it yet, which is
@@ -66,12 +47,14 @@ func emptyDatabaseFile(t *testing.T) string {
 }
 
 func TestOpenDB(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	t.Run("a database that is there is opened, and migrated", func(t *testing.T) {
-		useDatabase(t, emptyDatabaseFile(t))
+		t.Parallel()
 
-		db, err := openWith(ctx, migrateFromFiles)
+		db, err := openWith(ctx, emptyDatabaseFile(t), migrateFromFiles)
 		require.NoError(t, err)
 		defer db.Close()
 
@@ -82,9 +65,9 @@ func TestOpenDB(t *testing.T) {
 	})
 
 	t.Run("foreign keys are enforced on what it returns", func(t *testing.T) {
-		useDatabase(t, emptyDatabaseFile(t))
+		t.Parallel()
 
-		db, err := openWith(ctx, migrateFromFiles)
+		db, err := openWith(ctx, emptyDatabaseFile(t), migrateFromFiles)
 		require.NoError(t, err)
 		defer db.Close()
 
@@ -94,9 +77,9 @@ func TestOpenDB(t *testing.T) {
 	})
 
 	t.Run("the database is not configured", func(t *testing.T) {
-		useDatabase(t, "")
+		t.Parallel()
 
-		db, err := openWith(ctx, migrateFromFiles)
+		db, err := openWith(ctx, "", migrateFromFiles)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "database path is not configured")
@@ -104,10 +87,11 @@ func TestOpenDB(t *testing.T) {
 	})
 
 	t.Run("a database that is not there says what to do", func(t *testing.T) {
-		path := filepath.Join(t.TempDir(), "nothing.db")
-		useDatabase(t, path)
+		t.Parallel()
 
-		db, err := openWith(ctx, migrateFromFiles)
+		path := filepath.Join(t.TempDir(), "nothing.db")
+
+		db, err := openWith(ctx, path, migrateFromFiles)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), path)
@@ -117,9 +101,9 @@ func TestOpenDB(t *testing.T) {
 	})
 
 	t.Run("a path that is not a file is not a database", func(t *testing.T) {
-		useDatabase(t, t.TempDir())
+		t.Parallel()
 
-		db, err := openWith(ctx, migrateFromFiles)
+		db, err := openWith(ctx, t.TempDir(), migrateFromFiles)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not a regular file")
@@ -127,10 +111,10 @@ func TestOpenDB(t *testing.T) {
 	})
 
 	t.Run("nothing is migrated that is not there", func(t *testing.T) {
-		useDatabase(t, filepath.Join(t.TempDir(), "nothing.db"))
+		t.Parallel()
 
 		called := false
-		_, err := openWith(ctx, func(context.Context, *sql.DB) error {
+		_, err := openWith(ctx, filepath.Join(t.TempDir(), "nothing.db"), func(context.Context, *sql.DB) error {
 			called = true
 			return nil
 		})
@@ -140,10 +124,10 @@ func TestOpenDB(t *testing.T) {
 	})
 
 	t.Run("migrating is done on the database that is handed over", func(t *testing.T) {
-		useDatabase(t, emptyDatabaseFile(t))
+		t.Parallel()
 
 		var migrated *sql.DB
-		db, err := openWith(ctx, func(_ context.Context, db *sql.DB) error {
+		db, err := openWith(ctx, emptyDatabaseFile(t), func(_ context.Context, db *sql.DB) error {
 			migrated = db
 			return nil
 		})
@@ -155,11 +139,11 @@ func TestOpenDB(t *testing.T) {
 	})
 
 	t.Run("a migration that fails is an error, and the database is closed", func(t *testing.T) {
-		useDatabase(t, emptyDatabaseFile(t))
+		t.Parallel()
 
 		boom := errors.New("migration 7 failed")
 		var migrated *sql.DB
-		db, err := openWith(ctx, func(_ context.Context, db *sql.DB) error {
+		db, err := openWith(ctx, emptyDatabaseFile(t), func(_ context.Context, db *sql.DB) error {
 			migrated = db
 			return boom
 		})
@@ -170,14 +154,29 @@ func TestOpenDB(t *testing.T) {
 		assert.Error(t, migrated.PingContext(ctx), "it is not left open")
 	})
 
-	t.Run("the migrations that are embedded are the ones that are used", func(t *testing.T) {
-		useDatabase(t, emptyDatabaseFile(t))
+	t.Run("the schema that is given is the one that is migrated to", func(t *testing.T) {
+		t.Parallel()
 
-		// Migrations is only filled in by the binary, so in a test there is
-		// nothing to migrate with, which is an error and not an empty schema
-		db, err := Open(ctx)
+		db, err := repositorySchema().Open(ctx, emptyDatabaseFile(t))
+
+		require.NoError(t, err)
+		defer db.Close()
+		current, err := repositorySchema().CurrentVersion(ctx, db)
+		require.NoError(t, err)
+		latest, err := repositorySchema().LatestVersion()
+		require.NoError(t, err)
+		assert.Equal(t, latest, current)
+	})
+
+	t.Run("a schema that has no migrations is an error, and not an empty schema", func(t *testing.T) {
+		t.Parallel()
+
+		path := emptyDatabaseFile(t)
+
+		db, err := NewSchema(nil).Open(ctx, path)
 
 		require.Error(t, err)
 		assert.Nil(t, db)
+		assert.Contains(t, err.Error(), "no migrations are embedded")
 	})
 }

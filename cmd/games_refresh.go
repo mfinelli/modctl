@@ -22,7 +22,6 @@ import (
 	"fmt"
 
 	"github.com/mfinelli/modctl/internal"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -42,7 +41,7 @@ It is safe to run multiple times.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -51,7 +50,7 @@ It is safe to run multiple times.`,
 		style.Println(style.Bold.Render("Scanning stores..."))
 		style.Println()
 
-		result, err := internal.ScanStores(ctx, db)
+		result, err := internal.ScanStores(ctx, db, userDirs())
 
 		// warnings are worth showing even if the scan then failed
 		for _, w := range result.Warnings {

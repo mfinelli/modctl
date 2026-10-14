@@ -31,10 +31,10 @@ import (
 
 // GameInstallSelectors completes "games set-active <selector>".
 // It returns *full selectors* (always includes #instance) with a description.
-func GameInstallSelectors(cmd *cobra.Command, toComplete string) ([]string, cobra.ShellCompDirective) {
+func (c Completer) GameInstallSelectors(cmd *cobra.Command, toComplete string) ([]string, cobra.ShellCompDirective) {
 	ctx := context.Background()
 
-	db, err := database.SetupReadOnly()
+	db, err := database.SetupReadOnly(c.DatabasePath)
 	if err != nil {
 		// No DB (not initialized) or error: don't fall back to file completion.
 		return nil, cobra.ShellCompDirectiveNoFileComp

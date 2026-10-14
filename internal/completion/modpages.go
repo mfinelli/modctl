@@ -32,9 +32,9 @@ import (
 // ModPageIDs completes mod page IDs for the active (or --game-scoped) game
 // install. Returns candidates as numeric IDs with the mod page name and
 // source kind as the description.
-func ModPageIDs(cmd *cobra.Command, toComplete string) ([]string, cobra.ShellCompDirective) {
+func (c Completer) ModPageIDs(cmd *cobra.Command, toComplete string) ([]string, cobra.ShellCompDirective) {
 	ctx := context.Background()
-	db, err := database.SetupReadOnly()
+	db, err := database.SetupReadOnly(c.DatabasePath)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -48,7 +48,7 @@ func ModPageIDs(cmd *cobra.Command, toComplete string) ([]string, cobra.ShellCom
 		}
 		gameID = v
 	} else {
-		active, err := state.LoadActive()
+		active, err := state.LoadActive(c.StateDir)
 		if err != nil || active.ActiveGameInstallID <= 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}

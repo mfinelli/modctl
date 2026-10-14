@@ -25,9 +25,6 @@ import (
 	"path/filepath"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -59,7 +56,7 @@ moves later, this target will not be updated automatically.`,
 		name := args[0]
 		rawPath := args[1]
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -67,7 +64,7 @@ moves later, this target will not be updated automatically.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.GameInstall(ctx, q, gamesTargetsAddGame)
+		gi, err := gameInstall(ctx, q, gamesTargetsAddGame)
 		if err != nil {
 			return err
 		}
@@ -114,13 +111,13 @@ func init() {
 		"Override the currently active game")
 	gamesTargetsAddCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	gamesTargetsAddCmd.Flags().StringVar(&gamesTargetsAddRelTo, "relative-to", "",
 		"Name of an existing target to resolve the path relative to")
 	gamesTargetsAddCmd.RegisterFlagCompletionFunc("relative-to",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.TargetNames(cmd, toComplete)
+			return completer().TargetNames(cmd, toComplete)
 		})
 }

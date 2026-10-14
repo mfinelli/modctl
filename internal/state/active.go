@@ -24,9 +24,11 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-
-	"github.com/adrg/xdg"
 )
+
+// activeFilename is the file, in the state directory, that has the active
+// selection.
+const activeFilename = "active.json"
 
 type Active struct {
 	ActiveStoreID             string `json:"active_store_id,omitempty"`
@@ -35,11 +37,11 @@ type Active struct {
 	UpdatedAt                 string `json:"updated_at,omitempty"`
 }
 
-func LoadActive() (Active, error) {
-	p, err := xdg.StateFile(filepath.Join("modctl", "active.json"))
-	if err != nil {
-		return Active{}, err
-	}
+// LoadActive reads the active selection from the state directory dir. There
+// is none until one is saved, which is an empty Active and not an error, and
+// nothing is made by looking: not the directory, and not the file.
+func LoadActive(dir string) (Active, error) {
+	p := filepath.Join(dir, activeFilename)
 
 	b, err := os.ReadFile(p)
 	if err != nil {
@@ -56,11 +58,13 @@ func LoadActive() (Active, error) {
 	return a, nil
 }
 
-func SaveActive(a Active) error {
-	p, err := xdg.StateFile(filepath.Join("modctl", "active.json"))
-	if err != nil {
-		return err
+// SaveActive writes the active selection a to the state directory dir, which
+// is made if it is not there. UpdatedAt is set to now, whatever a has in it.
+func SaveActive(dir string, a Active) error {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("make %s: %w", dir, err)
 	}
+	p := filepath.Join(dir, activeFilename)
 
 	a.UpdatedAt = time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 

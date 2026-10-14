@@ -29,14 +29,10 @@ import (
 	"time"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/mfinelli/modctl/internal/updatechain"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"golang.org/x/term"
 )
 
@@ -70,18 +66,18 @@ to proceed even if the operation would exhaust your API quota.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		apiKey := viper.GetString("nexus.apikey")
+		apiKey := cfg.NexusAPIKey
 		if apiKey == "" {
 			return fmt.Errorf("nexus api key not configured; set nexus.apikey in your config file")
 		}
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
 		defer db.Close()
 
-		client, err := nexusclient.New(ctx, apiKey, logger, rootCmd.Version)
+		client, err := nexusClient(ctx, apiKey, logger)
 		if err != nil {
 			return fmt.Errorf("initializing nexus client: %w", err)
 		}
@@ -90,7 +86,7 @@ to proceed even if the operation would exhaust your API quota.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.GameInstall(ctx, q, modsNexusCheckUpdatesGame)
+		gi, err := gameInstall(ctx, q, modsNexusCheckUpdatesGame)
 		if err != nil {
 			return err
 		}
@@ -108,7 +104,7 @@ to proceed even if the operation would exhaust your API quota.`,
 		if _, err := client.ValidateUser(); err != nil {
 			logger.Warn("failed to validate nexus user for quota check", "error", err)
 		}
-		rateLimitState, err := nexusclient.LoadRateLimitState()
+		rateLimitState, err := loadRateLimitState()
 		if err != nil {
 			logger.Warn("failed to load rate limit state", "error", err)
 		}
@@ -127,7 +123,7 @@ to proceed even if the operation would exhaust your API quota.`,
 		}
 
 		// Open cache reader to check TTL and build superseded set
-		cacheReader, err := nexusclient.NewCacheReader(ctx, logger)
+		cacheReader, err := nexusCacheReader(ctx, logger)
 		if err != nil {
 			return fmt.Errorf("opening nexus cache: %w", err)
 		}
@@ -321,7 +317,7 @@ to proceed even if the operation would exhaust your API quota.`,
 
 				// Re-sync remaining count from state file every 10 cold fetches
 				if coldFetchCount%10 == 0 {
-					if s, err := nexusclient.LoadRateLimitState(); err == nil {
+					if s, err := loadRateLimitState(); err == nil {
 						h, d := s.EffectiveRemaining()
 						remaining = min(int64(h), int64(d))
 					}
@@ -465,7 +461,7 @@ func init() {
 		"Override the currently active game")
 	modsNexusCheckUpdatesCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	modsNexusCheckUpdatesCmd.Flags().BoolVar(&modsNexusCheckUpdatesForce, "force", false,

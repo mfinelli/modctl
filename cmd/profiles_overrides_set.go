@@ -27,11 +27,9 @@ import (
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
-	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -62,7 +60,7 @@ winner for this path in the active profile.`,
 		}
 		srcFile := args[1]
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -70,7 +68,7 @@ winner for this path in the active profile.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesSetGame)
+		gi, err := gameInstall(ctx, q, profilesOverridesSetGame)
 		if err != nil {
 			return err
 		}
@@ -107,10 +105,10 @@ winner for this path in the active profile.`,
 		}
 
 		bs := blobstore.Store{
-			ArchivesDir:  viper.GetString("archives_dir"),
-			BackupsDir:   viper.GetString("backups_dir"),
-			OverridesDir: viper.GetString("overrides_dir"),
-			TmpDir:       viper.GetString("tmp_dir"),
+			ArchivesDir:  cfg.ArchivesDir,
+			BackupsDir:   cfg.BackupsDir,
+			OverridesDir: cfg.OverridesDir,
+			TmpDir:       cfg.TmpDir,
 		}
 
 		// ingest the file into the override blob store
@@ -189,13 +187,13 @@ func init() {
 		"Override the currently active game")
 	profilesOverridesSetCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 	profilesOverridesSetCmd.Flags().StringVarP(&profilesOverridesSetProfile, "profile", "p", "",
 		"Override the currently active profile")
 	profilesOverridesSetCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ProfileNames(cmd, toComplete)
+			return completer().ProfileNames(cmd, toComplete)
 		})
 	profilesOverridesSetCmd.Flags().StringVar(&profilesOverridesSetNotes, "notes", "",
 		"Optional notes for this override")

@@ -45,11 +45,11 @@ import (
 )
 
 // GameInstall resolves the game install that a command is for: the one
-// that arg says (see ExplicitGameInstall), or the active one if arg is
-// empty, which is what leaving out --game means.
-func GameInstall(ctx context.Context, q *dbq.Queries, arg string) (dbq.GameInstall, error) {
+// that arg says (see ExplicitGameInstall), or the active one, from the state
+// directory stateDir, if arg is empty, which is what leaving out --game means.
+func GameInstall(ctx context.Context, q *dbq.Queries, stateDir string, arg string) (dbq.GameInstall, error) {
 	if arg == "" {
-		active, err := state.LoadActive()
+		active, err := state.LoadActive(stateDir)
 		if err != nil {
 			return dbq.GameInstall{}, fmt.Errorf("load active selection: %w", err)
 		}

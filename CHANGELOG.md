@@ -53,6 +53,8 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 - `apply` now records the hash and size of the file that an overwrite replaces,
   from the check for drift that it already does or from the backup it made.
   Nothing is read just for this so with `--no-recheck` nothing is recorded.
+- Fix a crash when Nexus Mods answered that the rate limit was exceeded and the
+  file that keeps the rate limits could not be read.
 
 ## v0.8.0 - 2026-10-10
 

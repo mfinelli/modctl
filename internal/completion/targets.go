@@ -35,9 +35,9 @@ import (
 //
 // Returns candidates in "name\troot_path" format so the user can see where
 // each target points without having to run a separate command.
-func TargetNames(cmd *cobra.Command, toComplete string) ([]string, cobra.ShellCompDirective) {
+func (c Completer) TargetNames(cmd *cobra.Command, toComplete string) ([]string, cobra.ShellCompDirective) {
 	ctx := context.Background()
-	db, err := database.SetupReadOnly()
+	db, err := database.SetupReadOnly(c.DatabasePath)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -51,7 +51,7 @@ func TargetNames(cmd *cobra.Command, toComplete string) ([]string, cobra.ShellCo
 		}
 		gameID = v
 	} else {
-		active, err := state.LoadActive()
+		active, err := state.LoadActive(c.StateDir)
 		if err != nil || active.ActiveGameInstallID <= 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}

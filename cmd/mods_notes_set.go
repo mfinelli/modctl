@@ -27,8 +27,6 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/spf13/cobra"
 )
 
@@ -49,13 +47,13 @@ Pass - as the text to read it from stdin:
 		if len(args) != 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return completion.ModPageIDs(cmd, toComplete)
+		return completer().ModPageIDs(cmd, toComplete)
 	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -63,7 +61,7 @@ Pass - as the text to read it from stdin:
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.GameInstall(ctx, q, modsNotesSetGame)
+		gi, err := gameInstall(ctx, q, modsNotesSetGame)
 		if err != nil {
 			return err
 		}
@@ -97,6 +95,6 @@ func init() {
 		"Override the currently active game")
 	modsNotesSetCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 }

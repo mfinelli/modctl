@@ -41,6 +41,10 @@ func Full(
 	bs blobstore.Store,
 	opts Options,
 ) (Result, error) {
+	if err := opts.validate(); err != nil {
+		return Result{}, err
+	}
+
 	if !opts.NoVerify {
 		var toVerify []blobToVerify
 		archiveBlobs, err := q.ListBlobsByKind(ctx, string(blobstore.KindArchive))
@@ -93,14 +97,14 @@ func Full(
 	defer tw.Close()
 
 	// 1. Snapshot the database into a temp file
-	dbPath, dbSha256, err := snapshotDB(ctx, db)
+	dbPath, dbSha256, err := snapshotDB(ctx, db, opts.ScratchDir)
 	if err != nil {
 		return Result{}, fmt.Errorf("snapshot database: %w", err)
 	}
 	defer os.Remove(dbPath)
 
 	// 1b. Snapshot the nexus cache database
-	cacheDBPath, cacheSha256, err := snapshotCacheDB(ctx, opts.CacheDBPath)
+	cacheDBPath, cacheSha256, err := snapshotCacheDB(ctx, opts.CacheDBPath, opts.ScratchDir)
 	if err != nil {
 		return Result{}, fmt.Errorf("snapshot nexus cache: %w", err)
 	}
@@ -109,7 +113,7 @@ func Full(
 	}
 
 	// 2. Get schema version
-	schemaVersion, err := database.CurrentSchemaVersion(ctx, db)
+	schemaVersion, err := opts.Schema.CurrentVersion(ctx, db)
 	if err != nil {
 		return Result{}, fmt.Errorf("get schema version: %w", err)
 	}
@@ -207,10 +211,10 @@ func Full(
 	return Result{SkippedBlobs: skipped}, nil
 }
 
-// snapshotDB uses the SQLite backup API to create a consistent snapshot.
-// Returns the path to the temp file and its sha256.
-func snapshotDB(ctx context.Context, db *sql.DB) (path string, sha256hex string, err error) {
-	tmp, err := os.CreateTemp("", "modctl-export-db-*.sqlite")
+// snapshotDB uses the SQLite backup API to create a consistent snapshot, in
+// the directory scratchDir. Returns the path to the temp file and its sha256.
+func snapshotDB(ctx context.Context, db *sql.DB, scratchDir string) (path string, sha256hex string, err error) {
+	tmp, err := os.CreateTemp(scratchDir, "modctl-export-db-*.sqlite")
 	if err != nil {
 		return "", "", fmt.Errorf("create temp file: %w", err)
 	}
@@ -232,15 +236,15 @@ func snapshotDB(ctx context.Context, db *sql.DB) (path string, sha256hex string,
 	return tmpPath, sha, nil
 }
 
-// snapshotCacheDB creates a consistent snapshot of the nexus cache database.
-// Returns the path to the temp file and its sha256. If the cache DB does not
-// exist yet, returns empty strings and no error.
-func snapshotCacheDB(ctx context.Context, cacheDBPath string) (path string, sha256hex string, err error) {
+// snapshotCacheDB creates a consistent snapshot of the nexus cache database, in
+// the directory scratchDir. Returns the path to the temp file and its sha256.
+// If the cache DB does not exist yet, returns empty strings and no error.
+func snapshotCacheDB(ctx context.Context, cacheDBPath string, scratchDir string) (path string, sha256hex string, err error) {
 	if _, err := os.Stat(cacheDBPath); os.IsNotExist(err) {
 		return "", "", nil
 	}
 
-	tmp, err := os.CreateTemp("", "modctl-export-cache-*.sqlite")
+	tmp, err := os.CreateTemp(scratchDir, "modctl-export-cache-*.sqlite")
 	if err != nil {
 		return "", "", fmt.Errorf("create temp file: %w", err)
 	}

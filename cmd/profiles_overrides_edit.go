@@ -29,12 +29,10 @@ import (
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
-	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/extractor"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -72,7 +70,7 @@ archives.`,
 			return err
 		}
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -80,7 +78,7 @@ archives.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesEditGame)
+		gi, err := gameInstall(ctx, q, profilesOverridesEditGame)
 		if err != nil {
 			return err
 		}
@@ -102,16 +100,16 @@ archives.`,
 		}
 
 		bs := blobstore.Store{
-			ArchivesDir:  viper.GetString("archives_dir"),
-			BackupsDir:   viper.GetString("backups_dir"),
-			OverridesDir: viper.GetString("overrides_dir"),
-			TmpDir:       viper.GetString("tmp_dir"),
+			ArchivesDir:  cfg.ArchivesDir,
+			BackupsDir:   cfg.BackupsDir,
+			OverridesDir: cfg.OverridesDir,
+			TmpDir:       cfg.TmpDir,
 		}
 
 		ex := extractor.Extractor{
-			BsdtarPath: viper.GetString("bsdtar"),
+			BsdtarPath: cfg.Bsdtar,
 			BlobStore:  bs,
-			StagingDir: viper.GetString("tmp_dir"),
+			StagingDir: cfg.TmpDir,
 		}
 
 		// check for existing override
@@ -302,13 +300,13 @@ func init() {
 		"Override the currently active game")
 	profilesOverridesEditCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 	profilesOverridesEditCmd.Flags().StringVarP(&profilesOverridesEditProfile, "profile", "p", "",
 		"Override the currently active profile")
 	profilesOverridesEditCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ProfileNames(cmd, toComplete)
+			return completer().ProfileNames(cmd, toComplete)
 		})
 
 	profilesOverridesEditCmd.Flags().BoolVar(&profilesOverridesEditReset, "reset", false,

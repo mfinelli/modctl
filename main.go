@@ -34,7 +34,7 @@ var sampleTarGz []byte
 
 func main() {
 	cmd.SampleTarGz = sampleTarGz
-	database.Migrations = migrations
+	cmd.Schema = database.NewSchema(migrations)
 
 	if r := cmd.Execute(); r != 0 {
 		os.Exit(r)

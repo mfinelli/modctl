@@ -160,6 +160,39 @@ Each command or subcommand group has its own file following the naming
 convention already established in the package (e.g. `profiles_create.go`,
 `mods_nexus_link.go`).
 
+### Writing tests
+
+Tests must not touch the machine that they run on, and the packages in
+`internal/` are written so that they can't. CI runs the tests through
+`scripts/test.bash`, which points `HOME`, the XDG directories and `TMPDIR` at a
+temporary directory (the ones that hold state are read-only) and fails if
+anything is left in it or in the repository.
+
+Respect the following rules when writing tests:
+
+- **Packages in `internal/` are given what they work on.** They don't read the
+  environment, `$HOME`, the working directory or the system temporary directory,
+  and they don't import `xdg` or `viper` (`internal/config` is the only
+  exception: it reads the config file).
+- **`cmd/` is the only place that knows where things are.** `cmd/env.go` turns
+  the configuration and the XDG directories into those arguments. When a
+  function in `internal/` needs another path or setting, add a parameter instead
+  of reading it from its surroundings.
+- **No package-level variables in `internal/`** apart from read-only values
+  (tables, styles, embedded files) and sentinel errors. State that is shared is
+  what makes tests depend on each other and keeps them from running in parallel.
+- **Tests set up everything they use**: `t.TempDir()` for files,
+  `testbuilder.SetupDB` or `SetupDBFile` for a database, `testbuilder.Schema()`
+  for the migrations, and a fake `http.RoundTripper` or a local server for the
+  network. Nothing in a test talks to the real Nexus Mods.
+- **Tests don't change global state**: no assigning to a package-level variable
+  (of any package), no `t.Setenv`, `os.Setenv` or `os.Chdir`, and no `TestMain`
+  that sets something up for the others. Tests should use `t.Parallel()` where
+  possible, and `go test -race -shuffle=on` should always pass. The tests of
+  `internal/style` are the only exception: they check how the output behaves on
+  a terminal and with `NO_COLOR`, which is the environment, so they run one at a
+  time.
+
 ## Future ideas
 
 - Additional stores (Heroic, Lutris, GOG)

@@ -21,9 +21,9 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/mfinelli/modctl/internal/database"
 )
@@ -42,43 +42,48 @@ multiple times and will not overwrite existing data.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		err := os.MkdirAll(viper.GetString("archives_dir"), 0o0755)
+		err := os.MkdirAll(cfg.ArchivesDir, 0o0755)
 		if err != nil {
 			return fmt.Errorf("error creating archives directory: %w", err)
 		}
 
-		err = os.MkdirAll(viper.GetString("backups_dir"), 0o0755)
+		err = os.MkdirAll(cfg.BackupsDir, 0o0755)
 		if err != nil {
 			return fmt.Errorf("error creating backups directory: %w", err)
 		}
 
-		err = os.MkdirAll(viper.GetString("cache_dir"), 0o0755)
+		err = os.MkdirAll(cacheDir(), 0o0755)
 		if err != nil {
 			return fmt.Errorf("error creating cache directory: %w", err)
 		}
 
-		err = os.MkdirAll(viper.GetString("locks_dir"), 0o0755)
+		err = os.MkdirAll(cfg.LocksDir, 0o0755)
 		if err != nil {
 			return fmt.Errorf("error creating locks directory: %w", err)
 		}
 
-		err = os.MkdirAll(viper.GetString("overrides_dir"), 0o0755)
+		err = os.MkdirAll(cfg.OverridesDir, 0o0755)
 		if err != nil {
 			return fmt.Errorf("error creating overrides directory: %w", err)
 		}
 
-		err = os.MkdirAll(viper.GetString("tmp_dir"), 0o0755)
+		err = os.MkdirAll(cfg.TmpDir, 0o0755)
 		if err != nil {
 			return fmt.Errorf("error creating tmp directory: %w", err)
 		}
 
-		db, err := database.Setup()
+		err = os.MkdirAll(filepath.Dir(databasePath()), 0o0755)
+		if err != nil {
+			return fmt.Errorf("error creating database directory: %w", err)
+		}
+
+		db, err := database.Setup(databasePath())
 		if err != nil {
 			return fmt.Errorf("error opening database: %w", err)
 		}
 		defer db.Close()
 
-		err = database.Migrate(ctx, db)
+		err = Schema.Migrate(ctx, db)
 		if err != nil {
 			return fmt.Errorf("error migrating database: %w", err)
 		}

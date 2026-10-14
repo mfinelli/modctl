@@ -22,8 +22,6 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -45,13 +43,13 @@ recreating rules in a different order.`,
 		if len(args) != 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return completion.ModFileVersionIDs(cmd, toComplete)
+		return completer().ModFileVersionIDs(cmd, toComplete)
 	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -60,7 +58,7 @@ recreating rules in a different order.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.GameInstall(ctx, q, profilesRemapClearGame)
+		gi, err := gameInstall(ctx, q, profilesRemapClearGame)
 		if err != nil {
 			return err
 		}
@@ -100,12 +98,12 @@ func init() {
 		"Override the currently active game")
 	profilesRemapClearCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 	profilesRemapClearCmd.PersistentFlags().StringVarP(&profilesRemapClearProfile, "profile", "p", "",
 		"Override the currently active profile")
 	profilesRemapClearCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ProfileNames(cmd, toComplete)
+			return completer().ProfileNames(cmd, toComplete)
 		})
 }

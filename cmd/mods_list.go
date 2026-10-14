@@ -25,9 +25,6 @@ import (
 	"sort"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/mfinelli/modctl/internal/updatechain"
@@ -60,7 +57,7 @@ only reads the cache: use ` + "`modctl mods nexus check-updates`" + ` to refresh
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -69,7 +66,7 @@ only reads the cache: use ` + "`modctl mods nexus check-updates`" + ` to refresh
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.GameInstall(ctx, q, modsListGame)
+		gi, err := gameInstall(ctx, q, modsListGame)
 		if err != nil {
 			return err
 		}
@@ -166,7 +163,7 @@ only reads the cache: use ` + "`modctl mods nexus check-updates`" + ` to refresh
 
 		for _, p := range pages {
 			if p.NexusDomain.Valid && p.NexusModID.Valid {
-				c, err := nexusclient.NewCacheReader(ctx, logger)
+				c, err := nexusCacheReader(ctx, logger)
 				if err != nil {
 					logger.Warn("failed to open nexus cache", "error", err)
 					break
@@ -402,6 +399,6 @@ func init() {
 		"Override the currently active game")
 	modsListCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 }

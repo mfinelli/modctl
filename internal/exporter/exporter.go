@@ -32,6 +32,7 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/blobstore"
+	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/fsutil"
 )
 
@@ -50,9 +51,29 @@ type Options struct {
 	NoVerify bool
 	// CacheDBPath is the full path to the nexus_cache.db
 	CacheDBPath string
+	// ScratchDir is the directory that the snapshots of the databases are
+	// made in, before they are written to the bundle (and removed). It has
+	// to be there, and to have room for a copy of the databases. It is not
+	// found by the exporter: nothing is made anywhere that it was not told.
+	ScratchDir string
+	// Schema is the schema of the databases that are in the bundle: the
+	// version that the bundle says the database is at is its, and so is what
+	// the database of a game is made with. It is not found by the exporter.
+	Schema *database.Schema
 	// Progress, if set, is told how verifying blobs is going. The exporter
 	// itself prints nothing.
 	Progress func(Progress)
+}
+
+// validate says what is missing from the options that every export needs.
+func (o Options) validate() error {
+	if o.ScratchDir == "" {
+		return errors.New("no scratch directory to make the snapshots of the databases in")
+	}
+	if o.Schema == nil {
+		return errors.New("no schema to make the databases of the bundle with")
+	}
+	return nil
 }
 
 // ProgressKind says what a Progress update is about.

@@ -27,16 +27,13 @@ import (
 	"time"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
-	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/extractor"
 	"github.com/mfinelli/modctl/internal/lock"
 	"github.com/mfinelli/modctl/internal/planner"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -63,7 +60,7 @@ Use --dry-run to preview the plan without making any changes.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -72,7 +69,7 @@ Use --dry-run to preview the plan without making any changes.`,
 		q := dbq.New(db)
 
 		// Resolve game install
-		gi, err := argresolver.GameInstall(ctx, q, unapplyGame)
+		gi, err := gameInstall(ctx, q, unapplyGame)
 		if err != nil {
 			return err
 		}
@@ -123,7 +120,7 @@ Use --dry-run to preview the plan without making any changes.`,
 		}
 
 		// Acquire per-game lock to prevent concurrent apply/unapply
-		unlock, err := lock.GameInstall(viper.GetString("locks_dir"), gi.ID)
+		unlock, err := lock.GameInstall(cfg.LocksDir, gi.ID)
 		if err != nil {
 			return err
 		}
@@ -190,15 +187,15 @@ Use --dry-run to preview the plan without making any changes.`,
 		style.Println()
 
 		bs := blobstore.Store{
-			ArchivesDir: viper.GetString("archives_dir"),
-			BackupsDir:  viper.GetString("backups_dir"),
-			TmpDir:      viper.GetString("tmp_dir"),
+			ArchivesDir: cfg.ArchivesDir,
+			BackupsDir:  cfg.BackupsDir,
+			TmpDir:      cfg.TmpDir,
 		}
 
 		ext := extractor.Extractor{
-			BsdtarPath: viper.GetString("bsdtar"),
+			BsdtarPath: cfg.Bsdtar,
 			BlobStore:  bs,
-			StagingDir: viper.GetString("tmp_dir"),
+			StagingDir: cfg.TmpDir,
 		}
 
 		// Create operation record
@@ -344,7 +341,7 @@ func init() {
 		"Override the currently active game")
 	unapplyCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	unapplyCmd.Flags().BoolVar(&unapplyDryRun, "dry-run", false,

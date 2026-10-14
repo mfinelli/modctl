@@ -19,7 +19,6 @@
 package database
 
 import (
-	"context"
 	"database/sql"
 	"os"
 	"path/filepath"
@@ -149,53 +148,81 @@ func TestDSNReadOnly(t *testing.T) {
 	})
 }
 
-// useMigrationsOfRepository has Migrations be the ones of the repository for the
-// length of a test, as they are in the binary. It changes something that is
-// global, so the tests that use it are not run in parallel.
-func useMigrationsOfRepository(t *testing.T) {
-	t.Helper()
+func TestSetup(t *testing.T) {
+	t.Parallel()
 
-	old := Migrations
-	Migrations = os.DirFS("../..")
-	t.Cleanup(func() { Migrations = old })
+	t.Run("it opens a database that can be written, with foreign keys enforced", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.TempDir(), "modctl.db")
+
+		db, err := Setup(path)
+		require.NoError(t, err)
+		defer db.Close()
+
+		_, err = db.Exec(`CREATE TABLE things (id INTEGER PRIMARY KEY)`)
+		require.NoError(t, err)
+		assert.FileExists(t, path)
+
+		var enabled int
+		require.NoError(t, db.QueryRow(`PRAGMA foreign_keys`).Scan(&enabled))
+		assert.Equal(t, 1, enabled)
+	})
+
+	t.Run("what it opens is the database at the path it is given", func(t *testing.T) {
+		t.Parallel()
+
+		first, err := Setup(filepath.Join(t.TempDir(), "first.db"))
+		require.NoError(t, err)
+		defer first.Close()
+		second, err := Setup(filepath.Join(t.TempDir(), "second.db"))
+		require.NoError(t, err)
+		defer second.Close()
+
+		_, err = first.Exec(`CREATE TABLE things (id INTEGER PRIMARY KEY)`)
+		require.NoError(t, err)
+
+		_, err = second.Exec(`SELECT * FROM things`)
+		assert.Error(t, err, "the other database has no such table")
+	})
 }
 
-func TestMigrations(t *testing.T) {
-	t.Run("there are none until there are some", func(t *testing.T) {
-		_, err := LatestSchemaVersion()
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no migrations are embedded")
+func TestSetupReadOnly(t *testing.T) {
+	t.Parallel()
 
-		db, err := sql.Open("sqlite3", ":memory:")
+	t.Run("it reads what is there and can not change it", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.TempDir(), "modctl.db")
+		rw, err := Setup(path)
+		require.NoError(t, err)
+		defer rw.Close()
+		_, err = rw.Exec(`CREATE TABLE things (id INTEGER PRIMARY KEY)`)
+		require.NoError(t, err)
+		_, err = rw.Exec(`INSERT INTO things (id) VALUES (1)`)
+		require.NoError(t, err)
+
+		db, err := SetupReadOnly(path)
 		require.NoError(t, err)
 		defer db.Close()
-		_, err = GooseProvider(db)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no migrations are embedded")
+
+		var n int
+		require.NoError(t, db.QueryRow(`SELECT COUNT(*) FROM things`).Scan(&n))
+		assert.Equal(t, 1, n)
+		_, err = db.Exec(`INSERT INTO things (id) VALUES (2)`)
+		assert.Error(t, err)
 	})
 
-	t.Run("the ones that are set are the ones that are used", func(t *testing.T) {
-		useMigrationsOfRepository(t)
+	t.Run("it does not make a database that is not there", func(t *testing.T) {
+		t.Parallel()
 
-		latest, err := LatestSchemaVersion()
-		require.NoError(t, err)
-		want, err := latestMigrationVersion(os.DirFS("../../migrations"))
-		require.NoError(t, err)
-		assert.Equal(t, want, latest)
-		assert.Positive(t, latest)
+		path := filepath.Join(t.TempDir(), "nothing.db")
 
-		db, err := sql.Open("sqlite3", DSN(filepath.Join(t.TempDir(), "modctl.db"), false))
+		db, err := SetupReadOnly(path)
 		require.NoError(t, err)
 		defer db.Close()
-		require.NoError(t, Migrate(context.Background(), db))
 
-		current, err := CurrentSchemaVersion(context.Background(), db)
-		require.NoError(t, err)
-		assert.Equal(t, latest, current)
-	})
-
-	t.Run("they are only there for the length of the test", func(t *testing.T) {
-		_, err := LatestSchemaVersion()
-		require.Error(t, err)
+		assert.Error(t, db.Ping())
+		assert.NoFileExists(t, path)
 	})
 }

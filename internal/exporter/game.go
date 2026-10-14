@@ -46,6 +46,10 @@ func Game(
 	gi dbq.GameInstall,
 	opts Options,
 ) (Result, error) {
+	if err := opts.validate(); err != nil {
+		return Result{}, err
+	}
+
 	if !opts.NoVerify {
 		var toVerify []blobToVerify
 		archiveBlobs, err := q.ListArchiveBlobsForGameInstall(ctx, gi.ID)
@@ -92,7 +96,7 @@ func Game(
 
 	// 1. Build the scoped SQLite database
 	scopedDBPath, dbSha256, archiveCount, backupCount, overrideCount, err := buildGameScopedDB(
-		ctx, q, gi, opts.SkipInventory,
+		ctx, q, gi, opts.SkipInventory, opts.ScratchDir, opts.Schema,
 	)
 	if err != nil {
 		return Result{}, fmt.Errorf("build game-scoped database: %w", err)
@@ -101,7 +105,7 @@ func Game(
 
 	// 1b. Build scoped nexus cache database
 	cacheDBPath, cacheSha256, err := buildGameScopedCacheDB(
-		ctx, q, opts.CacheDBPath, gi.ID,
+		ctx, q, opts.CacheDBPath, gi.ID, opts.ScratchDir,
 	)
 	if err != nil {
 		return Result{}, fmt.Errorf("build game-scoped nexus cache: %w", err)
@@ -111,7 +115,7 @@ func Game(
 	}
 
 	// 2. Get schema version from source DB
-	schemaVersion, err := database.CurrentSchemaVersion(ctx, db)
+	schemaVersion, err := opts.Schema.CurrentVersion(ctx, db)
 	if err != nil {
 		return Result{}, fmt.Errorf("get schema version: %w", err)
 	}
@@ -200,15 +204,18 @@ func Game(
 }
 
 // buildGameScopedDB constructs a fresh SQLite database containing only rows
-// relevant to the given game install. Returns the path to the temp file,
-// the sha256 of the database, and blob counts.
+// relevant to the given game install, in the directory scratchDir, with the
+// schema schema. Returns the path to the temp file, the sha256 of the database,
+// and blob counts.
 func buildGameScopedDB(
 	ctx context.Context,
 	q *dbq.Queries,
 	gi dbq.GameInstall,
 	skipInventory bool,
+	scratchDir string,
+	schema *database.Schema,
 ) (path string, dbSha256 string, archiveCount int, backupCount int, overrideCount int, err error) {
-	tmp, err := os.CreateTemp("", "modctl-export-*.sqlite")
+	tmp, err := os.CreateTemp(scratchDir, "modctl-export-*.sqlite")
 	if err != nil {
 		return "", "", 0, 0, 0, fmt.Errorf("create temp db: %w", err)
 	}
@@ -222,7 +229,7 @@ func buildGameScopedDB(
 	}
 	defer scopedDB.Close()
 
-	if err := database.Migrate(ctx, scopedDB); err != nil {
+	if err := schema.Migrate(ctx, scopedDB); err != nil {
 		os.Remove(tmpPath)
 		return "", "", 0, 0, 0, fmt.Errorf("migrate scoped db: %w", err)
 	}
@@ -597,14 +604,16 @@ func exportWriteOncePatterns(ctx context.Context, src, dst *dbq.Queries, gameIns
 }
 
 // buildGameScopedCacheDB constructs a fresh nexus cache database containing
-// only rows relevant to the given game install's mod pages. Returns the path
-// to the temp file and its sha256. If the cache DB does not exist or the game
-// has no nexus-linked mod pages, returns empty strings and no error.
+// only rows relevant to the given game install's mod pages, in the directory
+// scratchDir. Returns the path to the temp file and its sha256. If the cache DB
+// does not exist or the game has no nexus-linked mod pages, returns empty
+// strings and no error.
 func buildGameScopedCacheDB(
 	ctx context.Context,
 	q *dbq.Queries,
 	cacheDBPath string,
 	gameInstallID int64,
+	scratchDir string,
 ) (path string, sha256hex string, err error) {
 	if _, err := os.Stat(cacheDBPath); os.IsNotExist(err) {
 		return "", "", nil
@@ -627,7 +636,7 @@ func buildGameScopedCacheDB(
 	defer srcCacheDB.Close()
 
 	// Create destination temp file
-	tmp, err := os.CreateTemp("", "modctl-export-cache-*.sqlite")
+	tmp, err := os.CreateTemp(scratchDir, "modctl-export-cache-*.sqlite")
 	if err != nil {
 		return "", "", fmt.Errorf("create temp cache db: %w", err)
 	}

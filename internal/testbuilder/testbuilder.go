@@ -21,6 +21,7 @@ package testbuilder
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -29,7 +30,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/pressly/goose/v3"
-	goosedb "github.com/pressly/goose/v3/database"
 	"github.com/stretchr/testify/require"
 )
 
@@ -51,38 +51,65 @@ func SetupDB(t *testing.T) *sql.DB {
 	return db
 }
 
+// SetupDBFile is SetupDB for a database in a file, which is what something that
+// opens its database by its path needs (a database that is not in memory is
+// one for every connection, which is what lets the code that is tested open it
+// for itself). It returns the database, for what the test puts in it, and the
+// path to it. The file is in a directory of the test, and the database is
+// closed when the test completes.
+func SetupDBFile(t *testing.T) (*sql.DB, string) {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "modctl.db")
+	db, err := sql.Open("sqlite3", database.DSN(path, false))
+	require.NoError(t, err, "open sqlite file")
+	t.Cleanup(func() { db.Close() })
+
+	_, err = NewProvider(t, db).Up(context.Background())
+	require.NoError(t, err, "run migrations")
+
+	return db, path
+}
+
 // NewProvider returns a goose provider for db that reads migrations from the
 // filesystem, for tests that need to control how far a database is migrated.
 func NewProvider(t *testing.T, db *sql.DB) *goose.Provider {
 	t.Helper()
 
-	fsys := os.DirFS(findMigrationsDir(t))
-
-	base, err := goosedb.NewStore(goosedb.DialectSQLite3, "schema_migrations")
-	require.NoError(t, err, "create goose store")
-
-	p, err := goose.NewProvider(goose.DialectCustom, db, fsys,
-		goose.WithStore(&database.SqliteStore{Store: base}),
-	)
+	p, err := Schema().Provider(db)
 	require.NoError(t, err, "create goose provider")
 
 	return p
 }
 
-func findMigrationsDir(t *testing.T) string {
-	t.Helper()
+// Schema is the schema of the repository: what main makes with the migrations
+// that are embedded in the binary, which a test does not have, so it is made
+// with the migrations in the directory that they are in. A test gives it to
+// what migrates a database, since nothing finds one by itself.
+func Schema() *database.Schema {
+	dir, err := migrationsDir()
+	if err != nil {
+		panic(err)
+	}
+
+	return database.NewSchema(os.DirFS(filepath.Dir(dir)))
+}
+
+func migrationsDir() (string, error) {
 	_, filename, _, ok := runtime.Caller(0)
-	require.True(t, ok, "runtime.Caller failed")
+	if !ok {
+		return "", fmt.Errorf("runtime.Caller failed")
+	}
 	// filename is the absolute path to this source file;
 	// walk up until we find a directory containing "migrations/"
 	dir := filepath.Dir(filename)
 	for {
 		if _, err := os.Stat(filepath.Join(dir, "migrations")); err == nil {
-			return filepath.Join(dir, "migrations")
+			return filepath.Join(dir, "migrations"), nil
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			t.Fatal("could not find migrations directory")
+			return "", fmt.Errorf("could not find migrations directory")
 		}
 		dir = parent
 	}

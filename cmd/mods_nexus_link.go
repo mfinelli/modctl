@@ -26,13 +26,11 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/nexus"
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"go.finelli.dev/util"
 )
 
@@ -59,18 +57,18 @@ version for manual linking.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		apiKey := viper.GetString("nexus.apikey")
+		apiKey := cfg.NexusAPIKey
 		if apiKey == "" {
 			return fmt.Errorf("nexus api key not configured; set nexus.apikey in your config file")
 		}
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
 		defer db.Close()
 
-		client, err := nexusclient.New(ctx, apiKey, logger, rootCmd.Version)
+		client, err := nexusClient(ctx, apiKey, logger)
 		if err != nil {
 			return fmt.Errorf("initializing nexus client: %w", err)
 		}
@@ -79,7 +77,7 @@ version for manual linking.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.GameInstall(ctx, q, modsNexusLinkGame)
+		gi, err := gameInstall(ctx, q, modsNexusLinkGame)
 		if err != nil {
 			return err
 		}
@@ -102,14 +100,14 @@ func init() {
 		"Override the currently active game")
 	modsNexusLinkCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	modsNexusLinkCmd.Flags().StringVar(&modsNexusLinkVersionID, "version-id", "",
 		"mod file version ID to link (manual mode)")
 	modsNexusLinkCmd.RegisterFlagCompletionFunc("version-id",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ModFileVersionIDs(cmd, toComplete)
+			return completer().ModFileVersionIDs(cmd, toComplete)
 		})
 
 	modsNexusLinkCmd.Flags().StringVar(&modsNexusLinkNexusURL, "nexus-url", "",

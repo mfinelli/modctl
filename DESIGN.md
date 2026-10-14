@@ -517,6 +517,13 @@ The default `tmp_dir` is under `$XDG_RUNTIME_DIR`. This is intentional since
 cleaned up on logout. Users with large mod archives or small tmpfs allocations
 can override `tmp_dir` in config to point elsewhere.
 
+Exports and imports do not use `tmp_dir`. A bundle holds every blob, so the
+snapshots of the databases that an export makes and the bundle that `import`,
+`verify` and `extract` extract need room for a copy of the data, which a tmpfs
+may not have. They go in the temporary directory of the system (`$TMPDIR`,
+usually `/tmp`). The commands give that directory to the code that needs it, the
+same as everything else under `internal/` (see section 17).
+
 ## 6. Safety model
 
 Only entries with `entry_type = 'file'` are considered during planning.
@@ -1459,7 +1466,7 @@ This preserves a clean v1 while allowing richer v2.
   bundle (they can be scanned later with `mods scan-inventory`). Note: no
   profiles are applied automatically after import - run `profiles set-active`
   and `apply` to deploy mods. Requires temporary disk space roughly equal to the
-  bundle size.
+  bundle size, in the temporary directory of the system (see section 5).
 - `gc` - garbage collect unreferenced blobs from the blob store
 - `verify <bundle>` - verify the integrity of a modctl export bundle without
   importing it. Checks the database snapshot against the manifest sha256, runs
@@ -1689,6 +1696,45 @@ Include in `testdata/`:
   entries, malformed lines) should be tested at the unit level and included in
   `testdata/` fixture archives for integration tests
 
+### Test isolation
+
+Tests are hermetic: running them never reads or changes anything on the machine
+that they run on, and they do not depend on each other. The same way that code
+under `internal/` does not print (see section 16), it does not look for what it
+works on:
+
+- It does not read the environment, `$HOME`, the working directory or the
+  temporary directory of the system, and it does not import `xdg` or `viper`
+  (`internal/config` reads the config file, and is the one that does). The
+  database path, the state, cache and scratch directories, the schema (the
+  migrations), the directories of the user and the like are arguments, or fields
+  of an options struct. `cmd/` is the only place that knows where things are
+  (`cmd/env.go`), and the configuration is read once, at startup.
+- A function that needs something it was not given should fail instead of
+  falling back to a default that it found by itself. An export without a scratch
+  directory or a schema is an error, for example.
+- There are no package-level variables under `internal/` apart from read-only
+  values (tables, styles, embedded files) and sentinel errors. The migrations
+  are not global either: a `database.Schema` has them, `main` makes one from the
+  embedded files, and a test makes one from the directory that they are in
+  (`testbuilder.Schema()`).
+- A test sets up what it uses: `t.TempDir()` for files, `testbuilder.SetupDB` or
+  `SetupDBFile` for a database, a fake HTTP transport or a local WebSocket
+  server for Nexus Mods. Nothing in a test uses the network or opens a browser.
+- A test does not change global state: it does not assign to package-level
+  variables, call `t.Setenv`, `os.Setenv` or `os.Chdir`, or have a `TestMain`
+  that sets something up for the others. That is what lets every test call
+  `t.Parallel()`, and what keeps `go test -race -shuffle=on` passing. The tests
+  of `internal/style` are the exception: they check how the output behaves on a
+  terminal and with `NO_COLOR`, which is the environment, so they run one at a
+  time.
+
+CI runs the tests with `scripts/test.bash`, which runs `go test -race -count=1`
+with `HOME`, the XDG directories and `TMPDIR` in a temporary directory (the ones
+that hold state are read-only), and fails if anything is left in it or in the
+repository. The results of a test are never taken from the cache: a test that is
+not run cannot find anything.
+
 ## 18. Operational considerations
 
 - lock per game during apply to avoid concurrent changes
@@ -1704,7 +1750,15 @@ Include in `testdata/`:
 
 The config file is a TOML file at `$XDG_CONFIG_HOME/modctl/config.toml` by
 default. Any command accepts `--config <path>` to use a different file. The file
-is optional: if it does not exist, all built-in defaults are used.
+is optional: if it does not exist, all built-in defaults are used. A file that
+is asked for with `--config` must exist, and a file that cannot be read or is
+not valid TOML is an error, whichever file it is.
+
+The configuration is read once, when a command starts, by `internal/config`,
+which makes a typed value for the commands to use. Reading it does not create
+anything: not the file, the directory that it is in, or the directories that it
+names (`init` makes the ones that it needs, the directory of the database
+included). The keys are not case sensitive in the file.
 
 ### Keys and defaults
 
@@ -1737,8 +1791,11 @@ read/write only).
 ### config command
 
 The `config` command allows reading and writing config values without hand-
-editing the file. The file is created if it does not exist when `config set` is
-run.
+editing the file. `config set`, `auth nexus login` and `auth nexus logout` all
+change the file the same way: it is created if it does not exist (with mode
+`0600`, in a directory with mode `0700`), and the key that is changed is the one
+that is in the file, whatever the case of its name is in a file that was edited
+by hand, so that there are never two.
 
 Note that `config set` rewrites the entire config file. Any comments or custom
 formatting added by hand will not be preserved.
@@ -1775,9 +1832,11 @@ The Nexus API key can be provisioned in two ways:
 - **Manual**: `config set nexus.apikey <key>` for users who prefer to manage
   their own keys directly from their Nexus account settings page.
 
-The SSO flow is implemented in `internal/nexussso` using
-`github.com/coder/websocket`. A UUID is generated per login attempt and used as
-the session identifier shared between the local WebSocket connection and the
+The SSO flow is implemented in `internal/nexusclient` (`sso.go`) using
+`github.com/coder/websocket`. It talks to the server and opens the browser
+through values that it is given, so that a test runs it against a local
+WebSocket server and no browser. A UUID is generated per login attempt and used
+as the session identifier shared between the local WebSocket connection and the
 browser authorization page. No connection state is persisted between attempts;
 if the connection drops the user simply re-runs `auth nexus login`.
 
@@ -1794,10 +1853,10 @@ state is updated as a side effect of the validate call and persisted to
 
 Nexus enforces per-user rate limits (2,500 requests/24h, 100 requests/hour once
 the daily limit is exceeded). Rate limit state is persisted to
-`$XDG_STATE_HOME/modctl/nexus_rate_limits.json` and updated after every API call
-from response headers. Batch operations perform a pre-flight check and warn the
-user if quota may be insufficient, with `--force` to proceed anyway. The client
-also enforces a local 30 req/sec limit via a token bucket rate limiter to avoid
+`$XDG_STATE_HOME/modctl/nexus.json` and updated after every API call from
+response headers. Batch operations perform a pre-flight check and warn the user
+if quota may be insufficient, with `--force` to proceed anyway. The client also
+enforces a local 30 req/sec limit via a token bucket rate limiter to avoid
 nginx-level 429s.
 
 Rate limit reset timestamps in Nexus API response headers use the format
@@ -1855,14 +1914,15 @@ versions are shown as "old version" without an update indicator.
 The `internal/nexusclient` package provides:
 
 - `Client`: full client with API key, HTTP client, rate limiter, and cache DB.
-  Used for commands that make API calls.
+  It is given the directories of the cache and of the rate limit state. Used for
+  commands that make API calls.
 - `CacheReader`: lightweight read-only cache accessor. Used by `profiles status`
   and `mods info` which need cached data but should not make API calls. `Client`
   embeds `CacheReader`.
 
-The API key is read from config (`nexus.apikey`). If not configured, Nexus
-linking is silently skipped at import time; commands that require it error with
-a helpful message.
+The API key is read from config (`nexus.apikey`) by the command, which gives it
+to the client. If not configured, Nexus linking is silently skipped at import
+time; commands that require it error with a helpful message.
 
 ## 21. Garbage Collection
 
@@ -1959,6 +2019,10 @@ For game-scoped exports, a fresh SQLite database is created, migrations are run
 to bring it to the current schema, and only the relevant rows are inserted in
 foreign key dependency order.
 
+The snapshots, and the fresh database, are made in the scratch directory that
+the export is given (the temporary directory of the system, see section 5), and
+are removed when the export is over, whether it worked or not.
+
 ### Blob verification
 
 Before writing the bundle, all blobs are hashed and compared against their
@@ -1996,16 +2060,17 @@ Bundles exported by an older version are supported. After the integrity check
 the extracted `modctl.db` is migrated to the current schema (goose `Up`) before
 anything reads it, so that the current generated queries work against it. This
 happens on the temporary extracted copy only: the bundle file is opened
-read-only and streamed into a temp directory, so the original export is never
-modified. Once migrated, the bundle database is opened with a read-only
-connection, since nothing that reads a bundle writes to it. Every consumer of
-the bundle database (full and game-scoped import, `verify`, `extract`) goes
-through the same open path (`restore.OpenAndValidate`). A bundle database is
-just a smaller database built with the same migration chain, so this is the same
-code path as a normal upgrade. The database's own schema version is what decides
-whether to migrate (current: leave alone, older: migrate, newer: leave as it
-is), so the check does not rely on the manifest. A newer database is not touched
-here: import refuses it as described above, while `verify` only warns.
+read-only and streamed into a directory of its own in the scratch directory (see
+section 5), so the original export is never modified. Once migrated, the bundle
+database is opened with a read-only connection, since nothing that reads a
+bundle writes to it. Every consumer of the bundle database (full and game-scoped
+import, `verify`, `extract`) goes through the same open path
+(`restore.OpenAndValidate`). A bundle database is just a smaller database built
+with the same migration chain, so this is the same code path as a normal
+upgrade. The database's own schema version is what decides whether to migrate
+(current: leave alone, older: migrate, newer: leave as it is), so the check does
+not rely on the manifest. A newer database is not touched here: import refuses
+it as described above, while `verify` only warns.
 
 Blob files are verified by hashing their content against their filename (which
 is their sha256) before ingestion. A mismatch causes import to abort.

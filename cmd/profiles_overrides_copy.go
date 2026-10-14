@@ -23,7 +23,6 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -51,13 +50,13 @@ are replaced.`,
 		if len(args) != 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return completion.ProfileNames(cmd, toComplete)
+		return completer().ProfileNames(cmd, toComplete)
 	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -65,7 +64,7 @@ are replaced.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.GameInstall(ctx, q, profilesOverridesCopyGame)
+		gi, err := gameInstall(ctx, q, profilesOverridesCopyGame)
 		if err != nil {
 			return err
 		}
@@ -156,13 +155,13 @@ func init() {
 		"Override the currently active game")
 	profilesOverridesCopyCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 	profilesOverridesCopyCmd.Flags().StringVarP(&profilesOverridesCopyProfile, "profile", "p", "",
 		"Override the currently active profile")
 	profilesOverridesCopyCmd.RegisterFlagCompletionFunc("profile",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.ProfileNames(cmd, toComplete)
+			return completer().ProfileNames(cmd, toComplete)
 		})
 	profilesOverridesCopyCmd.Flags().BoolVar(&profilesOverridesCopyForce, "force", false,
 		"Replace conflicting overrides in the destination profile")

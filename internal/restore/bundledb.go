@@ -28,9 +28,8 @@ import (
 )
 
 // providerFunc builds a goose provider (and so the set of known migrations)
-// for a database. Production code uses database.GooseProvider; tests supply
-// one that reads migrations from the filesystem because the embedded copy is
-// only populated in the real binary.
+// for a database. Production code uses the Provider of a database.Schema; a test
+// can supply one that it controls further (how far it has migrated, say).
 type providerFunc func(*sql.DB) (*goose.Provider, error)
 
 // openBundleDB opens the extracted bundle database read-only. If the bundle

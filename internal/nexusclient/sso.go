@@ -57,7 +57,30 @@ type apiKeyPayload struct {
 // Progress messages are written to w. The caller should wrap ctx with a
 // timeout before calling (DefaultSSOTimeout is the recommended value)
 func Login(ctx context.Context, w io.Writer) (string, error) {
-	conn, _, err := websocket.Dial(ctx, ssoWSURL, nil)
+	return login(ctx, w, ssoServer{
+		wsURL:       ssoWSURL,
+		authURL:     ssoAuthURL,
+		openBrowser: openBrowser,
+	})
+}
+
+// ssoServer is what the SSO flow talks to, and how it sends the user there. It
+// is Nexus Mods and the browser of the user, which a test can't talk to (and
+// must not open), so a test has one of its own.
+type ssoServer struct {
+	// wsURL is where the flow is run, which is a websocket.
+	wsURL string
+
+	// authURL is the page where the user authorizes modctl.
+	authURL string
+
+	// openBrowser opens url for the user, if it can.
+	openBrowser func(url string)
+}
+
+// login is Login for the server s.
+func login(ctx context.Context, w io.Writer, s ssoServer) (string, error) {
+	conn, _, err := websocket.Dial(ctx, s.wsURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("connecting to Nexus SSO: %w", err)
 	}
@@ -92,9 +115,9 @@ func Login(ctx context.Context, w io.Writer) (string, error) {
 
 		var tok connectionTokenPayload
 		if err := json.Unmarshal(envelope.Data, &tok); err == nil && tok.ConnectionToken != "" {
-			authURL := fmt.Sprintf("%s?id=%s&application=%s", ssoAuthURL, id, AppSlug)
+			authURL := fmt.Sprintf("%s?id=%s&application=%s", s.authURL, id, AppSlug)
 			fmt.Fprintf(w, "\nOpen this URL in your browser to authorize modctl with Nexus Mods:\n\n  %s\n\nWaiting for authorization (Ctrl+C to cancel)...\n", authURL)
-			openBrowser(authURL)
+			s.openBrowser(authURL)
 			continue
 		}
 

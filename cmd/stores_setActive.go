@@ -25,8 +25,6 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/state"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -47,13 +45,13 @@ The store must already be configured.`,
 		if len(args) != 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return completion.StoreIDs(cmd, toComplete)
+		return completer().StoreIDs(cmd, toComplete)
 	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -73,14 +71,14 @@ The store must already be configured.`,
 			return fmt.Errorf("store %q is disabled", storeID)
 		}
 
-		a, err := state.LoadActive()
+		a, err := state.LoadActive(stateDir())
 		if err != nil {
 			return err
 		}
 
 		a.ActiveStoreID = store.ID
 
-		if err := state.SaveActive(a); err != nil {
+		if err := state.SaveActive(stateDir(), a); err != nil {
 			return err
 		}
 

@@ -29,9 +29,6 @@ import (
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
-	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/nexusclient/dbc"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/mfinelli/modctl/internal/updatechain"
@@ -57,13 +54,13 @@ to refresh cached data.`,
 		if len(args) != 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return completion.ModPageIDs(cmd, toComplete)
+		return completer().ModPageIDs(cmd, toComplete)
 	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -72,7 +69,7 @@ to refresh cached data.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.GameInstall(ctx, q, modsInfoGame)
+		gi, err := gameInstall(ctx, q, modsInfoGame)
 		if err != nil {
 			return err
 		}
@@ -93,7 +90,7 @@ func init() {
 		"Override the currently active game")
 	modsInfoCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	modsInfoCmd.Flags().BoolVar(&modsInfoShowInventory, "show-inventory", false,
@@ -181,7 +178,7 @@ func runModsInfo(
 		}
 	}
 	if mp.SourceKind == "nexus" && mp.NexusGameDomain.Valid && mp.NexusModID.Valid {
-		cacheReader, err := nexusclient.NewCacheReader(ctx, logger)
+		cacheReader, err := nexusCacheReader(ctx, logger)
 		if err != nil {
 			logger.Warn("failed to open nexus cache", "error", err)
 		} else {

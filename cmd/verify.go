@@ -63,7 +63,7 @@ Exits non-zero if any integrity issues are found. Version warnings
 		style.Println(style.Bold.Render("Verifying bundle: " + bundlePath))
 		style.Println()
 
-		bundle, err := restore.OpenAndValidate(ctx, bundlePath)
+		bundle, err := restore.OpenAndValidate(ctx, bundlePath, scratchDir(), Schema)
 		if err != nil {
 			return fmt.Errorf("bundle validation failed: %w", err)
 		}
@@ -106,7 +106,7 @@ Exits non-zero if any integrity issues are found. Version warnings
 		// same thing (every command migrates it), but it may not exist yet, or
 		// may not have been migrated since an upgrade. An older schema is not
 		// worth a warning since import migrates it.
-		if latest, err := database.LatestSchemaVersion(); err == nil &&
+		if latest, err := Schema.LatestVersion(); err == nil &&
 			bundle.Manifest.SchemaVersion > latest {
 			style.Println(style.Warning.Render(fmt.Sprintf(
 				"  ⚠ bundle schema version %d is newer than the latest this version of modctl supports (%d) - upgrade modctl before importing",

@@ -25,8 +25,6 @@ import (
 	"os"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
 	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
@@ -57,7 +55,7 @@ Safety checks:
 		if len(args) > 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return completion.ProfileNames(cmd, toComplete)
+		return completer().ProfileNames(cmd, toComplete)
 	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -65,7 +63,7 @@ Safety checks:
 
 		profileName := args[0]
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -74,7 +72,7 @@ Safety checks:
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.GameInstall(ctx, q, profilesDeleteGame)
+		gi, err := gameInstall(ctx, q, profilesDeleteGame)
 		if err != nil {
 			return err
 		}
@@ -146,7 +144,7 @@ func init() {
 		"Override the currently active game")
 	profilesDeleteCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	profilesDeleteCmd.Flags().BoolVar(&profilesDeleteForce, "force", false,

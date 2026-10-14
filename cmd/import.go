@@ -22,7 +22,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/blobstore"
@@ -30,7 +29,6 @@ import (
 	"github.com/mfinelli/modctl/internal/restore"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"golang.org/x/mod/semver"
 )
 
@@ -76,7 +74,7 @@ Use --dry-run to preview what would be imported without making any changes.`,
 
 		// Open and validate bundle before touching the DB
 		style.Println(style.Bold.Render("Validating bundle..."))
-		bundle, err := restore.OpenAndValidate(ctx, bundlePath)
+		bundle, err := restore.OpenAndValidate(ctx, bundlePath, scratchDir(), Schema)
 		if err != nil {
 			return fmt.Errorf("invalid bundle: %w", err)
 		}
@@ -105,26 +103,26 @@ Use --dry-run to preview what would be imported without making any changes.`,
 		style.Println(style.Success.Render("  ✓ bundle integrity OK"))
 		style.Println()
 
-		if err := database.EnsureExists(); err != nil {
+		if err := database.EnsureExists(databasePath()); err != nil {
 			return err
 		}
-		db, err := database.Setup()
+		db, err := database.Setup(databasePath())
 		if err != nil {
 			return fmt.Errorf("error setting up database: %w", err)
 		}
 		defer db.Close() // NB if we do a full restore we'll close this
 		//    twice, but it shouldn't be a problem
-		if err := database.Migrate(ctx, db); err != nil {
+		if err := Schema.Migrate(ctx, db); err != nil {
 			return fmt.Errorf("error migrating database: %w", err)
 		}
 
 		q := dbq.New(db)
 
 		bs := blobstore.Store{
-			ArchivesDir:  viper.GetString("archives_dir"),
-			BackupsDir:   viper.GetString("backups_dir"),
-			OverridesDir: viper.GetString("overrides_dir"),
-			TmpDir:       viper.GetString("tmp_dir"),
+			ArchivesDir:  cfg.ArchivesDir,
+			BackupsDir:   cfg.BackupsDir,
+			OverridesDir: cfg.OverridesDir,
+			TmpDir:       cfg.TmpDir,
 		}
 
 		opts := restore.Options{
@@ -133,7 +131,8 @@ Use --dry-run to preview what would be imported without making any changes.`,
 			SkipInventory: importSkipInventory,
 			SameMachine:   importSameMachine,
 			Game:          importGame,
-			CacheDBPath:   filepath.Join(viper.GetString("cache_dir"), "nexus_cache.db"),
+			CacheDBPath:   nexusCacheDBPath(),
+			Schema:        Schema,
 		}
 
 		// Warn if bundle modctl version is newer
@@ -169,7 +168,7 @@ Use --dry-run to preview what would be imported without making any changes.`,
 				style.Println(style.Bold.Render("Importing (full)..."))
 				result, importErr = restore.Full(
 					ctx, db, q, bs, bundle, opts,
-					viper.GetString("database"),
+					databasePath(),
 					rootCmd.Version,
 					logger,
 				)

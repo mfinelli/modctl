@@ -25,13 +25,9 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal"
-	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/lock"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var gamesTargetsDisableGame string
@@ -53,7 +49,7 @@ the only enabled target.`,
 		if len(args) != 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return completion.TargetNames(cmd, toComplete)
+		return completer().TargetNames(cmd, toComplete)
 	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -61,7 +57,7 @@ the only enabled target.`,
 
 		name := args[0]
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -69,14 +65,14 @@ the only enabled target.`,
 
 		q := dbq.New(db)
 
-		gi, err := argresolver.GameInstall(ctx, q, gamesTargetsDisableGame)
+		gi, err := gameInstall(ctx, q, gamesTargetsDisableGame)
 		if err != nil {
 			return err
 		}
 
 		// Hold the per-game lock so an apply can't record installed files for
 		// this target between the checks below and the update.
-		unlock, err := lock.GameInstall(viper.GetString("locks_dir"), gi.ID)
+		unlock, err := lock.GameInstall(cfg.LocksDir, gi.ID)
 		if err != nil {
 			return err
 		}
@@ -144,6 +140,6 @@ func init() {
 		"Override the currently active game")
 	gamesTargetsDisableCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 }

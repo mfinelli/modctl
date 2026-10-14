@@ -25,9 +25,6 @@ import (
 	"time"
 
 	"github.com/mfinelli/modctl/dbq"
-	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -51,7 +48,7 @@ Use --limit to change the number of operations shown.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -73,7 +70,7 @@ Use --limit to change the number of operations shown.`,
 		}
 
 		// Resolve game install
-		gi, err := argresolver.GameInstall(ctx, q, operationsListGame)
+		gi, err := gameInstall(ctx, q, operationsListGame)
 		if err != nil {
 			return err
 		}
@@ -103,7 +100,7 @@ func init() {
 		"Override the currently active game")
 	operationsListCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 	operationsListCmd.Flags().BoolVarP(&operationsListAll, "all", "A", false,
 		"Show operations across all game installs")

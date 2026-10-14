@@ -185,15 +185,46 @@ func TestLatestMigrationVersionMatchesGoose(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-func TestLatestSchemaVersion(t *testing.T) {
+func TestSchemaLatestVersion(t *testing.T) {
 	t.Parallel()
 
-	t.Run("errors when no migrations are embedded", func(t *testing.T) {
+	t.Run("it is the highest of the migrations that the schema is made with", func(t *testing.T) {
 		t.Parallel()
 
-		// Migrations is only populated by main, never in tests
-		got, err := LatestSchemaVersion()
-		require.Error(t, err)
-		assert.Equal(t, int64(0), got)
+		got, err := repositorySchema().LatestVersion()
+
+		require.NoError(t, err)
+		want, err := latestMigrationVersion(os.DirFS("../../migrations"))
+		require.NoError(t, err)
+		assert.Equal(t, want, got)
+		assert.Positive(t, got)
+	})
+
+	t.Run("a schema that has no migrations is an error, and not version zero", func(t *testing.T) {
+		t.Parallel()
+
+		for name, schema := range map[string]*Schema{
+			"without a file system": NewSchema(nil),
+			"that is not there":     nil,
+		} {
+			schema := schema
+			t.Run(name, func(t *testing.T) {
+				t.Parallel()
+
+				got, err := schema.LatestVersion()
+
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "no migrations are embedded")
+				assert.Equal(t, int64(0), got)
+			})
+		}
+	})
+
+	t.Run("a file system that has no migrations directory is an error", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := NewSchema(fstest.MapFS{"other/00001_x.sql": {}}).LatestVersion()
+
+		assert.Error(t, err)
 	})
 }

@@ -23,10 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var authNexusStatusCmd = &cobra.Command{
@@ -42,7 +40,7 @@ not count against your API request quota.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		kv := style.KV{Indent: 2, Width: 16}
 
-		apiKey := viper.GetString("nexus.apikey")
+		apiKey := cfg.NexusAPIKey
 		if apiKey == "" {
 			style.Println(style.Warning.Render("  ⚠ not authenticated"))
 			style.Println(style.Subtle.Render("    run `modctl auth nexus login` to authenticate"))
@@ -51,7 +49,7 @@ not count against your API request quota.`,
 		}
 
 		ctx := cmd.Context()
-		client, err := nexusclient.New(ctx, apiKey, logger, rootCmd.Version)
+		client, err := nexusClient(ctx, apiKey, logger)
 		if err != nil {
 			return fmt.Errorf("initializing nexus client: %w", err)
 		}
@@ -73,7 +71,7 @@ not count against your API request quota.`,
 		kv.Write(&b, "username:", info.Name)
 
 		// Rate limit state was updated as a side effect of ValidateUser
-		state, err := nexusclient.LoadRateLimitState()
+		state, err := loadRateLimitState()
 		if err != nil {
 			// Non-fatal: we already have the username, just skip quota display
 			logger.Warn("failed to load rate limit state", "error", err)

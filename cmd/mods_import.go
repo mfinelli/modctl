@@ -35,17 +35,13 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/archivescanner"
-	"github.com/mfinelli/modctl/internal/argresolver"
 	"github.com/mfinelli/modctl/internal/blobstore"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/fsutil"
 	"github.com/mfinelli/modctl/internal/importer"
 	"github.com/mfinelli/modctl/internal/nexus"
 	"github.com/mfinelli/modctl/internal/nexusclient"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -94,19 +90,19 @@ has been safely stored and the database has been updated successfully.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
 		defer db.Close()
 
 		inputPath := args[0]
-		archivesDir := viper.GetString("archives_dir")
+		archivesDir := cfg.ArchivesDir
 
 		bs := blobstore.Store{
 			ArchivesDir:  archivesDir,
-			BackupsDir:   viper.GetString("backups_dir"),
-			OverridesDir: viper.GetString("overrides_dir"),
+			BackupsDir:   cfg.BackupsDir,
+			OverridesDir: cfg.OverridesDir,
 		}
 
 		// Optional nexus parse
@@ -159,7 +155,7 @@ has been safely stored and the database has been updated successfully.`,
 		q := dbq.New(db)
 
 		// Resolve game install id: --game overrides active selection
-		gi, err := argresolver.GameInstall(ctx, q, modsImportGame)
+		gi, err := gameInstall(ctx, q, modsImportGame)
 		if err != nil {
 			return err
 		}
@@ -186,9 +182,9 @@ has been safely stored and the database has been updated successfully.`,
 		// If we have a nexus URL and an API key, pre-fetch the file list to identify
 		// the correct label before creating the mod_file row
 		if modsImportNexusUrl != "" && !modsImportSkipNexusLink {
-			apiKey := viper.GetString("nexus.apikey")
+			apiKey := cfg.NexusAPIKey
 			if apiKey != "" {
-				client, err := nexusclient.New(ctx, apiKey, logger, rootCmd.Version)
+				client, err := nexusClient(ctx, apiKey, logger)
 				if err != nil {
 					style.Println(style.Warning.Render(fmt.Sprintf("  ⚠ failed to initialize nexus client: %s", err)))
 				} else {
@@ -239,11 +235,11 @@ has been safely stored and the database has been updated successfully.`,
 
 		// Attempt Nexus linking if we have a URL, an API key, and --skip-nexus-link was not set
 		if modsImportNexusUrl != "" && !modsImportSkipNexusLink {
-			apiKey := viper.GetString("nexus.apikey")
+			apiKey := cfg.NexusAPIKey
 			if apiKey == "" {
 				style.Println(style.Subtle.Render("  nexus api key not configured, skipping link"))
 			} else {
-				client, err := nexusclient.New(ctx, apiKey, logger, rootCmd.Version)
+				client, err := nexusClient(ctx, apiKey, logger)
 				if err != nil {
 					// Non-fatal, warn and continue
 					style.Println(style.Warning.Render(fmt.Sprintf("  ⚠ failed to initialize nexus client: %s", err)))
@@ -295,7 +291,7 @@ func init() {
 		"Override the currently active game")
 	modsImportCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	modsImportCmd.Flags().StringVar(&modsImportName, "name", "",
@@ -332,7 +328,7 @@ func prepareImportArchive(ctx context.Context, inputPath string, listTimeout tim
 	}
 
 	// Not an archive (or bsdtar couldn't list it) -- wrap into tar.gz.
-	tmpDir := viper.GetString("tmp_dir")
+	tmpDir := cfg.TmpDir
 	wrapped, cleanup, err := wrapIntoTarGz(tmpDir, inputPath)
 	if err != nil {
 		return prepareArchiveResult{}, err
@@ -351,7 +347,7 @@ func prepareImportArchive(ctx context.Context, inputPath string, listTimeout tim
 
 func bsdtarListOK(ctx context.Context, archivePath string) error {
 	// Keep output quiet on success; capture stderr for failure message.
-	cmd := exec.CommandContext(ctx, viper.GetString("bsdtar"), "-t", "-f", archivePath)
+	cmd := exec.CommandContext(ctx, cfg.Bsdtar, "-t", "-f", archivePath)
 	var stderr bytes.Buffer
 	cmd.Stdout = io.Discard
 	cmd.Stderr = &stderr

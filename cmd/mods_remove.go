@@ -25,8 +25,6 @@ import (
 
 	"github.com/mfinelli/modctl/dbq"
 	"github.com/mfinelli/modctl/internal/argresolver"
-	"github.com/mfinelli/modctl/internal/completion"
-	"github.com/mfinelli/modctl/internal/database"
 	"github.com/mfinelli/modctl/internal/style"
 	"github.com/spf13/cobra"
 )
@@ -60,13 +58,13 @@ items are removed automatically via cascade.`,
 		if len(args) != 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return completion.ModPageIDs(cmd, toComplete)
+		return completer().ModPageIDs(cmd, toComplete)
 	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		db, err := database.Open(ctx)
+		db, err := openDB(ctx)
 		if err != nil {
 			return err
 		}
@@ -75,7 +73,7 @@ items are removed automatically via cascade.`,
 		q := dbq.New(db)
 
 		// Resolve game install
-		gi, err := argresolver.GameInstall(ctx, q, modsRemoveGame)
+		gi, err := gameInstall(ctx, q, modsRemoveGame)
 		if err != nil {
 			return err
 		}
@@ -218,7 +216,7 @@ func init() {
 		"Override the currently active game")
 	modsRemoveCmd.RegisterFlagCompletionFunc("game",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.GameInstallSelectors(cmd, toComplete)
+			return completer().GameInstallSelectors(cmd, toComplete)
 		})
 
 	modsRemoveCmd.Flags().StringVar(&modsRemoveFileVersion, "file-version", "",
@@ -229,7 +227,7 @@ func init() {
 			if len(args) > 0 {
 				modPageArg = strings.TrimSpace(args[0])
 			}
-			return completion.ModFileVersionIDsForPage(cmd, modPageArg, toComplete)
+			return completer().ModFileVersionIDsForPage(cmd, modPageArg, toComplete)
 		})
 
 	modsRemoveCmd.Flags().BoolVar(&modsRemoveForce, "force", false,
