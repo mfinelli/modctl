@@ -73,6 +73,51 @@ func TestGetModCached(t *testing.T) {
 		assert.Equal(t, "skyrim", second.DomainName)
 	})
 
+	t.Run("what is in the cache is the mod that the API said", func(t *testing.T) {
+		t.Parallel()
+
+		c, api := newTestClient(t, respondWith(modBody))
+
+		fromAPI, err := c.GetModCached("skyrim", 1)
+		require.NoError(t, err)
+		fromCache, err := c.GetModCached("skyrim", 1)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, api.asked(), "the second time it is in the cache")
+		assert.Equal(t, fromAPI, fromCache)
+		assert.Equal(t, "5.2", fromCache.Version)
+	})
+
+	t.Run("a cache that has no version for the mod has none", func(t *testing.T) {
+		t.Parallel()
+
+		c, _ := newTestClient(t, respondWith(`{"mod_id":1,"name":"SkyUI","domain_name":"skyrim"}`))
+		_, err := c.GetModCached("skyrim", 1)
+		require.NoError(t, err)
+
+		got, err := c.GetModCached("skyrim", 1)
+
+		require.NoError(t, err)
+		assert.Empty(t, got.Version)
+		assert.Equal(t, "SkyUI", got.Name)
+	})
+
+	t.Run("a cache that has nothing that can be read says nothing about the version", func(t *testing.T) {
+		t.Parallel()
+
+		c, _ := newTestClient(t, respondWith(modBody))
+		_, err := c.GetModCached("skyrim", 1)
+		require.NoError(t, err)
+		_, err = c.db.Exec(`UPDATE nexus_mod_info SET raw_json = NULL`)
+		require.NoError(t, err)
+
+		got, err := c.GetModCached("skyrim", 1)
+
+		require.NoError(t, err)
+		assert.Empty(t, got.Version)
+		assert.Equal(t, "SkyUI", got.Name, "and the rest is what the columns have")
+	})
+
 	t.Run("what is cached for less than a week is not asked of the API", func(t *testing.T) {
 		t.Parallel()
 

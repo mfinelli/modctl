@@ -20,6 +20,7 @@ package nexusclient
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -119,7 +120,7 @@ func (c *Client) GetModFilesCached(gameDomain string, modID int64) (*ModFilesRes
 
 // modInfoFromRow converts a dbc.NexusModInfo row back to a ModInfo struct
 func modInfoFromRow(row dbc.NexusModInfo) *ModInfo {
-	return &ModInfo{
+	info := &ModInfo{
 		ModID:       row.NexusModID,
 		Name:        row.Name.String,
 		Summary:     row.Summary.String,
@@ -128,6 +129,18 @@ func modInfoFromRow(row dbc.NexusModInfo) *ModInfo {
 		IsAvailable: row.IsAvailable.Int64 == 1,
 		RawJSON:     []byte(row.RawJson.String),
 	}
+
+	// The cache has no column for the version, but raw_json holds the full
+	// response from the API, so read it from there. That way a mod read from
+	// the cache has the same fields as one that was just fetched.
+	var said struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(info.RawJSON, &said); err == nil {
+		info.Version = said.Version
+	}
+
+	return info
 }
 
 // modFilesResponseFromRows converts cache rows back to a ModFilesResponse
