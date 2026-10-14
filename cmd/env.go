@@ -21,6 +21,7 @@ package cmd
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"os"
 
@@ -59,6 +60,7 @@ func configDirs() config.Dirs {
 		CacheHome:  xdg.CacheHome,
 		StateHome:  xdg.StateHome,
 		RuntimeDir: xdg.RuntimeDir,
+		TempDir:    os.TempDir(),
 	}
 }
 
@@ -95,12 +97,17 @@ func nexusCacheDBPath() string {
 
 // scratchDir is the directory that has room for a copy of what is exported or
 // imported: the snapshots of the databases that are made for an export, and the
-// bundle that is extracted for an import (which has all of the blobs in it).
-// It is the temporary directory of the system, and not tmp_dir: that one is for
-// the staging of the archives that are applied, and is by default on tmpfs,
-// which is not where a bundle that is as big as all of the mods has to go.
-func scratchDir() string {
-	return os.TempDir()
+// bundle that is extracted for an import (which has all of the blobs in it). It
+// is scratch_dir, which is the temporary directory of the system unless it is
+// configured, and not tmp_dir: that one is for the staging of the archives that
+// are applied, and is by default on tmpfs, which is not where a bundle that is
+// as big as all of the mods has to go.
+func scratchDir() (string, error) {
+	if err := os.MkdirAll(cfg.ScratchDir, 0o700); err != nil {
+		return "", fmt.Errorf("error creating scratch directory: %w", err)
+	}
+
+	return cfg.ScratchDir, nil
 }
 
 // userDirs are the directories of the user that the stores are looked for in.

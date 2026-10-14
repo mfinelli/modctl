@@ -19,6 +19,19 @@ destination machine does not need to make API calls to rebuild it. If the cache
 was not present on disk at export time it is simply omitted; `modctl
 check-updates` will repopulate it on the next run.
 
+## Temporary space
+
+Exporting and importing need room for a copy of your data while they work: an
+export makes snapshots of the databases before it writes the bundle, and
+`import`, `verify`, and `extract` unpack the bundle before they use it (it has
+all of your archives in it). That space is in the temporary directory of your
+system (`$TMPDIR`, usually `/tmp`), but if it is a tmpfs or is too small, you
+can set `scratch_dir` to a directory with more room:
+
+```bash
+modctl config set scratch_dir /var/tmp/modctl
+```
+
 ## Exporting
 
 ### Full export

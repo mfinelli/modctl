@@ -53,6 +53,8 @@ type Dirs struct {
 	// RuntimeDir is where what is only needed while modctl runs is
 	// ($XDG_RUNTIME_DIR).
 	RuntimeDir string
+	// TempDir is the temporary directory of the system ($TMPDIR, or /tmp).
+	TempDir string
 }
 
 // State is the directory that modctl keeps its state in, which is the active
@@ -84,6 +86,7 @@ var fields = []field{
 	{"locks_dir", func(c *Config) *string { return &c.LocksDir }},
 	{"overrides_dir", func(c *Config) *string { return &c.OverridesDir }},
 	{"tmp_dir", func(c *Config) *string { return &c.TmpDir }},
+	{"scratch_dir", func(c *Config) *string { return &c.ScratchDir }},
 	{"nexus.apikey", func(c *Config) *string { return &c.NexusAPIKey }},
 }
 
@@ -114,9 +117,15 @@ type Config struct {
 	CacheDir     string
 	LocksDir     string
 	TmpDir       string
-	NexusAPIKey  string
-	File         string // the config file that was read, if one was
-	fromFile     map[string]bool
+	// ScratchDir is where there is room for a copy of the data: the snapshots
+	// of the databases that an export makes, and the bundle that is extracted
+	// to import, verify or extract it. It is not TmpDir, which is for the
+	// staging of the archives that are applied, and which is by default on
+	// tmpfs.
+	ScratchDir  string
+	NexusAPIKey string
+	File        string // the config file that was read, if one was
+	fromFile    map[string]bool
 }
 
 // Defaults is the configuration of a user whose directories are dirs, who has
@@ -131,6 +140,7 @@ func Defaults(d Dirs) Config {
 		LocksDir:     filepath.Join(d.State(), "locks"),
 		CacheDir:     filepath.Join(d.CacheHome, "modctl"),
 		TmpDir:       filepath.Join(d.RuntimeDir, "modctl"),
+		ScratchDir:   d.TempDir,
 	}
 }
 

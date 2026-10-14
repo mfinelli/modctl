@@ -75,12 +75,17 @@ Examples:
 			OverridesDir: cfg.OverridesDir,
 		}
 
+		scratch, err := scratchDir()
+		if err != nil {
+			return err
+		}
+
 		opts := exporter.Options{
 			ModctlVersion: rootCmd.Version,
 			SkipInventory: exportSkipInventory,
 			NoVerify:      exportNoVerify,
 			CacheDBPath:   nexusCacheDBPath(),
-			ScratchDir:    scratchDir(),
+			ScratchDir:    scratch,
 			Schema:        Schema,
 			Progress:      printExportProgress,
 		}

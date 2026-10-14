@@ -520,9 +520,11 @@ can override `tmp_dir` in config to point elsewhere.
 Exports and imports do not use `tmp_dir`. A bundle holds every blob, so the
 snapshots of the databases that an export makes and the bundle that `import`,
 `verify` and `extract` extract need room for a copy of the data, which a tmpfs
-may not have. They go in the temporary directory of the system (`$TMPDIR`,
-usually `/tmp`). The commands give that directory to the code that needs it, the
-same as everything else under `internal/` (see section 17).
+may not have. They go in `scratch_dir`, which is the temporary directory of the
+system (`$TMPDIR`, usually `/tmp`) unless it is configured: a user whose `/tmp`
+is a tmpfs, or is small, points it at a directory with the room. The commands
+make it if it is not there, and give it to the code that needs it, the same as
+everything else under `internal/` (see section 17).
 
 ## 6. Safety model
 
@@ -1466,7 +1468,7 @@ This preserves a clean v1 while allowing richer v2.
   bundle (they can be scanned later with `mods scan-inventory`). Note: no
   profiles are applied automatically after import - run `profiles set-active`
   and `apply` to deploy mods. Requires temporary disk space roughly equal to the
-  bundle size, in the temporary directory of the system (see section 5).
+  bundle size, in `scratch_dir` (see section 5).
 - `gc` - garbage collect unreferenced blobs from the blob store
 - `verify <bundle>` - verify the integrity of a modctl export bundle without
   importing it. Checks the database snapshot against the manifest sha256, runs
@@ -1772,11 +1774,12 @@ included). The keys are not case sensitive in the file.
 | `overrides_dir` | `$XDG_DATA_HOME/modctl/overrides` | Blob store for user overrides            |
 | `locks_dir`     | `$XDG_STATE_HOME/modctl/locks`    | Per-game lockfiles                       |
 | `tmp_dir`       | `$XDG_RUNTIME_DIR/modctl`         | Staging directory for extraction         |
+| `scratch_dir`   | `$TMPDIR`, or `/tmp`              | Room for a copy of the data in an export |
 | `nexus.apikey`  | (none)                            | Nexus Mods API key                       |
 
 Only `nexus.apikey` has no default. All other keys have sane defaults and most
 users will never need to change them. See section 5 for the rationale behind the
-`tmp_dir` default.
+`tmp_dir` and `scratch_dir` defaults.
 
 `nexus.apikey` can be provisioned automatically via `auth nexus login` without
 the user needing to visit their API settings page. `config set nexus.apikey`
@@ -2020,8 +2023,8 @@ to bring it to the current schema, and only the relevant rows are inserted in
 foreign key dependency order.
 
 The snapshots, and the fresh database, are made in the scratch directory that
-the export is given (the temporary directory of the system, see section 5), and
-are removed when the export is over, whether it worked or not.
+the export is given (`scratch_dir`, see section 5), and are removed when the
+export is over, whether it worked or not.
 
 ### Blob verification
 

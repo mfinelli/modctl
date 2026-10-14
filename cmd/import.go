@@ -74,7 +74,12 @@ Use --dry-run to preview what would be imported without making any changes.`,
 
 		// Open and validate bundle before touching the DB
 		style.Println(style.Bold.Render("Validating bundle..."))
-		bundle, err := restore.OpenAndValidate(ctx, bundlePath, scratchDir(), Schema)
+		scratch, err := scratchDir()
+		if err != nil {
+			return err
+		}
+
+		bundle, err := restore.OpenAndValidate(ctx, bundlePath, scratch, Schema)
 		if err != nil {
 			return fmt.Errorf("invalid bundle: %w", err)
 		}

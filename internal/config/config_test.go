@@ -39,6 +39,7 @@ func dirsIn(home string) Dirs {
 		CacheHome:  filepath.Join(home, ".cache"),
 		StateHome:  filepath.Join(home, ".local", "state"),
 		RuntimeDir: filepath.Join("/run", "user", "1000"),
+		TempDir:    "/tmp",
 	}
 }
 
@@ -89,7 +90,7 @@ func TestKeys(t *testing.T) {
 
 		assert.Equal(t, []string{
 			"bsdtar", "database", "archives_dir", "backups_dir", "cache_dir",
-			"locks_dir", "overrides_dir", "tmp_dir", "nexus.apikey",
+			"locks_dir", "overrides_dir", "tmp_dir", "scratch_dir", "nexus.apikey",
 		}, Keys())
 	})
 
@@ -129,6 +130,7 @@ func TestDefaults(t *testing.T) {
 		assert.Equal(t, "/home/me/.local/state/modctl/locks", c.LocksDir)
 		assert.Equal(t, "/home/me/.cache/modctl", c.CacheDir)
 		assert.Equal(t, "/run/user/1000/modctl", c.TmpDir)
+		assert.Equal(t, "/tmp", c.ScratchDir, "the temporary directory of the system, and not tmp_dir")
 		assert.Empty(t, c.NexusAPIKey)
 	})
 
@@ -162,12 +164,13 @@ func TestConfigValue(t *testing.T) {
 
 		c := Config{
 			Bsdtar: "a", Database: "b", ArchivesDir: "c", BackupsDir: "d", CacheDir: "e",
-			LocksDir: "f", OverridesDir: "g", TmpDir: "h", NexusAPIKey: "i",
+			LocksDir: "f", OverridesDir: "g", TmpDir: "h", NexusAPIKey: "i", ScratchDir: "j",
 		}
 
 		for key, want := range map[string]string{
 			"bsdtar": "a", "database": "b", "archives_dir": "c", "backups_dir": "d", "cache_dir": "e",
 			"locks_dir": "f", "overrides_dir": "g", "tmp_dir": "h", "nexus.apikey": "i",
+			"scratch_dir": "j",
 		} {
 			got, ok := c.Value(key)
 			assert.True(t, ok, key)
@@ -268,6 +271,7 @@ cache_dir = "/x/cache"
 locks_dir = "/x/locks"
 overrides_dir = "/x/overrides"
 tmp_dir = "/x/tmp"
+scratch_dir = "/x/scratch"
 
 [nexus]
 apikey = "the-key"
@@ -280,11 +284,32 @@ apikey = "the-key"
 			"bsdtar": "/usr/bin/bsdtar", "database": "/x/db", "archives_dir": "/x/archives",
 			"backups_dir": "/x/backups", "cache_dir": "/x/cache", "locks_dir": "/x/locks",
 			"overrides_dir": "/x/overrides", "tmp_dir": "/x/tmp", "nexus.apikey": "the-key",
+			"scratch_dir": "/x/scratch",
 		} {
 			got, _ := c.Value(key)
 			assert.Equal(t, want, got, key)
 			assert.True(t, c.FromFile(key), key)
 		}
+	})
+
+	t.Run("the scratch directory and tmp_dir are two settings, each with its own default", func(t *testing.T) {
+		t.Parallel()
+
+		d := dirsIn(t.TempDir())
+		onlyTmp := filepath.Join(t.TempDir(), "tmp.toml")
+		writeFile(t, onlyTmp, "tmp_dir = \"/x/tmp\"\n")
+		onlyScratch := filepath.Join(t.TempDir(), "scratch.toml")
+		writeFile(t, onlyScratch, "scratch_dir = \"/x/scratch\"\n")
+
+		a, err := Load(d, onlyTmp)
+		require.NoError(t, err)
+		b, err := Load(d, onlyScratch)
+		require.NoError(t, err)
+
+		assert.Equal(t, "/x/tmp", a.TmpDir)
+		assert.Equal(t, "/tmp", a.ScratchDir, "it is still the temporary directory of the system")
+		assert.Equal(t, Defaults(d).TmpDir, b.TmpDir)
+		assert.Equal(t, "/x/scratch", b.ScratchDir)
 	})
 
 	t.Run("a key that is a dotted key is the key of a table, as it is in toml", func(t *testing.T) {
@@ -519,6 +544,20 @@ func TestSet(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "/x/archives", c.ArchivesDir)
 		assert.Equal(t, "the-key", c.NexusAPIKey)
+	})
+
+	t.Run("the scratch directory can be set", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.TempDir(), "config.toml")
+
+		require.NoError(t, Set(path, "scratch_dir", "/var/tmp/modctl"))
+
+		c, err := Load(dirsIn(t.TempDir()), path)
+		require.NoError(t, err)
+		assert.Equal(t, "/var/tmp/modctl", c.ScratchDir)
+		assert.True(t, c.FromFile("scratch_dir"))
+		assert.False(t, c.FromFile("tmp_dir"))
 	})
 
 	t.Run("a key is set over what it was", func(t *testing.T) {

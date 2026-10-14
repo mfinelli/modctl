@@ -55,6 +55,12 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
   Nothing is read just for this so with `--no-recheck` nothing is recorded.
 - Fix a crash when Nexus Mods answered that the rate limit was exceeded and the
   file that keeps the rate limits could not be read.
+- Add the `scratch_dir` setting: where `export` makes the snapshots of the
+  databases, and where `import`, `verify` and `extract` unpack the bundle. It is
+  the temporary directory of the system (`$TMPDIR`, usually `/tmp`), which is
+  what those commands use, unless set, so that a bundle does not have to go in a
+  tmpfs that has no room for it. Note that this is separate from the `tmp_dir`
+  setting.
 
 ## v0.8.0 - 2026-10-10
 

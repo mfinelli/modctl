@@ -63,7 +63,12 @@ Exits non-zero if any integrity issues are found. Version warnings
 		style.Println(style.Bold.Render("Verifying bundle: " + bundlePath))
 		style.Println()
 
-		bundle, err := restore.OpenAndValidate(ctx, bundlePath, scratchDir(), Schema)
+		scratch, err := scratchDir()
+		if err != nil {
+			return err
+		}
+
+		bundle, err := restore.OpenAndValidate(ctx, bundlePath, scratch, Schema)
 		if err != nil {
 			return fmt.Errorf("bundle validation failed: %w", err)
 		}
