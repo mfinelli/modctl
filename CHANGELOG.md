@@ -7,6 +7,8 @@ based on the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
 
 ## v0.9.0 - 2026-10-15
 
+This is another pre-release that does a fairly large amount of internal refactoring.
+
 ### Changes
 
 - Steam library instance ids are now stable. A library keeps the instance id
