@@ -43,7 +43,6 @@ func TestRelpath(t *testing.T) {
 	}
 
 	for _, tc := range valid {
-		tc := tc
 		t.Run("valid/"+tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -71,7 +70,6 @@ func TestRelpath(t *testing.T) {
 	}
 
 	for _, tc := range invalid {
-		tc := tc
 		t.Run("invalid/"+tc.name, func(t *testing.T) {
 			t.Parallel()
 

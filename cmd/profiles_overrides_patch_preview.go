@@ -215,7 +215,7 @@ Note: requires archive extraction which may be slow for large archives.`,
 		}
 
 		// colorize diff output line by line
-		for _, line := range strings.Split(diff, "\n") {
+		for line := range strings.SplitSeq(diff, "\n") {
 			switch {
 			case strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---"):
 				style.Println(style.Bold.Render(line))

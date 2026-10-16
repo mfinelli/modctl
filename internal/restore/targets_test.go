@@ -56,7 +56,6 @@ func TestUnverifiedTarget(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -161,7 +160,6 @@ func TestFullImportsTargetsDisabledUnlessItIsTheSameMachine(t *testing.T) {
 		{"another machine", false},
 		{"the same machine", true},
 	} {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 

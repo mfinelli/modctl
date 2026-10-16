@@ -204,8 +204,7 @@ func replaceFileWith(ctx context.Context, rename func(oldpath, newpath string) e
 }
 
 func isExdev(err error) bool {
-	var linkErr *os.LinkError
-	if errors.As(err, &linkErr) {
+	if linkErr, ok := errors.AsType[*os.LinkError](err); ok {
 		return errors.Is(linkErr.Err, syscall.EXDEV)
 	}
 	return false

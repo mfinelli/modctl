@@ -148,8 +148,7 @@ Use --dry-run to preview the plan without making any changes. Add the
 		for _, target := range targets {
 			plan, err := planner.BuildApplyPlan(ctx, q, gi.ID, p.ID, target, applySkipRecheck)
 			if err != nil {
-				var uninvErr *planner.UninventoriedArchiveError
-				if errors.As(err, &uninvErr) {
+				if uninvErr, ok := errors.AsType[*planner.UninventoriedArchiveError](err); ok {
 					return fmt.Errorf("%w\nrun 'modctl mods scan-inventory' to fix", uninvErr)
 				}
 				return fmt.Errorf("build plan for target %q: %w", target.Name, err)

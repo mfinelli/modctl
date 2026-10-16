@@ -18,6 +18,8 @@
 
 package internal
 
+import "slices"
+
 // IsBinaryContent reports whether data appears to be binary by scanning for
 // null bytes in the first 8KB, matching the heuristic used by Git and other
 // tools.
@@ -26,10 +28,5 @@ func IsBinaryContent(data []byte) bool {
 	if len(check) > 8192 {
 		check = check[:8192]
 	}
-	for _, b := range check {
-		if b == 0 {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(check, 0)
 }

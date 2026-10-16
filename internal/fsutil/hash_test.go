@@ -93,7 +93,6 @@ func TestHashFile(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -166,7 +165,7 @@ func TestHashFile(t *testing.T) {
 			mu sync.Mutex
 		)
 		for i := range paths {
-			for r := 0; r < rounds; r++ {
+			for range rounds {
 				wg.Add(1)
 				go func(i int) {
 					defer wg.Done()
@@ -182,7 +181,7 @@ func TestHashFile(t *testing.T) {
 
 		for i := range paths {
 			require.Len(t, got[i], rounds)
-			for r := 0; r < rounds; r++ {
+			for r := range rounds {
 				require.NoError(t, errs[i][r])
 				assert.Equal(t, want[i], got[i][r], "file %d", i)
 			}
@@ -196,7 +195,6 @@ func TestHashFileSize(t *testing.T) {
 	ctx := context.Background()
 
 	for _, n := range []int{0, 1, 5, 4095, 4096, 4097, 1<<20 + 13, 3 << 20} {
-		n := n
 		t.Run("a file of "+strconv.Itoa(n)+" bytes", func(t *testing.T) {
 			t.Parallel()
 

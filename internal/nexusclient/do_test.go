@@ -81,7 +81,6 @@ func TestDoRequest(t *testing.T) {
 		t.Parallel()
 
 		for _, status := range []int{http.StatusOK, http.StatusNotFound, http.StatusInternalServerError} {
-			status := status
 			t.Run(http.StatusText(status), func(t *testing.T) {
 				t.Parallel()
 
@@ -244,9 +243,7 @@ func TestUpdateRateLimitState(t *testing.T) {
 			"X-RL-Hourly-Limit", "X-RL-Hourly-Remaining", "X-RL-Hourly-Reset",
 			"X-RL-Daily-Limit", "X-RL-Daily-Remaining", "X-RL-Daily-Reset",
 		} {
-			header := header
 			for name, value := range map[string]string{"missing": "", "invalid": "soon"} {
-				value := value
 				t.Run(header+" "+name, func(t *testing.T) {
 					t.Parallel()
 

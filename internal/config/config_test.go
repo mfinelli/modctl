@@ -465,7 +465,6 @@ apikey = "the-key"
 			"a bool":   {"database = true\n", "true"},
 			"a date":   {"database = 2026-10-13\n", "2026-10-13"},
 		} {
-			tc := tc
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 
@@ -813,7 +812,6 @@ func TestMask(t *testing.T) {
 		{"a key that is longer has its last four", "abcdefgh", "****efgh"},
 		{"as many stars as what is not shown", "0123456789", "******6789"},
 	} {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 

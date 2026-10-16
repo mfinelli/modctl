@@ -241,7 +241,6 @@ func TestExportNeedsAScratchDirectory(t *testing.T) {
 			return err
 		}},
 	} {
-		tc := tc
 		t.Run(tc.name+" without one is an error, and nothing is made", func(t *testing.T) {
 			t.Parallel()
 
@@ -458,7 +457,6 @@ func TestOpenAndValidate(t *testing.T) {
 			"hash bundle nexus cache",
 		},
 	} {
-		tc := tc
 		t.Run(tc.name+" is an error, and nothing is left", func(t *testing.T) {
 			t.Parallel()
 

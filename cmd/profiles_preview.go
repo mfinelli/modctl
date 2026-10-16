@@ -100,8 +100,7 @@ Binary files are detected automatically and refused unless --force is passed.`,
 		// Build apply plan to find the winner for this path
 		plan, err := planner.BuildApplyPlan(ctx, q, gi.ID, p.ID, target, false)
 		if err != nil {
-			var uninvErr *planner.UninventoriedArchiveError
-			if errors.As(err, &uninvErr) {
+			if uninvErr, ok := errors.AsType[*planner.UninventoriedArchiveError](err); ok {
 				return fmt.Errorf("%w\nrun 'modctl mods scan-inventory' to fix", uninvErr)
 			}
 			return fmt.Errorf("build apply plan: %w", err)
@@ -201,7 +200,7 @@ Binary files are detected automatically and refused unless --force is passed.`,
 			return nil
 		}
 
-		for _, line := range strings.Split(diff, "\n") {
+		for line := range strings.SplitSeq(diff, "\n") {
 			switch {
 			case strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---"):
 				style.Println(style.Bold.Render(line))

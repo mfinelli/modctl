@@ -348,7 +348,6 @@ func TestEnabledProfileVersion(t *testing.T) {
 
 		// whichever place it has among the versions that are in the profile
 		for name, enabledFirst := range map[string]bool{"it comes first": true, "it comes last": false} {
-			enabledFirst := enabledFirst
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 				f, profile, v1, v2, _ := setup(t)

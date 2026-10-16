@@ -31,17 +31,17 @@ func applyJSON(entries []Entry, input []byte) (Result, error) {
 	var res Result
 
 	// Parse into a generic map to preserve unknown keys
-	var doc map[string]interface{}
+	var doc map[string]any
 	if len(bytes.TrimSpace(input)) == 0 {
-		doc = make(map[string]interface{})
+		doc = make(map[string]any)
 	} else if err := json.Unmarshal(input, &doc); err != nil {
 		return res, fmt.Errorf("parse json: %w", err)
 	}
 	if doc == nil {
-		doc = make(map[string]interface{})
+		doc = make(map[string]any)
 	}
 	if doc == nil {
-		doc = make(map[string]interface{})
+		doc = make(map[string]any)
 	}
 
 	for _, e := range entries {
@@ -49,7 +49,7 @@ func applyJSON(entries []Entry, input []byte) (Result, error) {
 		case "json_set":
 			// Parse value as JSON first to preserve types (numbers, booleans, etc.)
 			// Fall back to string if not valid JSON
-			var parsed interface{}
+			var parsed any
 			if err := json.Unmarshal([]byte(e.EntryValue), &parsed); err != nil {
 				// treat as plain string
 				doc[e.EntryKey] = e.EntryValue

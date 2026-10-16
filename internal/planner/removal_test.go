@@ -141,7 +141,6 @@ func TestRemovalPlans(t *testing.T) {
 	}
 
 	for name, build := range builders {
-		name, build := name, build
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -271,7 +270,7 @@ func TestRemovalPlans(t *testing.T) {
 
 				// a map goes through its keys in a different order each time,
 				// so one run proves nothing
-				for i := 0; i < 20; i++ {
+				for i := range 20 {
 					plan, err := build(f)
 					require.NoError(t, err)
 

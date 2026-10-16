@@ -140,7 +140,7 @@ func snapshotDiff(want, got string) string {
 	count := func(s string) map[string]int {
 		m := map[string]int{}
 		if s != "" {
-			for _, l := range strings.Split(s, "\n") {
+			for l := range strings.SplitSeq(s, "\n") {
 				m[l]++
 			}
 		}
@@ -185,7 +185,7 @@ func TestMigrationsRoundTrip(t *testing.T) {
 		want[v] = schemaSnapshot(t, db)
 	}
 
-	for v := int64(0); v < latest; v++ {
+	for v := range latest {
 		t.Run(fmt.Sprintf("down to %d and back", v), func(t *testing.T) {
 			t.Parallel()
 
@@ -282,7 +282,7 @@ func TestMigrationsDownWithData(t *testing.T) {
 	_, latest, err := probe.GetVersions(ctx)
 	require.NoError(t, err)
 
-	for v := int64(0); v < latest; v++ {
+	for v := range latest {
 		t.Run(fmt.Sprintf("down to %d and back", v), func(t *testing.T) {
 			t.Parallel()
 

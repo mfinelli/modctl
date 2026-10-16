@@ -44,7 +44,6 @@ func TestBuildApplyPlanRejectsUnsafeOverridePaths(t *testing.T) {
 	t.Parallel()
 
 	for _, tc := range unsafePaths {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -134,9 +133,7 @@ func TestPlansLeaveUnsafeInstalledPathsAlone(t *testing.T) {
 	}
 
 	for _, b := range builders {
-		b := b
 		for _, tc := range unsafePaths {
-			tc := tc
 			t.Run(b.name+"/"+tc.name, func(t *testing.T) {
 				t.Parallel()
 

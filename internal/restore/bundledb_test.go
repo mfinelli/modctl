@@ -97,7 +97,6 @@ func TestOpenBundleDB(t *testing.T) {
 		t.Parallel()
 
 		for _, behind := range []int64{1, 2, 5} {
-			behind := behind
 			t.Run("behind "+string(rune('0'+behind)), func(t *testing.T) {
 				t.Parallel()
 

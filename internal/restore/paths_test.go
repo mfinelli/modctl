@@ -172,7 +172,7 @@ func TestCheckRelpaths(t *testing.T) {
 		t.Parallel()
 
 		var paths []string
-		for i := 0; i < 8; i++ {
+		for i := range 8 {
 			paths = append(paths, fmt.Sprintf("../escape%d.cfg", i))
 		}
 
@@ -395,7 +395,6 @@ func TestFullRefusesAnUnsafeBundle(t *testing.T) {
 		{"a backup that is kept", func(g *bundleGame) { g.backup("../escape.cfg") }, Options{Schema: testbuilder.Schema(), Force: true, SameMachine: true}},
 		{"a file that is installed and kept", func(g *bundleGame) { g.installed("../escape.cfg") }, Options{Schema: testbuilder.Schema(), Force: true, SameMachine: true}},
 	} {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -441,7 +440,6 @@ func TestCheckPaths(t *testing.T) {
 			"a backup":          func(g *bundleGame) { g.backup("../escape.cfg") },
 			"an installed file": func(g *bundleGame) { g.installed("../escape.cfg") },
 		} {
-			fill := fill
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 				db := testbuilder.SetupDB(t)

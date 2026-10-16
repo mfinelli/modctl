@@ -100,7 +100,6 @@ func TestExpandHome(t *testing.T) {
 		{"a home that is not known leaves it as it is", "~/Games", "", "~/Games"},
 		{"and so does a tilde alone", "~", "", "~"},
 	} {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -200,7 +199,6 @@ func TestScanStores(t *testing.T) {
 			"the old one":        filepath.Join(".steam", "steam"),
 			"the one of Flatpak": filepath.Join(".var", "app", "com.valvesoftware.Steam", "data", "Steam"),
 		} {
-			name, rel := name, rel
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 

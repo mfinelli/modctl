@@ -169,7 +169,7 @@ is passed.`,
 			return nil
 		}
 
-		for _, line := range strings.Split(diff, "\n") {
+		for line := range strings.SplitSeq(diff, "\n") {
 			switch {
 			case strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---"):
 				style.Println(style.Bold.Render(line))

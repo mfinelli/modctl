@@ -90,7 +90,6 @@ func TestLatestMigrationVersion(t *testing.T) {
 	}
 
 	for _, tc := range successes {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -138,7 +137,6 @@ func TestLatestMigrationVersion(t *testing.T) {
 	}
 
 	for _, tc := range failures {
-		tc := tc
 		t.Run("error: "+tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -207,7 +205,6 @@ func TestSchemaLatestVersion(t *testing.T) {
 			"without a file system": NewSchema(nil),
 			"that is not there":     nil,
 		} {
-			schema := schema
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 
