@@ -10,6 +10,6 @@
   },
   "devDependencies": {
     "realfavicon": "^0.9.3",
-    "wrangler": "^4.141.0"
+    "wrangler": "^4.152.0"
   }
 }
